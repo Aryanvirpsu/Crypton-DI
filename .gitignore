@@ -1,0 +1,25 @@
+@"
+# Rust
+/target
+**/*.rs.bk
+
+# Env
+.env
+**/.env
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Docker
+*.pid
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+"@ | Out-File -Encoding utf8 .gitignore
