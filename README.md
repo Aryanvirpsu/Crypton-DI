@@ -202,11 +202,3 @@ Just **devices, keys, and cryptographic proof**.
 
 ---
 
-If you want, I can:
-
-* shorten this to a **one-screen README**
-* add a **diagram image**
-* tailor it for **professors / investors**
-* or make a **CONTRIBUTING.md** next
-
-Just say the word.
