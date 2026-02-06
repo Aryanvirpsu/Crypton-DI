@@ -1,11 +1,13 @@
 use axum::Router;
+use crate::state::AppState;
 
-pub mod health;
-pub mod secure;
+mod health;
+mod secure; // if you have it
+mod auth_webauthn; // if you have it
 
-pub fn router() -> Router {
-    Router::new()
+pub fn router() -> Router<AppState> {
+    Router::<AppState>::new()
         .merge(health::router())
         .merge(secure::router())
+        .merge(auth_webauthn::router())
 }
-    

@@ -1,17 +1,27 @@
-use sqlx::PgPool;
-
 use crate::config::Config;
+use sqlx::PgPool;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: PgPool,
-    pub redis: redis::Client,
+    pub db: Option<PgPool>,
+    pub redis: Option<::redis::Client>,
 }
 
 impl AppState {
-    pub async fn new(cfg: &Config) -> Result<Self, Box<dyn std::error::Error>> {
-        let db = PgPool::connect(&cfg.database_url).await?;
-        let redis = redis::Client::open(cfg.redis_url.clone())?;
+    pub async fn new(cfg: &Config) -> anyhow::Result<Self> {
+        let db = if let Some(url) = cfg.database_url.as_deref() {
+            Some(PgPool::connect(url).await?)
+        } else {
+            tracing::warn!("DATABASE_URL not set; running without Postgres (Week 1)");
+            None
+        };
+
+        let redis = if let Some(url) = cfg.redis_url.as_deref() {
+            Some(::redis::Client::open(url)?)
+        } else {
+            tracing::warn!("REDIS_URL not set; running without Redis (Week 1)");
+            None
+        };
 
         Ok(Self { db, redis })
     }
