@@ -1,6 +1,5 @@
-@"
 # Rust
-/target
+**/target/
 **/*.rs.bk
 
 # Env
@@ -22,4 +21,3 @@ dist/
 
 # Logs
 *.log
-"@ | Out-File -Encoding utf8 .gitignore
