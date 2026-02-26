@@ -6,21 +6,54 @@ use axum::{
 use serde::Serialize;
 
 #[derive(Debug)]
-pub struct AppError(pub &'static str);
+pub struct AppError {
+    status: StatusCode,
+    message: String,
+}
 
 #[derive(Serialize)]
 struct ErrorBody {
     error: String,
 }
 
+impl AppError {
+    pub fn bad_request(msg: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: msg.into(),
+        }
+    }
+
+    pub fn internal(msg: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: msg.into(),
+        }
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         (
-            StatusCode::BAD_REQUEST,
+            self.status,
             Json(ErrorBody {
-                error: self.0.to_string(),
+                error: self.message,
             }),
         )
             .into_response()
+    }
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(e: anyhow::Error) -> Self {
+        tracing::error!(error = %e, "internal error");
+        Self::internal(e.to_string())
+    }
+}
+
+impl From<redis::RedisError> for AppError {
+    fn from(e: redis::RedisError) -> Self {
+        tracing::error!(error = %e, "redis error");
+        Self::internal(e.to_string())
     }
 }
