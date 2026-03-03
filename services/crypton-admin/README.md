@@ -1,204 +1,70 @@
-Here’s a **nice, clean, professional README** you can drop straight into your repo.
-It’s concise, readable, and sounds serious without being buzzword-y.
+# Getting Started with Create React App
 
----
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-# Crypton
+## Available Scripts
 
-**Crypton** is a zero-trust, device-based cryptographic identity system.
+In the project directory, you can run:
 
-Instead of passwords or OTPs, identity is defined as a **set of trusted devices**.
-Each device proves control by signing fresh challenges with hardware-protected keys.
-Servers store only public keys and enforce policy — nothing reusable, nothing secret.
+### `npm start`
 
----
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-## Why Crypton
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-Passwords are fragile:
+### `npm test`
 
-* they’re reused
-* they’re phished
-* they’re leaked
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-Crypton replaces them with **cryptographic proof**.
+### `npm run build`
 
-* No passwords
-* No shared secrets
-* No SMS or email recovery
-* No biometric data stored server-side
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
----
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-## Core Idea
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-> **Identity is a set of trusted devices.**
+### `npm run eject`
 
-* Each device holds a private key (hardware-backed when available)
-* The server stores only public keys
-* Every action requires a fresh challenge
-* Trust is per-device, not per-account
-* Devices can be revoked at any time
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
----
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-## Architecture Overview
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-```
-User
-  └── Device (hardware-backed key)
-        └── Signs challenge
-              └── Crypton Identity Service
-                    ├── Verify signature
-                    ├── Enforce policy
-                    └── Issue access
-```
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
----
+## Learn More
 
-## Zero-Trust Principles
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-* No passwords or shared secrets stored
-* Every request uses a fresh challenge
-* Replay protection via nonces
-* Devices are revocable
-* Step-up verification for sensitive actions
-* Deny-by-default access policies
-* Full audit logging
+To learn React, check out the [React documentation](https://reactjs.org/).
 
----
+### Code Splitting
 
-## Phases
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-### Phase A — Passkeys (WebAuthn)
+### Analyzing the Bundle Size
 
-* Passwordless registration and login
-* Device registry
-* Device revoke
-* Protected API demo
-* Passkeys act as recovery anchor
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-### Phase B — Native Device Keys
+### Making a Progressive Web App
 
-* Hardware-backed Ed25519 device keys
-* Device approval via existing trusted device
-* Key rotation and revocation
-* Passkeys retained only for recovery
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
----
+### Advanced Configuration
 
-## Recovery Model
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-Crypton uses **zero-trust recovery**.
+### Deployment
 
-* Recovery requires a valid passkey proof
-* A time-locked recovery event is created (e.g. 24 hours)
-* Any existing trusted device can cancel during the window
-* After the lock expires:
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-  * new device is enrolled
-  * old devices are revoked
+### `npm run build` fails to minify
 
-No SMS. No email. No humans in the loop.
-
----
-
-## Tech Stack
-
-* **Backend:** Rust + Axum
-* **Database:** PostgreSQL
-* **Cache / Nonces / Rate limits:** Redis
-* **Admin & Demo UI:** Next.js
-* **Local Dev:** Docker Compose
-
----
-
-## Repository Structure
-
-```
-crypton/
-├─ services/
-│  ├─ crypton-identity/    # Identity service (Axum)
-│  ├─ crypton-gateway/     # Policy & enforcement (future)
-│  └─ crypton-admin/       # Admin & demo UI (future)
-├─ libs/
-│  └─ contracts/           # Shared API contracts
-├─ infra/
-│  └─ docker-compose.yml
-└─ docs/
-   ├─ SPEC.md
-   ├─ API_CONTRACTS.md
-   └─ GIT_WORKFLOW.md
-```
-
----
-
-## Local Development
-
-### Requirements
-
-* Rust (stable)
-* Docker + Docker Compose
-
-### Start dependencies
-
-```bash
-docker compose -f infra/docker-compose.yml up -d
-```
-
-### Run identity service
-
-```bash
-cd services/crypton-identity
-cargo run
-```
-
-### Health check
-
-```bash
-curl http://localhost:8080/health
-```
-
-Expected response:
-
-```
-ok
-```
-
----
-
-## What This Project Is (and Isn’t)
-
-**Included**
-
-* Device-based identity
-* Passkeys (WebAuthn)
-* Cryptographic proof verification
-* Zero-trust recovery
-* Audit logging
-
-**Not included (yet)**
-
-* Messaging protocols
-* Payments or wallets
-* KYC / compliance
-* Blockchain / DID networks
-* Zero-knowledge proofs
-
----
-
-## Status
-
-🚧 **Active development**
-Phase A (Passkeys) in progress.
-
----
-
-## Vision
-
-Crypton treats identity as infrastructure — not an account, not a password, not a profile.
-
-Just **devices, keys, and cryptographic proof**.
-
----
-
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
