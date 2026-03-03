@@ -18,17 +18,19 @@ struct ErrorBody {
 
 impl AppError {
     pub fn bad_request(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::BAD_REQUEST,
-            message: msg.into(),
-        }
+        Self { status: StatusCode::BAD_REQUEST, message: msg.into() }
+    }
+
+    pub fn unauthorized(msg: impl Into<String>) -> Self {
+        Self { status: StatusCode::UNAUTHORIZED, message: msg.into() }
+    }
+
+    pub fn not_found(msg: impl Into<String>) -> Self {
+        Self { status: StatusCode::NOT_FOUND, message: msg.into() }
     }
 
     pub fn internal(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: msg.into(),
-        }
+        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: msg.into() }
     }
 }
 
