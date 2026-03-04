@@ -95,12 +95,6 @@ const MOCK_AUDIT_LOGS = [
 /* GET /risk/users
    Returns: Array<{ id, user, score, level, device, ip, loc, time, reasons }>
    level: "HIGH" | "MEDIUM" | "LOW" */
-const MOCK_MOCK_RISK_USERS = [
-  { id: "usr_001", user: "aryan@crypton.io", score: 82, level: "HIGH", device: "Unknown Device", ip: "185.220.101.4", loc: "Tokyo, JP", time: "02:14 AM", reasons: ["New device detected", "Foreign IP address", "Unusual login time", "Geo-velocity anomaly"] },
-  { id: "usr_002", user: "sarah@crypton.io", score: 34, level: "LOW", device: "iPhone 14", ip: "74.125.24.100", loc: "Austin, TX", time: "09:32 AM", reasons: ["Known device", "Familiar location"] },
-  { id: "usr_003", user: "admin@crypton.io", score: 61, level: "MEDIUM", device: "MacBook Pro", ip: "10.0.0.5", loc: "New York, NY", time: "11:58 PM", reasons: ["Unusual login time", "Multiple failed attempts"] },
-];
-
 /* GET /risk/feed
    Returns: Array<{ id, ico, type, msg, time }>
    type: "danger" | "warning" | "info" | "success" */
@@ -285,17 +279,91 @@ const FontLink = () => (
     .stat-c::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.16,1,.3,1)}
     .stat-c:hover::before{transform:scaleX(1)}
 
+    /* ── MOBILE NAV HAMBURGER ── */
+    .mob-menu-btn{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:8px;z-index:1100}
+    .mob-menu-btn span{display:block;width:22px;height:1.5px;background:var(--paper);transition:all .3s}
+    .mob-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+    .mob-menu-btn.open span:nth-child(2){opacity:0}
+    .mob-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+    .mob-drawer{position:fixed;inset:0;top:0;background:rgba(10,10,10,0.97);backdrop-filter:blur(20px);z-index:1050;display:flex;flex-direction:column;padding:100px 32px 40px;transform:translateX(100%);transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .mob-drawer.open{transform:translateX(0)}
+    .mob-drawer a,.mob-drawer button.mob-link{font-family:var(--display);font-size:clamp(36px,10vw,52px);letter-spacing:.06em;text-transform:uppercase;color:var(--paper);text-decoration:none;background:none;border:none;cursor:pointer;display:block;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;transition:color .2s}
+    .mob-drawer a:last-child,.mob-drawer button.mob-link:last-child{border-bottom:none}
+    .mob-drawer-ctas{display:flex;flex-direction:column;gap:12px;margin-top:32px}
+
+    /* ── BOTTOM TAB BAR (mobile app shell) ── */
+    .bottom-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:800;background:var(--ink-2);border-top:1px solid var(--line);padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+    .bottom-tabs-inner{display:flex;justify-content:space-around;align-items:center}
+    .tab-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:4px 8px;min-width:52px;color:var(--muted);transition:color .15s}
+    .tab-btn.active{color:var(--accent)}
+    .tab-btn span:first-child{font-size:18px;line-height:1}
+    .tab-btn span:last-child{font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase}
+
     @media(max-width:1023px){
-      nav{padding:20px 24px}
       .nav-links-wrap{display:none}
+      .landing-nav{padding:20px 24px!important}
+      .landing-nav.scrolled{padding:14px 24px!important}
       .hero-pad,.section-pad{padding-left:24px!important;padding-right:24px!important}
       .sidebar{width:56px}
       .sb-mark,.si-label,.sb-label-txt,.user-name,.user-role{display:none}
       .si{justify-content:center}
       .si-badge{display:none}
     }
-    @media(max-width:700px){
-      .hero-line{font-size:clamp(60px,16vw,100px)!important}
+    @media(max-width:767px){
+      .mob-menu-btn{display:flex}
+      .landing-nav .nav-desktop-btns{display:none}
+      /* hide desktop sidebar entirely on mobile */
+      .sidebar{display:none!important}
+      /* show bottom tabs */
+      .bottom-tabs{display:block}
+      /* push main content above bottom tabs */
+      .app-main{padding-bottom:72px!important}
+      /* hero */
+      .hero-line{font-size:clamp(58px,17vw,110px)!important}
+      /* landing sections stack */
+      .manifesto-grid{grid-template-columns:1fr!important;gap:40px!important}
+      .protocol-grid{grid-template-columns:1fr!important}
+      .features-grid{grid-template-columns:1fr!important}
+      .features-sticky{display:none!important}
+      .features-list{padding-right:0!important;border-right:none!important}
+      .stats-grid{grid-template-columns:1fr 1fr!important}
+      .dev-grid{grid-template-columns:1fr!important}
+      .dev-left{padding:40px 0 0!important;border-right:none!important}
+      .dev-right{padding:0 0 40px!important}
+      .footer-grid{grid-template-columns:1fr 1fr!important;gap:32px!important}
+      .footer-brand{grid-column:1/-1}
+      /* protocol cards stack */
+      .hiw-grid{grid-template-columns:1fr!important}
+      /* dashboard */
+      .stat-grid{grid-template-columns:1fr!important}
+      .orb-grid{grid-template-columns:1fr!important}
+      .orb-vis{display:none!important}
+      .page-header{padding:20px 20px 16px!important}
+      .page-body{padding:20px 20px 80px!important}
+      /* audit log table → cards */
+      .audit-table{display:none!important}
+      .audit-cards{display:flex!important}
+      /* sessions table → cards */
+      .sessions-table{display:none!important}
+      .sessions-cards{display:flex!important}
+      /* risk grid */
+      .risk-grid{grid-template-columns:1fr!important}
+      /* rbac */
+      .rbac-grid{grid-template-columns:1fr!important}
+      /* register */
+      .register-grid{grid-template-columns:1fr!important}
+      .register-vis{display:none!important}
+      .register-form{padding:48px 24px!important}
+      /* breadcrumb padding */
+      .breadcrumb-wrap{padding:10px 20px 0!important}
+    }
+    @media(max-width:400px){
+      .hero-line{font-size:clamp(48px,15vw,80px)!important}
+      .stats-grid{grid-template-columns:1fr!important}
+    }
+    @media(hover:none){
+      .feat-item:hover{padding-left:0}
+      .stat-c:hover::before{transform:scaleX(0)}
     }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   `}</style>
@@ -429,17 +497,41 @@ function Sidebar({ active, go }) {
   );
 }
 
+/* ─── BOTTOM TAB BAR (mobile only) ─── */
+function BottomTabBar({ active, go }) {
+  const tabs = [
+    { id: "dashboard", ico: "◈", label: "Home" },
+    { id: "devices",   ico: "📱", label: "Devices" },
+    { id: "auditlogs", ico: "📋", label: "Logs" },
+    { id: "risk",      ico: "🛡", label: "Risk" },
+    { id: "admin",     ico: "⚙", label: "Admin" },
+  ];
+  return (
+    <div className="bottom-tabs">
+      <div className="bottom-tabs-inner">
+        {tabs.map(t => (
+          <button key={t.id} className={`tab-btn${active === t.id ? " active" : ""}`} onClick={() => go(t.id)}>
+            <span>{t.ico}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─── APP SHELL (pages with sidebar) ─── */
 function AppShell({ active, go, children }) {
   return (
     <div style={{ display: "flex", flexDirection: "row", minHeight: "100vh", overflow: "hidden" }}>
       <Sidebar active={active} go={go} />
-      <main style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ padding: "14px 44px 0", borderBottom: "none" }}>
+      <main className="app-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div className="breadcrumb-wrap" style={{ padding: "14px 44px 0", borderBottom: "none" }}>
           <Breadcrumb page={active} go={go} />
         </div>
         {children}
       </main>
+      <BottomTabBar active={active} go={go} />
     </div>
   );
 }
@@ -485,48 +577,357 @@ const BtnO = ({ children, onClick, style = {} }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   LANDING PAGE
+   LANDING PAGE — SPHERE ENGINE + INTRO
 ═══════════════════════════════════════════════════════════════ */
-function HeroCanvas() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const ctx = c.getContext("2d");
-    const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
-    resize(); window.addEventListener("resize", resize);
-    const nodes = Array.from({ length: 55 }, () => ({
-      x: Math.random(), y: Math.random(),
-      vx: (Math.random() - .5) * .00025, vy: (Math.random() - .5) * .00025
+
+/* shared ease helpers */
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+const clampT = (v,a,b) => Math.max(a, Math.min(b, v));
+
+function useSphereIntro() {
+  /* Returns { canvasRef, introVisible, introPhase }
+     Manages the full intro sequence imperatively via canvas + DOM refs */
+  const canvasRef = useRef(null);
+  const stateRef = useRef({
+    W: 0, H: 0,
+    rotation: 0, rotSpeed: 0.004,
+    sphereAlpha: 0,
+    transitionT: 0,      // 0=center 1=settled
+    phase: "idle",       // idle → fadein → wordmark → transition → done
+    frame: 0,
+    arcs: [], arcTimer: 0,
+    mouse: { x: 0, y: 0 },
+  });
+  const introRef = useRef(null);   // the intro overlay div
+  const heroRef  = useRef(null);   // hero content div
+  const navRef   = useRef(null);
+
+  const isMobile = () => window.innerWidth <= 767;
+
+  /* build static dot/ring/particle arrays once */
+  const globeRef = useRef(null);
+  if (!globeRef.current) {
+    const dots = [];
+    const latStep = isMobile() ? 14 : 10;
+    const lonStep = isMobile() ? 14 : 10;
+    for (let lat = -80; lat <= 80; lat += latStep)
+      for (let lon = 0; lon < 360; lon += lonStep)
+        dots.push({
+          phi: (lat*Math.PI)/180, theta: (lon*Math.PI)/180,
+          size: Math.random()*1.2+0.4, brightness: Math.random()*.5+.5,
+          pulse: Math.random()*Math.PI*2, pulseSpeed: .02+Math.random()*.03
+        });
+    const rings = [
+      { tilt:.3,  speed:.007,  angle:0,   r:1.18, opacity:.35, dash:[8,6]  },
+      { tilt:-.5, speed:-.005, angle:1.2, r:1.28, opacity:.25, dash:[4,10] },
+      { tilt:.9,  speed:.009,  angle:2.4, r:1.12, opacity:.2,  dash:[12,8] },
+    ];
+    const pCount = isMobile() ? 30 : 60;
+    const particles = Array.from({ length: pCount }, () => ({
+      ring: Math.floor(Math.random()*3),
+      angle: Math.random()*Math.PI*2,
+      speed: (Math.random()*.008+.004) * (Math.random()>.5?1:-1),
+      size: Math.random()*2+1, brightness: Math.random(),
+      color: Math.random()>.5 ? "#C8F55A" : "#4ADE80",
     }));
-    let raf;
-    const draw = () => {
-      ctx.clearRect(0, 0, c.width, c.height);
-      nodes.forEach(n => {
-        n.x += n.vx; n.y += n.vy;
-        if (n.x < 0 || n.x > 1) n.vx *= -1;
-        if (n.y < 0 || n.y > 1) n.vy *= -1;
-      });
-      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-        const dx = (nodes[i].x - nodes[j].x) * c.width, dy = (nodes[i].y - nodes[j].y) * c.height;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 110) {
-          ctx.beginPath(); ctx.moveTo(nodes[i].x * c.width, nodes[i].y * c.height);
-          ctx.lineTo(nodes[j].x * c.width, nodes[j].y * c.height);
-          ctx.strokeStyle = `rgba(200,245,90,${.12 * (1 - d / 110)})`; ctx.lineWidth = .6; ctx.stroke();
-        }
-      }
-      nodes.forEach(n => { ctx.beginPath(); ctx.arc(n.x * c.width, n.y * c.height, 1.2, 0, Math.PI * 2); ctx.fillStyle = "rgba(200,245,90,.35)"; ctx.fill(); });
-      raf = requestAnimationFrame(draw);
+    globeRef.current = { dots, rings, particles };
+  }
+
+  const getSphereParams = (s) => {
+    const { W, H, transitionT } = s;
+    const mobile = W <= 767;
+    const introR   = Math.min(W,H) * (mobile ? .36 : .38);
+    const settledR = Math.min(W,H) * (mobile ? .38 : .32);
+    const iCx = W/2, iCy = H/2;
+    const sCx = mobile ? W/2 : W*.62;
+    const sCy = mobile ? H*.38 : H*.48;
+    const t = easeInOutCubic(transitionT);
+    return {
+      r:  introR  + (settledR - introR)  * t,
+      cx: iCx    + (sCx     - iCx)     * t,
+      cy: iCy    + (sCy     - iCy)     * t,
     };
-    draw();
-    return () => { window.removeEventListener("resize", resize); cancelAnimationFrame(raf); };
+  };
+
+  const project = (phi, theta, rot, cx, cy, r) => {
+    const x3 = Math.cos(phi)*Math.sin(theta+rot);
+    const y3 = Math.sin(phi);
+    const z3 = Math.cos(phi)*Math.cos(theta+rot);
+    const p = 2.8, sc = p/(p+z3*.4);
+    return { x: cx+x3*r*sc, y: cy-y3*r*sc, z: z3, sc };
+  };
+
+  const lerpSphere = (a, b, t, rot, cx, cy, r) => {
+    const ax=Math.cos(a.phi)*Math.sin(a.theta), ay=Math.sin(a.phi), az=Math.cos(a.phi)*Math.cos(a.theta);
+    const bx=Math.cos(b.phi)*Math.sin(b.theta), by=Math.sin(b.phi), bz=Math.cos(b.phi)*Math.cos(b.theta);
+    const dot=Math.min(1,ax*bx+ay*by+az*bz), omega=Math.acos(dot);
+    let rx,ry,rz;
+    if(omega<.001){rx=ax+t*(bx-ax);ry=ay+t*(by-ay);rz=az+t*(bz-az);}
+    else{const s=Math.sin(omega),sa=Math.sin((1-t)*omega)/s,sb=Math.sin(t*omega)/s;rx=sa*ax+sb*bx;ry=sa*ay+sb*by;rz=sa*az+sb*bz;}
+    const lift=1.06+Math.sin(t*Math.PI)*.12; rx*=lift;ry*=lift;rz*=lift;
+    const p=2.8,sc=p/(p+rz*.4);
+    return { x:cx+rx*r*sc, y:cy-ry*r*sc, z:rz, sc };
+  };
+
+  const spawnArc = (s) => {
+    const d = globeRef.current.dots;
+    const a=d[Math.floor(Math.random()*d.length)], b=d[Math.floor(Math.random()*d.length)];
+    s.arcs.push({ from:{phi:a.phi,theta:a.theta}, to:{phi:b.phi,theta:b.theta},
+      progress:0, speed:.008+Math.random()*.006, life:1, fadeSpeed:.012 });
+  };
+
+  /* draw one frame */
+  const drawFrame = (ctx, s) => {
+    const { W, H, rotation, sphereAlpha, arcs } = s;
+    const { dots, rings, particles } = globeRef.current;
+    const sp = getSphereParams(s);
+    const { r, cx, cy } = sp;
+
+    ctx.clearRect(0,0,W,H);
+
+    /* bg glow */
+    const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8);
+    bg.addColorStop(0,`rgba(16,28,16,${.5*sphereAlpha})`);
+    bg.addColorStop(1,"transparent");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    const sg = ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.1);
+    sg.addColorStop(0,`rgba(74,222,128,${.04*sphereAlpha})`);
+    sg.addColorStop(1,"transparent");
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,r*1.1,0,Math.PI*2); ctx.fill();
+
+    /* rings */
+    rings.forEach(ring => {
+      ring.angle += ring.speed;
+      const steps=120, pts=[];
+      for(let i=0;i<=steps;i++){
+        const a=(i/steps)*Math.PI*2+ring.angle;
+        const rx=Math.cos(a)*ring.r, ry=Math.sin(a)*Math.cos(ring.tilt)*ring.r, rz=Math.sin(a)*Math.sin(ring.tilt)*ring.r;
+        const rX=rx*Math.cos(rotation)+rz*Math.sin(rotation), rZ=-rx*Math.sin(rotation)+rz*Math.cos(rotation);
+        const p=2.8,sc=p/(p+rZ*.4);
+        pts.push({ x:cx+rX*r*sc, y:cy-ry*r*sc });
+      }
+      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.setLineDash(ring.dash);
+      ctx.strokeStyle=`rgba(200,245,90,${ring.opacity})`; ctx.lineWidth=.8;
+      ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
+      ctx.restore();
+      /* travelling dot on ring */
+      const da=Math.cos(ring.angle)*ring.r, db=Math.sin(ring.angle)*Math.cos(ring.tilt)*ring.r, dc=Math.sin(ring.angle)*Math.sin(ring.tilt)*ring.r;
+      const dX=da*Math.cos(rotation)+dc*Math.sin(rotation), dZ=-da*Math.sin(rotation)+dc*Math.cos(rotation);
+      const p2=2.8,dSc=p2/(p2+dZ*.4);
+      const px=cx+dX*r*dSc, py=cy-db*r*dSc;
+      const g2=ctx.createRadialGradient(px,py,0,px,py,6*dSc);
+      g2.addColorStop(0,"rgba(200,245,90,0.9)"); g2.addColorStop(1,"transparent");
+      ctx.save(); ctx.globalAlpha=sphereAlpha;
+      ctx.beginPath(); ctx.arc(px,py,5*dSc,0,Math.PI*2); ctx.fillStyle=g2; ctx.fill();
+      ctx.restore();
+    });
+
+    /* globe dots */
+    const visible=[];
+    dots.forEach(dot=>{
+      dot.pulse+=dot.pulseSpeed;
+      const p=project(dot.phi,dot.theta,rotation,cx,cy,r);
+      if(p.z>-0.1) visible.push({...p,dot});
+    });
+    visible.sort((a,b)=>a.z-b.z);
+    visible.forEach(({x,y,z,sc,dot})=>{
+      const df=(z+1)/2, pulse=.6+.4*Math.sin(dot.pulse), alpha=df*dot.brightness*pulse*sphereAlpha;
+      const size=dot.size*sc*(.5+df*.8);
+      const isAcc=dot.brightness>.8&&df>.7;
+      const color=isAcc?`rgba(200,245,90,${alpha})`:`rgba(74,222,128,${alpha*.7})`;
+      if(size>.3){
+        const g=ctx.createRadialGradient(x,y,0,x,y,size*2);
+        g.addColorStop(0,color); g.addColorStop(1,"transparent");
+        ctx.beginPath(); ctx.arc(x,y,size*2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+        ctx.beginPath(); ctx.arc(x,y,size,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+      }
+    });
+
+    /* arcs */
+    if(sphereAlpha>.4){
+      s.arcTimer++;
+      if(s.arcTimer>80){ spawnArc(s); s.arcTimer=0; }
+      for(let i=arcs.length-1;i>=0;i--){
+        const arc=arcs[i];
+        arc.progress=Math.min(1,arc.progress+arc.speed);
+        if(arc.progress>=1) arc.life-=arc.fadeSpeed;
+        if(arc.life<=0){ arcs.splice(i,1); continue; }
+        const steps=40,du=Math.floor(arc.progress*steps);
+        ctx.save(); ctx.globalAlpha=arc.life*.6*sphereAlpha;
+        let prev=null;
+        for(let k=0;k<=du;k++){
+          const t2=k/steps, pt=lerpSphere(arc.from,arc.to,t2,rotation,cx,cy,r);
+          if(pt.z<-.05){prev=null;continue;}
+          if(prev&&prev.z>-.05){
+            const sa=(1-Math.abs(t2-.5)*2)*.9;
+            ctx.strokeStyle=`rgba(200,245,90,${sa})`; ctx.lineWidth=1.2*pt.sc;
+            ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(pt.x,pt.y); ctx.stroke();
+          }
+          if(k===du){
+            const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,6);
+            g.addColorStop(0,"rgba(200,245,90,1)"); g.addColorStop(1,"transparent");
+            ctx.fillStyle=g; ctx.beginPath(); ctx.arc(pt.x,pt.y,5,0,Math.PI*2); ctx.fill();
+          }
+          prev=pt;
+        }
+        ctx.restore();
+      }
+    }
+
+    /* particles */
+    particles.forEach(p=>{
+      p.angle+=p.speed;
+      const ring=rings[p.ring];
+      const rx=Math.cos(p.angle)*ring.r, ry=Math.sin(p.angle)*Math.cos(ring.tilt)*ring.r, rz=Math.sin(p.angle)*Math.sin(ring.tilt)*ring.r;
+      const pX=rx*Math.cos(rotation)+rz*Math.sin(rotation), pZ=-rx*Math.sin(rotation)+rz*Math.cos(rotation);
+      const pp=2.8,pSc=pp/(pp+pZ*.4);
+      const ppx=cx+pX*r*pSc, ppy=cy-ry*r*pSc;
+      const df=(pZ+1)/2, alpha=(.4+p.brightness*.6)*df*sphereAlpha;
+      ctx.globalAlpha=alpha;
+      ctx.beginPath(); ctx.arc(ppx,ppy,p.size*pSc*.8,0,Math.PI*2);
+      ctx.fillStyle=p.color; ctx.fill();
+      ctx.globalAlpha=1;
+    });
+
+    /* rotate */
+    const mx=(s.mouse.x-W/2)/W;
+    const targetRS=.004+mx*.003;
+    s.rotSpeed+=(targetRS-s.rotSpeed)*.05;
+    s.rotation+=s.rotSpeed;
+    s.frame++;
+  };
+
+  /* animate one value with a promise */
+  const animVal = (setter, from, to, duration, ease=easeOutCubic) =>
+    new Promise(resolve=>{
+      const start=performance.now();
+      const tick=()=>{
+        const t=clampT((performance.now()-start)/duration,0,1);
+        setter(from+(to-from)*ease(t));
+        if(t<1) requestAnimationFrame(tick); else { setter(to); resolve(); }
+      };
+      requestAnimationFrame(tick);
+    });
+
+  /* DOM helper */
+  const anim = (el, kf, opts) => {
+    if(!el) return Promise.resolve();
+    return el.animate(kf,{fill:"forwards",...opts}).finished;
+  };
+
+  /* MAIN INTRO SEQUENCE */
+  const runIntro = useCallback(async () => {
+    const s = stateRef.current;
+    s.phase="fadein"; s.sphereAlpha=0; s.transitionT=0; s.rotation=0;
+
+    /* Phase 1 — sphere fades in centered */
+    await animVal(v=>{ s.sphereAlpha=v; }, 0, 1, 900, easeOutCubic);
+    await new Promise(r=>setTimeout(r,100));
+
+    /* Phase 2 — wordmark + bar + tagline */
+    const intro = introRef.current;
+    if(intro){
+      const wm = intro.querySelector(".intro-wm");
+      const bar = intro.querySelector(".intro-bar");
+      const tag = intro.querySelector(".intro-tag");
+      if(wm) await anim(wm,[{opacity:0,transform:"scale(.94) translateY(12px)"},{opacity:1,transform:"scale(1) translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,180));
+      if(bar) await anim(bar,[{transform:"scaleX(0)",transformOrigin:"left"},{transform:"scaleX(1)",transformOrigin:"left"}],{duration:600,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,300));
+      if(tag) await anim(tag,[{opacity:0,transform:"translateY(8px)"},{opacity:1,transform:"translateY(0)"}],{duration:500,easing:"ease"});
+    }
+    await new Promise(r=>setTimeout(r,820));
+
+    /* Phase 3 — sphere moves, intro dissolves, hero content arrives */
+    s.phase="transition";
+
+    const intro2 = introRef.current;
+    if(intro2){
+      const wm=intro2.querySelector(".intro-wm");
+      const tag=intro2.querySelector(".intro-tag");
+      if(wm) wm.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.9) translateY(-18px)"}],{duration:550,easing:"cubic-bezier(.4,0,1,1)",fill:"forwards"});
+      if(tag) tag.animate([{opacity:1},{opacity:0}],{duration:380,fill:"forwards"});
+    }
+
+    /* sphere transition: 0→1 over 900ms */
+    animVal(v=>{ s.transitionT=v; }, 0, 1, 900, easeInOutCubic);
+
+    await new Promise(r=>setTimeout(r,180));
+
+    /* hero gradient */
+    const hg = heroRef.current?.querySelector(".hero-gradient");
+    if(hg) hg.animate([{opacity:0},{opacity:1}],{duration:800,easing:"ease",fill:"forwards"});
+
+    /* nav */
+    const nav = navRef.current;
+    if(nav) nav.animate([{opacity:0,transform:"translateY(-16px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+
+    await new Promise(r=>setTimeout(r,150));
+
+    /* hero content */
+    const hc = heroRef.current;
+    if(hc){
+      const label = hc.querySelector(".hero-label-inner");
+      const line1 = hc.querySelector(".hl1");
+      const line2 = hc.querySelector(".hl2");
+      const meta  = hc.querySelector(".hero-meta");
+      const labelWrap = hc.querySelector(".hero-label-wrap");
+      if(labelWrap) labelWrap.animate([{opacity:0},{opacity:1}],{duration:300,fill:"forwards"});
+      if(label) label.animate([{transform:"translateY(100%)"},{transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,100));
+      if(line1) line1.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,70));
+      if(line2) line2.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,380));
+      if(meta) meta.animate([{opacity:0,transform:"translateY(14px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"ease",fill:"forwards"});
+    }
+
+    s.phase="done";
   }, []);
-  return <canvas ref={ref} style={{ position: "absolute", inset: 0, opacity: .3, width: "100%", height: "100%" }} />;
+
+  useEffect(()=>{
+    const canvas = canvasRef.current; if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const s = stateRef.current;
+
+    const resize = () => {
+      s.W = canvas.width = canvas.offsetWidth;
+      s.H = canvas.height = canvas.offsetHeight;
+      s.mouse.x = s.W/2; s.mouse.y = s.H/2;
+    };
+    resize();
+
+    const onMouse = e => { s.mouse.x=e.clientX; s.mouse.y=e.clientY; };
+    const onTouch = e => { if(e.touches[0]){ s.mouse.x=e.touches[0].clientX; } };
+    window.addEventListener("resize", resize);
+    window.addEventListener("mousemove", onMouse);
+    window.addEventListener("touchmove", onTouch, {passive:true});
+
+    let raf;
+    const loop = () => { drawFrame(ctx,s); raf=requestAnimationFrame(loop); };
+    loop();
+
+    /* start intro after fonts */
+    document.fonts.ready.then(()=>setTimeout(runIntro, 200));
+
+    return ()=>{
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouse);
+      window.removeEventListener("touchmove", onTouch);
+    };
+  }, [runIntro]);
+
+  return { canvasRef, introRef, heroRef, navRef };
 }
 
 function Landing({ go, toast }) {
   useReveal([]);
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { canvasRef, introRef, heroRef, navRef } = useSphereIntro();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -535,62 +936,96 @@ function Landing({ go, toast }) {
   }, []);
 
   const scrollTo = id => {
+    setMenuOpen(false);
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <div style={{ background: "var(--ink)" }} className="pg-in">
-      {/* NAV */}
-      <div className={`landing-nav${scrolled ? " scrolled" : ""}`}>
+    <div style={{ background: "var(--ink)" }}>
+
+      {/* ── SPHERE CANVAS (fullscreen, behind everything) ── */}
+      <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+
+      {/* ── INTRO OVERLAY ── */}
+      <div ref={introRef} style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div className="intro-wm" style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,10vw,120px)", letterSpacing: ".14em", textTransform: "uppercase", opacity: 0, position: "relative", textAlign: "center" }}>
+          CRYPTON
+          <div className="intro-bar" style={{ position: "absolute", bottom: -10, left: 0, right: 0, height: 2, background: "var(--accent)", transform: "scaleX(0)" }} />
+        </div>
+        <div className="intro-tag" style={{ fontFamily: "var(--mono)", fontSize: "clamp(9px,1.5vw,11px)", letterSpacing: ".22em", textTransform: "uppercase", color: "var(--accent)", marginTop: 20, opacity: 0 }}>
+          Zero-trust · Device identity · No passwords
+        </div>
+      </div>
+
+      {/* ── NAV ── */}
+      <div ref={navRef} className={`landing-nav${scrolled ? " scrolled" : ""}`} style={{ opacity: 0, zIndex: 600 }}>
         <a onClick={() => scrollTo("hero")} style={{ fontFamily: "var(--display)", fontSize: 20, letterSpacing: ".14em", color: "var(--paper)", textDecoration: "none", cursor: "pointer" }}>CRYPTON</a>
         <ul className="nav-links-wrap" style={{ display: "flex", gap: 36, listStyle: "none" }}>
-          {[
-            { label: "About", target: "about" },
-            { label: "Protocol", target: "protocol" },
-            { label: "Features", target: "features" },
-            { label: "Developer", target: "developer" },
-          ].map(l => (
+          {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
             <li key={l.label}>
               <button onClick={() => scrollTo(l.target)} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", border: "none", opacity: .7, transition: "opacity .2s", cursor: "pointer" }}
                 onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .7}>{l.label}</button>
             </li>
           ))}
         </ul>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="nav-desktop-btns" style={{ display: "flex", gap: 10 }}>
           <button onClick={() => go("dashboard")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "10px 18px", border: "1px solid var(--line2)", cursor: "pointer", transition: "all .2s" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--paper)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--line2)"; }}>Dashboard</button>
+            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--paper)"}
+            onMouseLeave={e => e.currentTarget.style.borderColor = "var(--line2)"}>Dashboard</button>
           <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
             onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Enroll Device</button>
         </div>
+        {/* Hamburger */}
+        <button className={`mob-menu-btn${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+          <span /><span /><span />
+        </button>
       </div>
 
-      {/* HERO */}
-      <section id="hero" style={{ height: "100vh", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 52px 56px" }} className="hero-pad">
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 100% 70% at 50% 15%,#1C1C1C 0%,var(--ink) 55%)" }} />
-        <HeroCanvas />
-        <div style={{ position: "relative", zIndex: 1, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 36, height: 1, background: "var(--accent)" }} />Zero-trust · Device identity · No passwords
+      {/* ── MOBILE DRAWER ── */}
+      <div className={`mob-drawer${menuOpen ? " open" : ""}`}>
+        {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
+          <button key={l.label} className="mob-link" onClick={() => scrollTo(l.target)}>{l.label}</button>
+        ))}
+        <div className="mob-drawer-ctas">
+          <button onClick={() => { setMenuOpen(false); go("dashboard"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "14px 0", border: "1px solid var(--line2)", cursor: "pointer", textAlign: "center" }}>Dashboard</button>
+          <button onClick={() => { setMenuOpen(false); go("register"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--accent)", padding: "14px 0", border: "none", cursor: "pointer", textAlign: "center" }}>Enroll Device</button>
         </div>
-        <div style={{ position: "relative", zIndex: 1, overflow: "hidden" }}>
-          <div className="hero-line" style={{ fontFamily: "var(--display)", fontSize: "clamp(80px,13.5vw,195px)", lineHeight: .9, letterSpacing: ".025em", textTransform: "uppercase" }}>Identity</div>
-          <div className="hero-line hero-line-2" style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "clamp(72px,12.5vw,180px)", lineHeight: .9 }}>Redefined.</div>
-        </div>
-        <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
-          <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 300, lineHeight: 1.75, fontWeight: 300 }}>Authentication powered by hardware cryptography. Every request verified. Every device accountable.</p>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => scrollTo("about")}>
-            <div style={{ width: 1, height: 44, background: "rgba(122,117,112,.3)", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "50%", background: "var(--accent)", animation: "sp 2s ease-in-out infinite" }} />
+      </div>
+
+      {/* ── HERO SECTION ── */}
+      <section id="hero" style={{ height: "100vh", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 52px 56px", zIndex: 10 }} className="hero-pad">
+        {/* bottom gradient */}
+        <div ref={heroRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          <div className="hero-gradient" style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,10,.9) 0%,rgba(10,10,10,.25) 45%,transparent 72%)", opacity: 0 }} />
+          {/* hero text lives inside heroRef for intro targeting */}
+          <div style={{ position: "absolute", bottom: 56, left: 52, right: 52 }} className="hero-pad-inner">
+            <div className="hero-label-wrap" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", display: "flex", alignItems: "center", gap: 14, marginBottom: 20, overflow: "hidden", opacity: 0 }}>
+              <div style={{ width: 36, height: 1, background: "var(--accent)", flexShrink: 0 }} />
+              <div className="hero-label-inner" style={{ transform: "translateY(100%)" }}>Zero-trust · Device identity · No passwords</div>
             </div>
-            Scroll to explore
+            <div style={{ overflow: "hidden" }}>
+              <div className="hl1" style={{ fontFamily: "var(--display)", fontSize: "clamp(58px,13.5vw,195px)", lineHeight: .9, letterSpacing: ".025em", textTransform: "uppercase", transform: "translateY(110%)", display: "block" }}>Identity</div>
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div className="hl2" style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "clamp(52px,12.5vw,180px)", lineHeight: .9, transform: "translateY(110%)", display: "block" }}>Redefined.</div>
+            </div>
+            <div className="hero-meta" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)", opacity: 0, flexWrap: "wrap", gap: 16 }}>
+              <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 300, lineHeight: 1.75, fontWeight: 300 }}>Authentication powered by hardware cryptography. Every request verified. Every device accountable.</p>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => scrollTo("about")}>
+                <div style={{ width: 1, height: 44, background: "rgba(122,117,112,.3)", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "50%", background: "var(--accent)", animation: "sp 2s ease-in-out infinite" }} />
+                </div>
+                Scroll to explore
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* TICKER */}
-      <div style={{ background: "var(--accent)", overflow: "hidden", padding: "13px 0", whiteSpace: "nowrap" }} aria-hidden="true">
+      {/* ── TICKER ── */}
+      <div style={{ background: "var(--accent)", overflow: "hidden", padding: "13px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }} aria-hidden="true">
         <div className="ticker-track">
           {["Zero Trust","Device Identity","Hardware Keys","No Passwords","Cryptographic Proof","Instant Revocation"].flatMap(t => [
             <span key={t} style={{ fontFamily: "var(--display)", fontSize: 17, letterSpacing: ".1em", color: "var(--ink)", padding: "0 28px", textTransform: "uppercase" }}>{t}</span>,
@@ -603,164 +1038,148 @@ function Landing({ go, toast }) {
         </div>
       </div>
 
-      {/* MANIFESTO */}
-      <section id="about" style={{ padding: "140px 52px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>01 — Manifesto</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div className="rv" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "end" }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1.15, letterSpacing: "-.01em" }}>
-            Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+      {/* ── CONTENT SECTIONS (all position:relative zIndex:10 to sit above canvas) ── */}
+      <div style={{ position: "relative", zIndex: 10, background: "var(--ink)" }}>
+
+        {/* MANIFESTO */}
+        <section id="about" style={{ padding: "140px 52px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>01 — Manifesto</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div>
-            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.85, maxWidth: 360, fontWeight: 300, marginBottom: 36 }}>
-              Crypton is a zero-trust identity platform where authentication is tied to cryptographic device keys — not passwords, not secrets, not human memory. Your private key never leaves your hardware.
-            </p>
-            <BtnO onClick={() => scrollTo("developer")}>Read the whitepaper →</BtnO>
-            <div style={{ marginTop: 16 }}>
-              <BtnF onClick={() => go("register")}>Enroll Your Device →</BtnF>
+          <div className="rv manifesto-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "end" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1.15, letterSpacing: "-.01em" }}>
+              Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+            </div>
+            <div>
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.85, maxWidth: 360, fontWeight: 300, marginBottom: 36 }}>
+                Crypton is a zero-trust identity platform where authentication is tied to cryptographic device keys — not passwords, not secrets, not human memory. Your private key never leaves your hardware.
+              </p>
+              <BtnO onClick={() => scrollTo("developer")}>Read the whitepaper →</BtnO>
+              <div style={{ marginTop: 16 }}><BtnF onClick={() => go("register")}>Enroll Your Device →</BtnF></div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* HOW IT WORKS */}
-      <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,7vw,92px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
-        <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
-        <div className="rv rv-1" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
+        {/* PROTOCOL */}
+        <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,7vw,92px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
+          <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
+          <div className="rv rv-1 hiw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
+            {[
+              { n: "01", t: "Challenge", b: "Server issues a unique, time-bound cryptographic nonce. Non-repeatable. Expires in milliseconds. Cannot be predicted or pre-computed." },
+              { n: "02", t: "Sign", b: "Your device's hardware security module signs the nonce using its private key. The key never leaves the chip. Face ID. Touch ID. Hardware token." },
+              { n: "03", t: "Verify", b: "The server verifies the signature against your registered public key. Match means access. Mismatch means instant rejection. Sub-200ms total." },
+            ].map(c => <HiWCard key={c.n} {...c} />)}
+          </div>
+        </section>
+
+        {/* FEATURES */}
+        <section id="features" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>03 — Capabilities</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+            <div className="features-list" style={{ paddingRight: 72, borderRight: "1px solid var(--line)" }}>
+              {[
+                { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
+                { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
+                { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
+                { i: "F.04", t: "Instant Revocation", b: "Revoke a compromised device in under 500ms. Propagates globally. No stale sessions. No grace periods." },
+                { i: "F.05", t: "Audit Trail", b: "Cryptographically signed, tamper-proof log of every authentication event. Export to CSV or JSON for compliance." },
+                { i: "F.06", t: "Time-Lock Recovery", b: "24-hour mandatory waiting period on recovery. Existing trusted devices can cancel unauthorized attempts." },
+              ].map((f, idx) => (
+                <div key={f.i} className="feat-item rv" style={{ padding: "32px 0", borderBottom: idx < 5 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "flex-start", gap: 20 }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 3, flexShrink: 0 }}>{f.i}</span>
+                  <div>
+                    <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 7 }}>{f.t}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{f.b}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="features-sticky" style={{ paddingLeft: 72 }}>
+              <div className="rv" style={{ position: "sticky", top: 120, height: 400, background: "var(--ink-3)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent)" }} />
+                <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+                  <div className="fv-glyph" style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 50px rgba(200,245,90,.35))" }}>🔐</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: "var(--accent)", marginTop: 14 }}>// secure enclave active</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* STATS */}
+        <div className="rv stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
           {[
-            { n: "01", t: "Challenge", b: "Server issues a unique, time-bound cryptographic nonce. Non-repeatable. Expires in milliseconds. Cannot be predicted or pre-computed." },
-            { n: "02", t: "Sign", b: "Your device's hardware security module signs the nonce using its private key. The key never leaves the chip. Face ID. Touch ID. Hardware token." },
-            { n: "03", t: "Verify", b: "The server verifies the signature against your registered public key. Match means access. Mismatch means instant rejection. Sub-200ms total." },
-          ].map(c => (
-            <HiWCard key={c.n} {...c} />
+            { v: "0", d: "Passwords ever stored\nin the Crypton system" },
+            { v: "100%", d: "Requests cryptographically\nverified, every time" },
+            { v: "<200ms", d: "End-to-end authentication\nlatency on 4G" },
+            { v: "∞", d: "Entropy in each\nhardware-generated key" },
+          ].map((s, i) => (
+            <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+              <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.65, whiteSpace: "pre-line" }}>{s.d}</div>
+            </div>
           ))}
         </div>
-      </section>
 
-      {/* FEATURES */}
-      <section id="features" style={{ padding: "0 52px 140px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>03 — Capabilities</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-          <div style={{ paddingRight: 72, borderRight: "1px solid var(--line)" }}>
+        {/* DEVELOPER */}
+        <section id="developer" style={{ padding: "140px 52px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>04 — Developer</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="dev-grid" style={{ display: "grid", gridTemplateColumns: "5fr 7fr", alignItems: "stretch" }}>
+            <div className="rv dev-left" style={{ padding: "80px 56px 80px 0", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 22 }}>// Integrate in 5 minutes</div>
+              <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,5.5vw,76px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 28 }}>Ship<br />Zero-<br />Trust.</h2>
+              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.85, marginBottom: 36, fontWeight: 300, maxWidth: 320 }}>Our SDK handles all cryptographic operations. Type-safe API. Works with any backend.</p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 36 }}>
+                {["TypeScript", "Rust", "Python", "Go"].map(l => <span key={l} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "5px 11px", border: "1px solid var(--line)", color: "var(--muted)" }}>{l}</span>)}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <BtnF onClick={() => go("admin")}>Read the Docs →</BtnF>
+                <BtnO onClick={() => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank")}>GitHub ↗</BtnO>
+              </div>
+            </div>
+            <div className="rv rv-1 dev-right" style={{ padding: "80px 0 80px 56px" }}>
+              <CodeBlock toast={toast} />
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+        <footer style={{ borderTop: "1px solid var(--line)", padding: "72px 52px 36px" }} className="section-pad">
+          <div className="rv footer-grid" style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 48, paddingBottom: 56, borderBottom: "1px solid var(--line)" }}>
+            <div className="footer-brand">
+              <div style={{ fontFamily: "var(--display)", fontSize: 56, letterSpacing: ".08em", lineHeight: 1, marginBottom: 20 }}>CRYPTON</div>
+              <p style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.7, maxWidth: 250 }}>Zero-trust device identity. Authentication powered by cryptography — not passwords, not hope.</p>
+            </div>
             {[
-              { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
-              { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
-              { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
-              { i: "F.04", t: "Instant Revocation", b: "Revoke a compromised device in under 500ms. Propagates globally. No stale sessions. No grace periods." },
-              { i: "F.05", t: "Audit Trail", b: "Cryptographically signed, tamper-proof log of every authentication event. Export to CSV or JSON for compliance." },
-              { i: "F.06", t: "Time-Lock Recovery", b: "24-hour mandatory waiting period on recovery. Existing trusted devices can cancel unauthorized attempts." },
-            ].map((f, idx) => (
-              <div key={f.i} className={`feat-item rv${idx > 2 ? "" : ""}`} style={{ padding: "32px 0", borderBottom: idx < 5 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "flex-start", gap: 20 }}>
-                <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 3, flexShrink: 0 }}>{f.i}</span>
-                <div>
-                  <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 7 }}>{f.t}</div>
-                  <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{f.b}</div>
-                </div>
+              { h: "Product", links: [{ l: "Protocol", action: () => scrollTo("protocol") }, { l: "Features", action: () => scrollTo("features") }, { l: "Pricing", action: () => toast("Pricing — coming soon", "info") }, { l: "Changelog", action: () => go("auditlogs") }] },
+              { h: "Developer", links: [{ l: "Documentation", action: () => go("admin") }, { l: "API Reference", action: () => go("admin") }, { l: "SDK", action: () => scrollTo("developer") }, { l: "GitHub", action: () => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank") }] },
+              { h: "Company", links: [{ l: "About", action: () => scrollTo("about") }, { l: "Security", action: () => go("risk") }, { l: "Privacy", action: () => toast("Privacy policy — coming soon", "info") }, { l: "Terms", action: () => toast("Terms of service — coming soon", "info") }] },
+            ].map(col => (
+              <div key={col.h}>
+                <h5 style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 18 }}>{col.h}</h5>
+                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 11 }}>
+                  {col.links.map(({ l, action }) => (
+                    <li key={l}><button onClick={action} style={{ fontSize: 13, color: "var(--paper)", opacity: .55, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "opacity .2s", fontFamily: "var(--body)" }}
+                      onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .55}>{l}</button></li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-          <div style={{ paddingLeft: 72 }}>
-            <div className="rv" style={{ position: "sticky", top: 120, height: 400, background: "var(--ink-3)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent)" }} />
-              <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-                <div className="fv-glyph" style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 50px rgba(200,245,90,.35))" }}>🔐</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: "var(--accent)", marginTop: 14 }}>// secure enclave active</div>
-              </div>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 28, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", flexWrap: "wrap", gap: 8 }}>
+            <span>© 2026 CRYPTON — ALL RIGHTS RESERVED</span><span>V1.0 · MARCH 2026</span>
           </div>
-        </div>
-      </section>
+        </footer>
 
-      {/* STATS */}
-      <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-        {[
-          { v: "0", d: "Passwords ever stored\nin the Crypton system" },
-          { v: "100%", d: "Requests cryptographically\nverified, every time" },
-          { v: "<200ms", d: "End-to-end authentication\nlatency on 4G" },
-          { v: "∞", d: "Entropy in each\nhardware-generated key" },
-        ].map((s, i) => (
-          <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-            <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.65, whiteSpace: "pre-line" }}>{s.d}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* DEVELOPER */}
-      <section id="developer" style={{ padding: "140px 52px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>04 — Developer</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "5fr 7fr", alignItems: "stretch" }}>
-          <div className="rv" style={{ padding: "80px 56px 80px 0", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 22 }}>// Integrate in 5 minutes</div>
-            <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,5.5vw,76px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 28 }}>Ship<br />Zero-<br />Trust.</h2>
-            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.85, marginBottom: 36, fontWeight: 300, maxWidth: 320 }}>Our SDK handles all cryptographic operations. Type-safe API. Works with any backend.</p>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 36 }}>
-              {["TypeScript", "Rust", "Python", "Go"].map(l => <span key={l} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "5px 11px", border: "1px solid var(--line)", color: "var(--muted)" }}>{l}</span>)}
-            </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <BtnF onClick={() => go("admin")}>Read the Docs →</BtnF>
-              <BtnO onClick={() => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank")}>GitHub ↗</BtnO>
-            </div>
-          </div>
-          <div className="rv rv-1" style={{ padding: "80px 0 80px 56px" }}>
-            <CodeBlock toast={toast} />
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer style={{ borderTop: "1px solid var(--line)", padding: "72px 52px 36px" }}>
-        <div className="rv" style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 48, paddingBottom: 56, borderBottom: "1px solid var(--line)" }}>
-          <div>
-            <div style={{ fontFamily: "var(--display)", fontSize: 56, letterSpacing: ".08em", lineHeight: 1, marginBottom: 20 }}>CRYPTON</div>
-            <p style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.7, maxWidth: 250 }}>Zero-trust device identity. Authentication powered by cryptography — not passwords, not hope.</p>
-          </div>
-          {[
-            { h: "Product", links: [
-              { l: "Protocol", action: () => scrollTo("protocol") },
-              { l: "Features", action: () => scrollTo("features") },
-              { l: "Pricing", action: () => toast("Pricing — coming soon", "info") },
-              { l: "Changelog", action: () => go("auditlogs") },
-            ]},
-            { h: "Developer", links: [
-              { l: "Documentation", action: () => go("admin") },
-              { l: "API Reference", action: () => go("admin") },
-              { l: "SDK", action: () => scrollTo("developer") },
-              { l: "GitHub", action: () => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank") },
-            ]},
-            { h: "Company", links: [
-              { l: "About", action: () => scrollTo("about") },
-              { l: "Security", action: () => go("risk") },
-              { l: "Privacy", action: () => toast("Privacy policy — coming soon", "info") },
-              { l: "Terms", action: () => toast("Terms of service — coming soon", "info") },
-            ]},
-          ].map(col => (
-            <div key={col.h}>
-              <h5 style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 18 }}>{col.h}</h5>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 11 }}>
-                {col.links.map(({ l, action }) => (
-                  <li key={l}>
-                    <button onClick={action} style={{ fontSize: 13, color: "var(--paper)", opacity: .55, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "opacity .2s", fontFamily: "var(--body)" }}
-                      onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .55}>{l}</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 28, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)" }}>
-          <span>© 2026 CRYPTON — ALL RIGHTS RESERVED</span><span>V1.0 · MARCH 2026</span>
-        </div>
-      </footer>
+      </div>{/* end zIndex:10 wrapper */}
     </div>
   );
 }
@@ -837,8 +1256,8 @@ function Register({ go, toast }) {
   const devLabel = ["Waiting for identity...", "Creating passkey...", "Device enrolled ✓"][step];
 
   return (
-    <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "3fr 2fr", minHeight: "100vh" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "72px 80px" }}>
+    <div className="pg-in register-grid" style={{ display: "grid", gridTemplateColumns: "3fr 2fr", minHeight: "100vh" }}>
+      <div className="register-form" style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "72px 80px" }}>
         <button onClick={() => go("landing")} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", marginBottom: 48, display: "flex", alignItems: "center", gap: 10, transition: "color .2s" }}
           onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>← Back to Home</button>
 
@@ -897,7 +1316,7 @@ function Register({ go, toast }) {
       </div>
 
       {/* VIZ PANEL */}
-      <div style={{ background: "#080808", borderLeft: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div className="register-vis" style={{ background: "#080808", borderLeft: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 70% at 50% 50%,rgba(200,245,90,.06),transparent)" }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, position: "relative", zIndex: 1 }}>
           <div className={devClass}>
@@ -942,13 +1361,13 @@ function Dashboard({ go, toast }) {
 
   return (
     <AppShell active="dashboard" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--line)" }}>
+      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--line)" }} className="page-header">
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Dashboard</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Security overview</div></div>
         <BtnF onClick={() => go("register")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Enroll Device</BtnF>
       </div>
-      <div style={{ padding: "36px 44px 60px", flex: 1 }}>
+      <div style={{ padding: "36px 44px 60px", flex: 1 }} className="page-body">
         {/* STAT CARDS */}
-        <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", marginBottom: 28, border: "1px solid var(--line)" }}>
+        <div className="pg-in stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", marginBottom: 28, border: "1px solid var(--line)" }}>
           {[
             { l: "Active Devices", v: String(MOCK_DASHBOARD_STATS.activeDevices), d: "↑ 1 this week", i: "📱", link: "devices" },
             { l: "Auth Events (24h)", v: String(MOCK_DASHBOARD_STATS.authEvents24h), d: "All verified", i: "⚡", link: "auditlogs" },
@@ -957,8 +1376,8 @@ function Dashboard({ go, toast }) {
         </div>
 
         {/* ORB */}
-        <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "auto 1fr", border: "1px solid var(--line)", marginBottom: 28, background: "var(--ink-2)" }}>
-          <div onClick={() => setOrb((orbIdx + 1) % 3)} style={{ width: 180, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, borderRight: "1px solid var(--line)", cursor: "pointer", position: "relative" }}>
+        <div className="pg-in orb-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", border: "1px solid var(--line)", marginBottom: 28, background: "var(--ink-2)" }}>
+          <div className="orb-vis" onClick={() => setOrb((orbIdx + 1) % 3)} style={{ width: 180, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, borderRight: "1px solid var(--line)", cursor: "pointer", position: "relative" }}>
             <div className="orb-pulse r1" style={{ position: "absolute" }} />
             <div className="orb-pulse r2" style={{ position: "absolute" }} />
             <div style={{ width: 96, height: 96, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, position: "relative", zIndex: 1, ...orbStyle }}>{orb.ico}</div>
@@ -1089,7 +1508,7 @@ function Devices({ go, toast }) {
         </div>
       </div>
 
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
         {tab === "devices" && (
           <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
             {devices.map(d => <DeviceCard key={d.name} {...d} onRevoke={() => openRevoke(d.name)} toast={toast} />)}
@@ -1191,7 +1610,7 @@ function Recovery({ go, toast }) {
 
   return (
     <AppShell active="recovery" go={go}>
-      <div style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Recovery</div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Time-lock zero-trust protocol</div>
       </div>
@@ -1282,11 +1701,11 @@ function NetworkCanvas() {
 function Admin({ go, toast }) {
   return (
     <AppShell active="admin" go={go}>
-      <div style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Admin</div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>System management · Analytics</div>
       </div>
-      <div style={{ padding: "36px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "36px 44px 60px" }}>
         <div className="pg-in" style={{ border: "1px solid var(--line)", background: "var(--ink-2)", marginBottom: 28, overflow: "hidden" }}>
           <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Network Topology — Live Trust Graph</span>
@@ -1347,11 +1766,11 @@ function AuditLogs({ go, toast }) {
   };
   return (
     <AppShell active="auditlogs" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Audit Logs</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Full cryptographic event stream</div></div>
         <BtnF onClick={exportCSV} style={{ padding: "8px 16px", fontSize: 9 }}>↓ Export CSV</BtnF>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" className="page-body" style={{ padding: "28px 44px 60px" }}>
         {/* Search + Filter */}
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search actor, action, location..."
@@ -1363,8 +1782,8 @@ function AuditLogs({ go, toast }) {
             })}
           </div>
         </div>
-        {/* Table */}
-        <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+        {/* Desktop Table */}
+        <div className="audit-table" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.2fr 1.2fr 1.5fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
             {["Actor","Action","Device","IP","Location","Time"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
           </div>
@@ -1381,6 +1800,22 @@ function AuditLogs({ go, toast }) {
             </div>
           ))}
         </div>
+        {/* Mobile Cards */}
+        <div className="audit-cards" style={{ display: "none", flexDirection: "column", gap: 8 }}>
+          {filtered.length === 0 && <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>No results found</div>}
+          {filtered.map((r, i) => (
+            <div key={i} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${typeColor[r.type]}`, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.type], letterSpacing: ".05em" }}>{r.action}</span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>{r.time}</span>
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>{r.actor}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <span>{r.device}</span><span>{r.loc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)", marginTop: 12, letterSpacing: ".06em" }}>{filtered.length} of {MOCK_AUDIT_LOGS.length} events shown</div>
       </div>
     </AppShell>
@@ -1393,8 +1828,8 @@ function AuditLogs({ go, toast }) {
 function RiskIntel({ go, toast }) {
   const [selected, setSelected] = useState(0);
   const [scanning, setScanning] = useState(false);
-  const [scores, setScores] = useState(MOCK_MOCK_RISK_USERS.map(u => u.score));
-  const user = MOCK_MOCK_RISK_USERS[selected];
+  const [scores, setScores] = useState(MOCK_RISK_USERS.map(u => u.score));
+  const user = MOCK_RISK_USERS[selected];
   const score = scores[selected];
 
   const levelColor = s => s >= 70 ? "var(--danger)" : s >= 40 ? "var(--warning)" : "var(--success)";
@@ -1415,12 +1850,12 @@ function RiskIntel({ go, toast }) {
 
   return (
     <AppShell active="risk" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Risk Intelligence</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Behavioral anomaly · Geo-velocity · Threat scoring</div></div>
         <BtnF onClick={rescan} style={{ padding: "8px 16px", fontSize: 9, opacity: scanning ? .6 : 1 }}>{scanning ? "Scanning..." : "↻ Re-scan"}</BtnF>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+      <div className="page-body" className="page-body" style={{ padding: "28px 44px 60px" }}>
+        <div className="risk-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
           {/* User selector + score */}
           <div style={{ border: "1px solid var(--line)", background: "var(--ink-2)", overflow: "hidden" }}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Select User</div>
@@ -1516,12 +1951,12 @@ function Sessions({ go, toast }) {
 
   return (
     <AppShell active="sessions" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Sessions</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Active sessions · Real-time monitor</div></div>
-        <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All Sessions</button>
+        <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All</button>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
+      <div className="page-body" className="page-body" style={{ padding: "28px 44px 60px" }}>
+        <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
           {[
             { l: "Active Sessions", v: sessions.filter(s => s.active).length.toString(), c: "var(--success)" },
             { l: "Idle Sessions", v: sessions.filter(s => !s.active).length.toString(), c: "var(--warning)" },
@@ -1540,8 +1975,9 @@ function Sessions({ go, toast }) {
             <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>All Clear</div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>All sessions have been terminated.</div>
           </div>
-        ) : (
-          <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+        ) : (<>
+          {/* Desktop table */}
+          <div className="sessions-table" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.2fr 1.2fr 1.2fr 0.8fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
               {["User","Device","Location","Started","Duration","Action"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
             </div>
@@ -1563,7 +1999,26 @@ function Sessions({ go, toast }) {
               </div>
             ))}
           </div>
-        )}
+          {/* Mobile cards */}
+          <div className="sessions-cards" style={{ display: "none", flexDirection: "column", gap: 10 }}>
+            {sessions.map(s => (
+              <div key={s.id} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${s.active ? "var(--success)" : "var(--warning)"}`, padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{s.user}</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginTop: 3 }}>{s.browser} · {s.device}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: s.active ? "var(--success)" : "var(--warning)" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: s.active ? "var(--success)" : "var(--warning)" }}>{s.duration}</span>
+                  </div>
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 12 }}>{s.loc} · {s.started}</div>
+                <button onClick={() => kill(s.id)} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--danger)", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)", padding: "7px 14px", cursor: "pointer" }}>Kill Session</button>
+              </div>
+            ))}
+          </div>
+        </>)}
       </div>
     </AppShell>
   );
@@ -1593,11 +2048,11 @@ function RBAC({ go, toast }) {
 
   return (
     <AppShell active="rbac" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Users & Roles</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Role-based access control · Least privilege</div></div>
         <BtnF onClick={() => toast("Invite flow — full implementation pending", "info")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Invite User</BtnF>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
 
         {/* Role assign modal */}
         {selectedUser && (
@@ -1637,7 +2092,7 @@ function RBAC({ go, toast }) {
         </div>
 
         {/* User table */}
-        <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+        <div className="rbac-grid" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 0.8fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
             {["User","Role","Devices","Last Active","Action"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
           </div>
@@ -1679,14 +2134,14 @@ function PolicyEngine({ go, toast }) {
 
   return (
     <AppShell active="policy" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Policy Engine</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Zero-trust rules · Adaptive enforcement</div></div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--success)", letterSpacing: ".06em", display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 8px var(--success)" }} />
           {policies.filter(p => p.active).length} / {policies.length} policies active
         </div>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
 
         {/* Threshold sliders */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
@@ -1751,7 +2206,7 @@ function OrgSettings({ go, toast }) {
 
   return (
     <AppShell active="orgsettings" go={go}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Org Settings</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Organization configuration · Multi-tenant</div></div>
         <BtnF onClick={save} style={{ padding: "8px 16px", fontSize: 9 }}>Save Changes</BtnF>
       </div>
