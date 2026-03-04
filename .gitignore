@@ -1,0 +1,32 @@
+# ── Rust ──────────────────────────────────────────────
+target/
+**/*.rs.bk
+
+# ── Node / React ──────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# CRA build output
+services/crypton-admin/build/
+
+# ── Environment / Secrets ─────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── TLS certs (local dev) ─────────────────────────────
+*.pem
+*.key
+*.crt
+
+# ── OS / Editor ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Claude local ──────────────────────────────────────
+.claude/settings.local.json
+.claude/worktrees/
