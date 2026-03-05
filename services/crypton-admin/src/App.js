@@ -887,14 +887,10 @@ function Landing({ go, toast }) {
         </section>
         <div className="rv stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
           {[
-            { v: "0", d: "Passwords ever stored
-in the Crypton system" },
-            { v: "100%", d: "Requests cryptographically
-verified, every time" },
-            { v: "<200ms", d: "End-to-end authentication
-latency on 4G" },
-            { v: "∞", d: "Entropy in each
-hardware-generated key" },
+            { v: "0", d: "Passwords ever stored\nin the Crypton system" },
+            { v: "100%", d: "Requests cryptographically\nverified, every time" },
+            { v: "<200ms", d: "End-to-end authentication\nlatency on 4G" },
+            { v: "∞", d: "Entropy in each\nhardware-generated key" },
           ].map((s, i) => (
             <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
               <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
