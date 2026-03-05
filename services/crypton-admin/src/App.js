@@ -74,17 +74,12 @@ const FontLink = () => (
       --body:'Geist',sans-serif;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{scroll-behavior:smooth;cursor:none}
-    body{font-family:var(--body);background:var(--ink);color:var(--paper);overflow-x:hidden;line-height:1.5}
+    html{scroll-behavior:smooth}
+    body{font-family:var(--body);background:var(--ink);color:var(--paper);overflow-x:hidden;line-height:1.5;cursor:auto}
     ::selection{background:var(--accent);color:var(--ink)}
     ::-webkit-scrollbar{width:2px}::-webkit-scrollbar-track{background:var(--ink)}::-webkit-scrollbar-thumb{background:var(--accent)}
 
     .grain{position:fixed;inset:0;z-index:9000;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.035}
-
-    /* cursor */
-    .cd{position:fixed;width:7px;height:7px;border-radius:50%;background:var(--accent);pointer-events:none;z-index:9999;transform:translate(-50%,-50%)}
-    .cr{position:fixed;width:32px;height:32px;border-radius:50%;border:1px solid rgba(200,245,90,0.4);pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .4s cubic-bezier(.25,1,.5,1),height .4s,border-color .3s}
-    .cr.hov{width:52px;height:52px;border-color:var(--accent)}
 
     /* page transition */
     .pg-in{animation:pgIn .4s cubic-bezier(.16,1,.3,1)}
@@ -100,8 +95,9 @@ const FontLink = () => (
     @keyframes fg{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-14px) rotate(3deg)}}
     .fv-glyph{animation:fg 7s ease-in-out infinite}
 
-    /* nav */
-    nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:28px 52px;mix-blend-mode:difference}
+    /* landing nav */
+    .landing-nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:24px 52px;transition:background .3s,backdrop-filter .3s,padding .3s,border-color .3s;border-bottom:1px solid transparent}
+    .landing-nav.scrolled{background:rgba(10,10,10,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:16px 52px;border-color:var(--line)}
 
     /* orb */
     @keyframes orbPulse{0%,100%{box-shadow:0 0 20px rgba(74,222,128,.2),0 0 60px rgba(74,222,128,.08);transform:scale(1)}50%{box-shadow:0 0 40px rgba(74,222,128,.35),0 0 80px rgba(74,222,128,.12);transform:scale(1.04)}}
@@ -159,54 +155,81 @@ const FontLink = () => (
     .stat-c::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.16,1,.3,1)}
     .stat-c:hover::before{transform:scaleX(1)}
 
+    /* ── MOBILE NAV HAMBURGER ── */
+    .mob-menu-btn{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:8px;z-index:1100}
+    .mob-menu-btn span{display:block;width:22px;height:1.5px;background:var(--paper);transition:all .3s}
+    .mob-menu-btn.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+    .mob-menu-btn.open span:nth-child(2){opacity:0}
+    .mob-menu-btn.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+    .mob-drawer{position:fixed;inset:0;top:0;background:rgba(10,10,10,0.97);backdrop-filter:blur(20px);z-index:1050;display:flex;flex-direction:column;padding:100px 32px 40px;transform:translateX(100%);transition:transform .4s cubic-bezier(.16,1,.3,1)}
+    .mob-drawer.open{transform:translateX(0)}
+    .mob-drawer a,.mob-drawer button.mob-link{font-family:var(--display);font-size:clamp(36px,10vw,52px);letter-spacing:.06em;text-transform:uppercase;color:var(--paper);text-decoration:none;background:none;border:none;cursor:pointer;display:block;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;transition:color .2s}
+    .mob-drawer-ctas{display:flex;flex-direction:column;gap:12px;margin-top:32px}
+
+    /* ── BOTTOM TAB BAR (mobile app shell) ── */
+    .bottom-tabs{display:none;position:fixed;bottom:0;left:0;right:0;z-index:800;background:var(--ink-2);border-top:1px solid var(--line);padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+    .bottom-tabs-inner{display:flex;justify-content:space-around;align-items:center}
+    .tab-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:4px 8px;min-width:52px;color:var(--muted);transition:color .15s}
+    .tab-btn.active{color:var(--accent)}
+    .tab-btn span:first-child{font-size:18px;line-height:1}
+    .tab-btn span:last-child{font-family:var(--mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase}
+
     @media(max-width:1023px){
-      nav{padding:20px 24px}
       .nav-links-wrap{display:none}
+      .landing-nav{padding:20px 24px!important}
+      .landing-nav.scrolled{padding:14px 24px!important}
       .hero-pad,.section-pad{padding-left:24px!important;padding-right:24px!important}
       .sidebar{width:56px}
       .sb-mark,.si-label,.sb-label-txt,.user-name,.user-role{display:none}
       .si{justify-content:center}
       .si-badge{display:none}
     }
-    @media(max-width:700px){
-      .hero-line{font-size:clamp(60px,16vw,100px)!important}
+    @media(max-width:767px){
+      .mob-menu-btn{display:flex}
+      .landing-nav .nav-desktop-btns{display:none}
+      .sidebar{display:none!important}
+      .bottom-tabs{display:block}
+      .app-main{padding-bottom:72px!important}
+      .hero-line{font-size:clamp(58px,17vw,110px)!important}
+      .manifesto-grid{grid-template-columns:1fr!important;gap:40px!important}
+      .protocol-grid{grid-template-columns:1fr!important}
+      .features-grid{grid-template-columns:1fr!important}
+      .features-sticky{display:none!important}
+      .features-list{padding-right:0!important;border-right:none!important}
+      .stats-grid{grid-template-columns:1fr 1fr!important}
+      .dev-grid{grid-template-columns:1fr!important}
+      .dev-left{padding:40px 0 0!important;border-right:none!important}
+      .dev-right{padding:0 0 40px!important}
+      .footer-grid{grid-template-columns:1fr 1fr!important;gap:32px!important}
+      .footer-brand{grid-column:1/-1}
+      .hiw-grid{grid-template-columns:1fr!important}
+      .stat-grid{grid-template-columns:1fr!important}
+      .orb-grid{grid-template-columns:1fr!important}
+      .orb-vis{display:none!important}
+      .page-header{padding:20px 20px 16px!important}
+      .page-body{padding:20px 20px 80px!important}
+      .audit-table{display:none!important}
+      .audit-cards{display:flex!important}
+      .sessions-table{display:none!important}
+      .sessions-cards{display:flex!important}
+      .risk-grid{grid-template-columns:1fr!important}
+      .rbac-grid{grid-template-columns:1fr!important}
+      .register-grid{grid-template-columns:1fr!important}
+      .register-vis{display:none!important}
+      .register-form{padding:48px 24px!important}
+      .breadcrumb-wrap{padding:10px 20px 0!important}
+    }
+    @media(max-width:400px){
+      .hero-line{font-size:clamp(48px,15vw,80px)!important}
+      .stats-grid{grid-template-columns:1fr!important}
+    }
+    @media(hover:none){
+      .feat-item:hover{padding-left:0}
+      .stat-c:hover::before{transform:scaleX(0)}
     }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
   `}</style>
 );
-
-/* ─── CURSOR ─── */
-function Cursor() {
-  const dotRef = useRef(null);
-  const ringRef = useRef(null);
-  const pos = useRef({ mx: 0, my: 0, rx: 0, ry: 0 });
-  const [hov, setHov] = useState(false);
-
-  useEffect(() => {
-    const move = e => { pos.current.mx = e.clientX; pos.current.my = e.clientY; };
-    document.addEventListener("mousemove", move);
-    let raf;
-    const loop = () => {
-      const p = pos.current;
-      p.rx += (p.mx - p.rx) * 0.13;
-      p.ry += (p.my - p.ry) * 0.13;
-      if (dotRef.current) { dotRef.current.style.left = p.mx + "px"; dotRef.current.style.top = p.my + "px"; }
-      if (ringRef.current) { ringRef.current.style.left = p.rx + "px"; ringRef.current.style.top = p.ry + "px"; }
-      raf = requestAnimationFrame(loop);
-    };
-    loop();
-    const over = e => setHov(e.target.closest("a,button") !== null);
-    document.addEventListener("mouseover", over);
-    return () => { document.removeEventListener("mousemove", move); document.removeEventListener("mouseover", over); cancelAnimationFrame(raf); };
-  }, []);
-
-  return (
-    <>
-      <div ref={dotRef} className="cd" />
-      <div ref={ringRef} className={`cr${hov ? " hov" : ""}`} />
-    </>
-  );
-}
 
 /* ─── BASE64URL UTILS ─── */
 const b64url = {
@@ -288,6 +311,208 @@ function ToastStack({ toasts }) {
 }
 
 /* ─── SCROLL REVEAL ─── */
+/* ─── EASING UTILS (used by sphere intro) ─── */
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+const clampT = (v,a,b) => Math.max(a, Math.min(b, v));
+
+/* ─── SPHERE INTRO ─── */
+function useSphereIntro() {
+  const canvasRef = useRef(null);
+  const stateRef = useRef({
+    W: 0, H: 0, rotation: 0, rotSpeed: 0.004, sphereAlpha: 0,
+    transitionT: 0, phase: "idle", frame: 0, arcs: [], arcTimer: 0, mouse: { x: 0, y: 0 },
+  });
+  const introRef = useRef(null);
+  const heroRef  = useRef(null);
+  const navRef   = useRef(null);
+  const isMobile = () => window.innerWidth <= 767;
+  const globeRef = useRef(null);
+  if (!globeRef.current) {
+    const dots = [];
+    const latStep = isMobile() ? 14 : 10, lonStep = isMobile() ? 14 : 10;
+    for (let lat = -80; lat <= 80; lat += latStep)
+      for (let lon = 0; lon < 360; lon += lonStep)
+        dots.push({ phi:(lat*Math.PI)/180, theta:(lon*Math.PI)/180, size:Math.random()*1.2+0.4, brightness:Math.random()*.5+.5, pulse:Math.random()*Math.PI*2, pulseSpeed:.02+Math.random()*.03 });
+    const rings = [
+      { tilt:.3,  speed:.007,  angle:0,   r:1.18, opacity:.35, dash:[8,6]  },
+      { tilt:-.5, speed:-.005, angle:1.2, r:1.28, opacity:.25, dash:[4,10] },
+      { tilt:.9,  speed:.009,  angle:2.4, r:1.12, opacity:.2,  dash:[12,8] },
+    ];
+    const pCount = isMobile() ? 30 : 60;
+    const particles = Array.from({ length: pCount }, () => ({
+      ring:Math.floor(Math.random()*3), angle:Math.random()*Math.PI*2,
+      speed:(Math.random()*.008+.004)*(Math.random()>.5?1:-1),
+      size:Math.random()*2+1, brightness:Math.random(), color:Math.random()>.5?"#C8F55A":"#4ADE80",
+    }));
+    globeRef.current = { dots, rings, particles };
+  }
+  const getSphereParams = (s) => {
+    const { W, H, transitionT } = s;
+    const mobile = W <= 767;
+    const introR = Math.min(W,H)*(mobile?.36:.38), settledR = Math.min(W,H)*(mobile?.38:.32);
+    const iCx=W/2, iCy=H/2, sCx=mobile?W/2:W*.62, sCy=mobile?H*.38:H*.48;
+    const t = easeInOutCubic(transitionT);
+    return { r:introR+(settledR-introR)*t, cx:iCx+(sCx-iCx)*t, cy:iCy+(sCy-iCy)*t };
+  };
+  const project = (phi,theta,rot,cx,cy,r) => {
+    const x3=Math.cos(phi)*Math.sin(theta+rot), y3=Math.sin(phi), z3=Math.cos(phi)*Math.cos(theta+rot);
+    const p=2.8, sc=p/(p+z3*.4);
+    return { x:cx+x3*r*sc, y:cy-y3*r*sc, z:z3, sc };
+  };
+  const lerpSphere = (a,b,t,rot,cx,cy,r) => {
+    const ax=Math.cos(a.phi)*Math.sin(a.theta), ay=Math.sin(a.phi), az=Math.cos(a.phi)*Math.cos(a.theta);
+    const bx=Math.cos(b.phi)*Math.sin(b.theta), by=Math.sin(b.phi), bz=Math.cos(b.phi)*Math.cos(b.theta);
+    const dot=Math.min(1,ax*bx+ay*by+az*bz), omega=Math.acos(dot);
+    let rx,ry,rz;
+    if(omega<.001){rx=ax+t*(bx-ax);ry=ay+t*(by-ay);rz=az+t*(bz-az);}
+    else{const s=Math.sin(omega),sa=Math.sin((1-t)*omega)/s,sb=Math.sin(t*omega)/s;rx=sa*ax+sb*bx;ry=sa*ay+sb*by;rz=sa*az+sb*bz;}
+    const lift=1.06+Math.sin(t*Math.PI)*.12; rx*=lift;ry*=lift;rz*=lift;
+    const p=2.8,sc=p/(p+rz*.4);
+    return { x:cx+rx*r*sc, y:cy-ry*r*sc, z:rz, sc };
+  };
+  const spawnArc = (s) => {
+    const d=globeRef.current.dots;
+    const a=d[Math.floor(Math.random()*d.length)], b=d[Math.floor(Math.random()*d.length)];
+    s.arcs.push({ from:{phi:a.phi,theta:a.theta}, to:{phi:b.phi,theta:b.theta}, progress:0, speed:.008+Math.random()*.006, life:1, fadeSpeed:.012 });
+  };
+  const drawFrame = (ctx,s) => {
+    const { W, H, rotation, sphereAlpha, arcs } = s;
+    const { dots, rings, particles } = globeRef.current;
+    const { r, cx, cy } = getSphereParams(s);
+    ctx.clearRect(0,0,W,H);
+    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8);
+    bg.addColorStop(0,`rgba(16,28,16,${.5*sphereAlpha})`); bg.addColorStop(1,"transparent");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+    const sg=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.1);
+    sg.addColorStop(0,`rgba(74,222,128,${.04*sphereAlpha})`); sg.addColorStop(1,"transparent");
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,r*1.1,0,Math.PI*2); ctx.fill();
+    rings.forEach(ring => {
+      ring.angle+=ring.speed;
+      const steps=120, pts=[];
+      for(let i=0;i<=steps;i++){
+        const a=(i/steps)*Math.PI*2+ring.angle;
+        const rx2=Math.cos(a)*ring.r, ry2=Math.sin(a)*Math.cos(ring.tilt)*ring.r, rz2=Math.sin(a)*Math.sin(ring.tilt)*ring.r;
+        const rX=rx2*Math.cos(rotation)+rz2*Math.sin(rotation), rZ=-rx2*Math.sin(rotation)+rz2*Math.cos(rotation);
+        const p2=2.8,sc2=p2/(p2+rZ*.4); pts.push({ x:cx+rX*r*sc2, y:cy-ry2*r*sc2 });
+      }
+      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.setLineDash(ring.dash);
+      ctx.strokeStyle=`rgba(200,245,90,${ring.opacity})`; ctx.lineWidth=.8;
+      ctx.beginPath(); pts.forEach((pt,i)=>i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y)); ctx.stroke(); ctx.restore();
+      const da=Math.cos(ring.angle)*ring.r, db=Math.sin(ring.angle)*Math.cos(ring.tilt)*ring.r, dc=Math.sin(ring.angle)*Math.sin(ring.tilt)*ring.r;
+      const dX=da*Math.cos(rotation)+dc*Math.sin(rotation), dZ=-da*Math.sin(rotation)+dc*Math.cos(rotation);
+      const p3=2.8,dSc=p3/(p3+dZ*.4), px=cx+dX*r*dSc, py=cy-db*r*dSc;
+      const g2=ctx.createRadialGradient(px,py,0,px,py,6*dSc);
+      g2.addColorStop(0,"rgba(200,245,90,0.9)"); g2.addColorStop(1,"transparent");
+      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.beginPath(); ctx.arc(px,py,5*dSc,0,Math.PI*2); ctx.fillStyle=g2; ctx.fill(); ctx.restore();
+    });
+    const visible=[];
+    dots.forEach(dot=>{ dot.pulse+=dot.pulseSpeed; const p4=project(dot.phi,dot.theta,rotation,cx,cy,r); if(p4.z>-0.1) visible.push({...p4,dot}); });
+    visible.sort((a,b2)=>a.z-b2.z);
+    visible.forEach(({x,y,z,sc,dot})=>{
+      const df=(z+1)/2, pulse=.6+.4*Math.sin(dot.pulse), alpha=df*dot.brightness*pulse*sphereAlpha;
+      const size=dot.size*sc*(.5+df*.8), isAcc=dot.brightness>.8&&df>.7;
+      const color=isAcc?`rgba(200,245,90,${alpha})`:`rgba(74,222,128,${alpha*.7})`;
+      if(size>.3){
+        const g=ctx.createRadialGradient(x,y,0,x,y,size*2);
+        g.addColorStop(0,color); g.addColorStop(1,"transparent");
+        ctx.beginPath(); ctx.arc(x,y,size*2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+        ctx.beginPath(); ctx.arc(x,y,size,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+      }
+    });
+    if(sphereAlpha>.4){
+      s.arcTimer++;
+      if(s.arcTimer>80){ spawnArc(s); s.arcTimer=0; }
+      for(let i=arcs.length-1;i>=0;i--){
+        const arc=arcs[i]; arc.progress=Math.min(1,arc.progress+arc.speed);
+        if(arc.progress>=1) arc.life-=arc.fadeSpeed;
+        if(arc.life<=0){ arcs.splice(i,1); continue; }
+        const steps=40, du=Math.floor(arc.progress*steps);
+        ctx.save(); ctx.globalAlpha=arc.life*.6*sphereAlpha; let prev=null;
+        for(let k=0;k<=du;k++){
+          const t2=k/steps, pt=lerpSphere(arc.from,arc.to,t2,rotation,cx,cy,r);
+          if(pt.z<-.05){prev=null;continue;}
+          if(prev&&prev.z>-.05){
+            const sa=(1-Math.abs(t2-.5)*2)*.9;
+            ctx.strokeStyle=`rgba(200,245,90,${sa})`; ctx.lineWidth=1.2*pt.sc;
+            ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(pt.x,pt.y); ctx.stroke();
+          }
+          if(k===du){
+            const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,6);
+            g.addColorStop(0,"rgba(200,245,90,1)"); g.addColorStop(1,"transparent");
+            ctx.fillStyle=g; ctx.beginPath(); ctx.arc(pt.x,pt.y,5,0,Math.PI*2); ctx.fill();
+          }
+          prev=pt;
+        }
+        ctx.restore();
+      }
+    }
+    particles.forEach(p5=>{ p5.angle+=p5.speed; const ring=rings[p5.ring]; const rx3=Math.cos(p5.angle)*ring.r, ry3=Math.sin(p5.angle)*Math.cos(ring.tilt)*ring.r, rz3=Math.sin(p5.angle)*Math.sin(ring.tilt)*ring.r; const pX=rx3*Math.cos(rotation)+rz3*Math.sin(rotation), pZ=-rx3*Math.sin(rotation)+rz3*Math.cos(rotation); const pp=2.8,pSc=pp/(pp+pZ*.4), ppx=cx+pX*r*pSc, ppy=cy-ry3*r*pSc; const df=(pZ+1)/2, alpha=(.4+p5.brightness*.6)*df*sphereAlpha; ctx.globalAlpha=alpha; ctx.beginPath(); ctx.arc(ppx,ppy,p5.size*pSc*.8,0,Math.PI*2); ctx.fillStyle=p5.color; ctx.fill(); ctx.globalAlpha=1; });
+    const mx=(s.mouse.x-W/2)/W; const targetRS=.004+mx*.003; s.rotSpeed+=(targetRS-s.rotSpeed)*.05; s.rotation+=s.rotSpeed; s.frame++;
+  };
+  const animVal = (setter,from,to,duration,ease=easeOutCubic) => new Promise(resolve=>{
+    const start=performance.now();
+    const tick=()=>{ const t=clampT((performance.now()-start)/duration,0,1); setter(from+(to-from)*ease(t)); if(t<1) requestAnimationFrame(tick); else { setter(to); resolve(); } };
+    requestAnimationFrame(tick);
+  });
+  const anim = (el,kf,opts) => { if(!el) return Promise.resolve(); return el.animate(kf,{fill:"forwards",...opts}).finished; };
+  const runIntro = useCallback(async () => {
+    const s=stateRef.current; s.phase="fadein"; s.sphereAlpha=0; s.transitionT=0; s.rotation=0;
+    await animVal(v=>{ s.sphereAlpha=v; },0,1,900,easeOutCubic);
+    await new Promise(r=>setTimeout(r,100));
+    const intro=introRef.current;
+    if(intro){
+      const wm=intro.querySelector(".intro-wm"), bar=intro.querySelector(".intro-bar"), tag=intro.querySelector(".intro-tag");
+      if(wm) await anim(wm,[{opacity:0,transform:"scale(.94) translateY(12px)"},{opacity:1,transform:"scale(1) translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,180));
+      if(bar) await anim(bar,[{transform:"scaleX(0)",transformOrigin:"left"},{transform:"scaleX(1)",transformOrigin:"left"}],{duration:600,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,300));
+      if(tag) await anim(tag,[{opacity:0,transform:"translateY(8px)"},{opacity:1,transform:"translateY(0)"}],{duration:500,easing:"ease"});
+    }
+    await new Promise(r=>setTimeout(r,820));
+    s.phase="transition";
+    const intro2=introRef.current;
+    if(intro2){
+      const wm=intro2.querySelector(".intro-wm"), tag=intro2.querySelector(".intro-tag");
+      if(wm) wm.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.9) translateY(-18px)"}],{duration:550,easing:"cubic-bezier(.4,0,1,1)",fill:"forwards"});
+      if(tag) tag.animate([{opacity:1},{opacity:0}],{duration:380,fill:"forwards"});
+    }
+    animVal(v=>{ s.transitionT=v; },0,1,900,easeInOutCubic);
+    await new Promise(r=>setTimeout(r,180));
+    const hg=heroRef.current?.querySelector(".hero-gradient");
+    if(hg) hg.animate([{opacity:0},{opacity:1}],{duration:800,easing:"ease",fill:"forwards"});
+    const nav=navRef.current;
+    if(nav) nav.animate([{opacity:0,transform:"translateY(-16px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+    await new Promise(r=>setTimeout(r,150));
+    const hc=heroRef.current;
+    if(hc){
+      const label=hc.querySelector(".hero-label-inner"), line1=hc.querySelector(".hl1"), line2=hc.querySelector(".hl2"), meta=hc.querySelector(".hero-meta"), labelWrap=hc.querySelector(".hero-label-wrap");
+      if(labelWrap) labelWrap.animate([{opacity:0},{opacity:1}],{duration:300,fill:"forwards"});
+      if(label) label.animate([{transform:"translateY(100%)"},{transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,100));
+      if(line1) line1.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,70));
+      if(line2) line2.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,380));
+      if(meta) meta.animate([{opacity:0,transform:"translateY(14px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"ease",fill:"forwards"});
+    }
+    s.phase="done";
+  }, []);
+  useEffect(()=>{
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext("2d"), s=stateRef.current;
+    const resize=()=>{ s.W=canvas.width=canvas.offsetWidth; s.H=canvas.height=canvas.offsetHeight; s.mouse.x=s.W/2; s.mouse.y=s.H/2; };
+    resize();
+    const onMouse=e=>{ s.mouse.x=e.clientX; s.mouse.y=e.clientY; };
+    const onTouch=e=>{ if(e.touches[0]){ s.mouse.x=e.touches[0].clientX; } };
+    window.addEventListener("resize",resize); window.addEventListener("mousemove",onMouse); window.addEventListener("touchmove",onTouch,{passive:true});
+    let raf; const loop=()=>{ drawFrame(ctx,s); raf=requestAnimationFrame(loop); }; loop();
+    document.fonts.ready.then(()=>setTimeout(runIntro,200));
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener("resize",resize); window.removeEventListener("mousemove",onMouse); window.removeEventListener("touchmove",onTouch); };
+  }, [runIntro]);
+  return { canvasRef, introRef, heroRef, navRef };
+}
+
 function useReveal(deps = []) {
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -395,16 +620,39 @@ function Breadcrumb({ page, go }) {
     </div>
   );
 }
+function BottomTabBar({ active, go }) {
+  const tabs = [
+    { id: "dashboard", ico: "◈",  label: "Home"    },
+    { id: "devices",   ico: "📱", label: "Devices"  },
+    { id: "auditlogs", ico: "📋", label: "Logs"     },
+    { id: "risk",      ico: "🛡", label: "Risk"     },
+    { id: "admin",     ico: "⚙",  label: "Admin"    },
+  ];
+  return (
+    <div className="bottom-tabs">
+      <div className="bottom-tabs-inner">
+        {tabs.map(t => (
+          <button key={t.id} className={`tab-btn${active === t.id ? " active" : ""}`} onClick={() => go(t.id)}>
+            <span>{t.ico}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AppShell({ active, go, auth, onLogout, children }) {
   return (
     <div style={{ display: "flex", flexDirection: "row", minHeight: "100vh", overflow: "hidden" }}>
       <Sidebar active={active} go={go} auth={auth} onLogout={onLogout} />
-      <main style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ padding: "14px 44px 0" }}>
+      <main className="app-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div className="breadcrumb-wrap" style={{ padding: "14px 44px 0" }}>
           <Breadcrumb page={active} go={go} />
         </div>
         {children}
       </main>
+      <BottomTabBar active={active} go={go} />
     </div>
   );
 }
@@ -1918,7 +2166,6 @@ export default function App() {
     <>
       <FontLink />
       <div className="grain" />
-      <Cursor />
       <ToastStack toasts={toasts} />
 
       {page === "home"        && <Home go={go} auth={auth} />}
