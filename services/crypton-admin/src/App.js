@@ -722,46 +722,92 @@ function HeroCanvas() {
 
 function Landing({ go, toast }) {
   useReveal([]);
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { canvasRef, introRef, heroRef, navRef } = useSphereIntro();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollTo = id => {
+    setMenuOpen(false);
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
-    <div style={{ background: "var(--ink)" }} className="pg-in">
-      {/* NAV */}
-      <nav>
-        <a href="#" style={{ fontFamily: "var(--display)", fontSize: 20, letterSpacing: ".14em", color: "var(--paper)", textDecoration: "none" }}>CRYPTON</a>
+    <div style={{ background: "var(--ink)" }}>
+      <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+      <div ref={introRef} style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div className="intro-wm" style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,10vw,120px)", letterSpacing: ".14em", textTransform: "uppercase", opacity: 0, position: "relative", textAlign: "center" }}>
+          CRYPTON
+          <div className="intro-bar" style={{ position: "absolute", bottom: -10, left: 0, right: 0, height: 2, background: "var(--accent)", transform: "scaleX(0)" }} />
+        </div>
+        <div className="intro-tag" style={{ fontFamily: "var(--mono)", fontSize: "clamp(9px,1.5vw,11px)", letterSpacing: ".22em", textTransform: "uppercase", color: "var(--accent)", marginTop: 20, opacity: 0 }}>
+          Zero-trust · Device identity · No passwords
+        </div>
+      </div>
+      <div ref={navRef} className={"landing-nav" + (scrolled ? " scrolled" : "")} style={{ opacity: 0, zIndex: 600 }}>
+        <a onClick={() => scrollTo("hero")} style={{ fontFamily: "var(--display)", fontSize: 20, letterSpacing: ".14em", color: "var(--paper)", textDecoration: "none", cursor: "pointer" }}>CRYPTON</a>
         <ul className="nav-links-wrap" style={{ display: "flex", gap: 36, listStyle: "none" }}>
-          {["About", "Protocol", "Features", "Developer"].map(l => (
-            <li key={l}><a href={`#${l.toLowerCase()}`} onClick={e => e.preventDefault()} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", textDecoration: "none", opacity: .5, transition: "opacity .2s" }}
-              onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .5}>{l}</a></li>
+          {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
+            <li key={l.label}>
+              <button onClick={() => scrollTo(l.target)} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", border: "none", opacity: .7, transition: "opacity .2s", cursor: "pointer" }}
+                onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .7}>{l.label}</button>
+            </li>
           ))}
         </ul>
-        <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
-          onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
-          onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Enroll Device</button>
-      </nav>
-
-      {/* HERO */}
-      <section style={{ height: "100vh", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 52px 56px" }} className="hero-pad">
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 100% 70% at 50% 15%,#1C1C1C 0%,var(--ink) 55%)" }} />
-        <HeroCanvas />
-        <div style={{ position: "relative", zIndex: 1, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 36, height: 1, background: "var(--accent)" }} />Zero-trust · Device identity · No passwords
+        <div className="nav-desktop-btns" style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => go("dashboard")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "10px 18px", border: "1px solid var(--line2)", cursor: "pointer", transition: "all .2s" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--paper)"}
+            onMouseLeave={e => e.currentTarget.style.borderColor = "var(--line2)"}>Dashboard</button>
+          <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
+            onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Enroll Device</button>
         </div>
-        <div style={{ position: "relative", zIndex: 1, overflow: "hidden" }}>
-          <div className="hero-line" style={{ fontFamily: "var(--display)", fontSize: "clamp(80px,13.5vw,195px)", lineHeight: .9, letterSpacing: ".025em", textTransform: "uppercase" }}>Identity</div>
-          <div className="hero-line hero-line-2" style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "clamp(72px,12.5vw,180px)", lineHeight: .9 }}>Redefined.</div>
+        <button className={"mob-menu-btn" + (menuOpen ? " open" : "")} onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+          <span /><span /><span />
+        </button>
+      </div>
+      <div className={"mob-drawer" + (menuOpen ? " open" : "")}>
+        {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
+          <button key={l.label} className="mob-link" onClick={() => scrollTo(l.target)}>{l.label}</button>
+        ))}
+        <div className="mob-drawer-ctas">
+          <button onClick={() => { setMenuOpen(false); go("dashboard"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "14px 0", border: "1px solid var(--line2)", cursor: "pointer", textAlign: "center" }}>Dashboard</button>
+          <button onClick={() => { setMenuOpen(false); go("register"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--accent)", padding: "14px 0", border: "none", cursor: "pointer", textAlign: "center" }}>Enroll Device</button>
         </div>
-        <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
-          <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 300, lineHeight: 1.75, fontWeight: 300 }}>Authentication powered by hardware cryptography. Every request verified. Every device accountable.</p>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 1, height: 44, background: "rgba(122,117,112,.3)", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "50%", background: "var(--accent)", animation: "sp 2s ease-in-out infinite" }} />
+      </div>
+      <section id="hero" style={{ height: "100vh", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 52px 56px", zIndex: 10 }} className="hero-pad">
+        <div ref={heroRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          <div className="hero-gradient" style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,10,.9) 0%,rgba(10,10,10,.25) 45%,transparent 72%)", opacity: 0 }} />
+          <div style={{ position: "absolute", bottom: 56, left: 52, right: 52 }} className="hero-pad-inner">
+            <div className="hero-label-wrap" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", display: "flex", alignItems: "center", gap: 14, marginBottom: 20, overflow: "hidden", opacity: 0 }}>
+              <div style={{ width: 36, height: 1, background: "var(--accent)", flexShrink: 0 }} />
+              <div className="hero-label-inner" style={{ transform: "translateY(100%)" }}>Zero-trust · Device identity · No passwords</div>
             </div>
-            Scroll to explore
+            <div style={{ overflow: "hidden" }}>
+              <div className="hl1" style={{ fontFamily: "var(--display)", fontSize: "clamp(58px,13.5vw,195px)", lineHeight: .9, letterSpacing: ".025em", textTransform: "uppercase", transform: "translateY(110%)", display: "block" }}>Identity</div>
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div className="hl2" style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "clamp(52px,12.5vw,180px)", lineHeight: .9, transform: "translateY(110%)", display: "block" }}>Redefined.</div>
+            </div>
+            <div className="hero-meta" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)", opacity: 0, flexWrap: "wrap", gap: 16 }}>
+              <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 300, lineHeight: 1.75, fontWeight: 300 }}>Authentication powered by hardware cryptography. Every request verified. Every device accountable.</p>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => scrollTo("about")}>
+                <div style={{ width: 1, height: 44, background: "rgba(122,117,112,.3)", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "50%", background: "var(--accent)", animation: "sp 2s ease-in-out infinite" }} />
+                </div>
+                Scroll to explore
+              </div>
+            </div>
           </div>
         </div>
       </section>
-
-      {/* TICKER */}
-      <div style={{ background: "var(--accent)", overflow: "hidden", padding: "13px 0", whiteSpace: "nowrap" }} aria-hidden="true">
+      <div style={{ background: "var(--accent)", overflow: "hidden", padding: "13px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }} aria-hidden="true">
         <div className="ticker-track">
           {["Zero Trust","Device Identity","Hardware Keys","No Passwords","Cryptographic Proof","Instant Revocation"].flatMap(t => [
             <span key={t} style={{ fontFamily: "var(--display)", fontSize: 17, letterSpacing: ".1em", color: "var(--ink)", padding: "0 28px", textTransform: "uppercase" }}>{t}</span>,
@@ -773,143 +819,138 @@ function Landing({ go, toast }) {
           ])}
         </div>
       </div>
-
-      {/* MANIFESTO */}
-      <section id="about" style={{ padding: "140px 52px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>01 — Manifesto</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div className="rv" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "end" }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1.15, letterSpacing: "-.01em" }}>
-            Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+      <div style={{ position: "relative", zIndex: 10, background: "var(--ink)" }}>
+        <section id="about" style={{ padding: "140px 52px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>01 — Manifesto</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div>
-            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.85, maxWidth: 360, fontWeight: 300, marginBottom: 36 }}>
-              Crypton is a zero-trust identity platform where authentication is tied to cryptographic device keys — not passwords, not secrets, not human memory. Your private key never leaves your hardware.
-            </p>
-            <BtnO onClick={() => toast("Whitepaper coming soon")}>Read the whitepaper →</BtnO>
+          <div className="rv manifesto-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "end" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1.15, letterSpacing: "-.01em" }}>
+              Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+            </div>
+            <div>
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.85, maxWidth: 360, fontWeight: 300, marginBottom: 36 }}>
+                Crypton is a zero-trust identity platform where authentication is tied to cryptographic device keys — not passwords, not secrets, not human memory. Your private key never leaves your hardware.
+              </p>
+              <BtnO onClick={() => scrollTo("developer")}>Read the whitepaper →</BtnO>
+              <div style={{ marginTop: 16 }}><BtnF onClick={() => go("register")}>Enroll Your Device →</BtnF></div>
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,7vw,92px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
-        <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
-        <div className="rv rv-1" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
+        </section>
+        <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,7vw,92px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
+          <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
+          <div className="rv rv-1 hiw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
+            {[
+              { n: "01", t: "Challenge", b: "Server issues a unique, time-bound cryptographic nonce. Non-repeatable. Expires in milliseconds. Cannot be predicted or pre-computed." },
+              { n: "02", t: "Sign", b: "Your device’s hardware security module signs the nonce using its private key. The key never leaves the chip. Face ID. Touch ID. Hardware token." },
+              { n: "03", t: "Verify", b: "The server verifies the signature against your registered public key. Match means access. Mismatch means instant rejection. Sub-200ms total." },
+            ].map(c => <HiWCard key={c.n} {...c} />)}
+          </div>
+        </section>
+        <section id="features" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>03 — Capabilities</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+            <div className="features-list" style={{ paddingRight: 72, borderRight: "1px solid var(--line)" }}>
+              {[
+                { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
+                { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
+                { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
+                { i: "F.04", t: "Instant Revocation", b: "Revoke a compromised device in under 500ms. Propagates globally. No stale sessions. No grace periods." },
+                { i: "F.05", t: "Audit Trail", b: "Cryptographically signed, tamper-proof log of every authentication event. Export to CSV or JSON for compliance." },
+                { i: "F.06", t: "Time-Lock Recovery", b: "24-hour mandatory waiting period on recovery. Existing trusted devices can cancel unauthorized attempts." },
+              ].map((f, idx) => (
+                <div key={f.i} className="feat-item rv" style={{ padding: "32px 0", borderBottom: idx < 5 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "flex-start", gap: 20 }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 3, flexShrink: 0 }}>{f.i}</span>
+                  <div>
+                    <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 7 }}>{f.t}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{f.b}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="features-sticky" style={{ paddingLeft: 72 }}>
+              <div className="rv" style={{ position: "sticky", top: 120, height: 400, background: "var(--ink-3)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent)" }} />
+                <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+                  <div className="fv-glyph" style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 50px rgba(200,245,90,.35))" }}>🔐</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: "var(--accent)", marginTop: 14 }}>// secure enclave active</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <div className="rv stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
           {[
-            { n: "01", t: "Challenge", b: "Server issues a unique, time-bound cryptographic nonce. Non-repeatable. Expires in milliseconds. Cannot be predicted or pre-computed." },
-            { n: "02", t: "Sign", b: "Your device's hardware security module signs the nonce using its private key. The key never leaves the chip. Face ID. Touch ID. Hardware token." },
-            { n: "03", t: "Verify", b: "The server verifies the signature against your registered public key. Match means access. Mismatch means instant rejection. Sub-200ms total." },
-          ].map(c => (
-            <HiWCard key={c.n} {...c} />
+            { v: "0", d: "Passwords ever stored
+in the Crypton system" },
+            { v: "100%", d: "Requests cryptographically
+verified, every time" },
+            { v: "<200ms", d: "End-to-end authentication
+latency on 4G" },
+            { v: "∞", d: "Entropy in each
+hardware-generated key" },
+          ].map((s, i) => (
+            <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+              <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.65, whiteSpace: "pre-line" }}>{s.d}</div>
+            </div>
           ))}
         </div>
-      </section>
-
-      {/* FEATURES */}
-      <section id="features" style={{ padding: "0 52px 140px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>03 — Capabilities</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-          <div style={{ paddingRight: 72, borderRight: "1px solid var(--line)" }}>
+        <section id="developer" style={{ padding: "140px 52px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>04 — Developer</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="dev-grid" style={{ display: "grid", gridTemplateColumns: "5fr 7fr", alignItems: "stretch" }}>
+            <div className="rv dev-left" style={{ padding: "80px 56px 80px 0", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 22 }}>// Integrate in 5 minutes</div>
+              <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,5.5vw,76px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 28 }}>Ship<br />Zero-<br />Trust.</h2>
+              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.85, marginBottom: 36, fontWeight: 300, maxWidth: 320 }}>Our SDK handles all cryptographic operations. Type-safe API. Works with any backend.</p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 36 }}>
+                {["TypeScript", "Rust", "Python", "Go"].map(l => <span key={l} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "5px 11px", border: "1px solid var(--line)", color: "var(--muted)" }}>{l}</span>)}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <BtnF onClick={() => go("admin")}>Read the Docs →</BtnF>
+                <BtnO onClick={() => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank")}>GitHub ↗</BtnO>
+              </div>
+            </div>
+            <div className="rv rv-1 dev-right" style={{ padding: "80px 0 80px 56px" }}>
+              <CodeBlock toast={toast} />
+            </div>
+          </div>
+        </section>
+        <footer style={{ borderTop: "1px solid var(--line)", padding: "72px 52px 36px" }} className="section-pad">
+          <div className="rv footer-grid" style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 48, paddingBottom: 56, borderBottom: "1px solid var(--line)" }}>
+            <div className="footer-brand">
+              <div style={{ fontFamily: "var(--display)", fontSize: 56, letterSpacing: ".08em", lineHeight: 1, marginBottom: 20 }}>CRYPTON</div>
+              <p style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.7, maxWidth: 250 }}>Zero-trust device identity. Authentication powered by cryptography — not passwords, not hope.</p>
+            </div>
             {[
-              { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
-              { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
-              { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
-              { i: "F.04", t: "Instant Revocation", b: "Revoke a compromised device in under 500ms. Propagates globally. No stale sessions. No grace periods." },
-              { i: "F.05", t: "Audit Trail", b: "Cryptographically signed, tamper-proof log of every authentication event. Export to CSV or JSON for compliance." },
-              { i: "F.06", t: "Time-Lock Recovery", b: "24-hour mandatory waiting period on recovery. Existing trusted devices can cancel unauthorized attempts." },
-            ].map((f, idx) => (
-              <div key={f.i} className={`feat-item rv${idx > 2 ? "" : ""}`} style={{ padding: "32px 0", borderBottom: idx < 5 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "flex-start", gap: 20 }}>
-                <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 3, flexShrink: 0 }}>{f.i}</span>
-                <div>
-                  <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 7 }}>{f.t}</div>
-                  <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{f.b}</div>
-                </div>
+              { h: "Product", links: [{ l: "Protocol", action: () => scrollTo("protocol") }, { l: "Features", action: () => scrollTo("features") }, { l: "Pricing", action: () => toast("Pricing — coming soon", "info") }, { l: "Changelog", action: () => go("auditlogs") }] },
+              { h: "Developer", links: [{ l: "Documentation", action: () => go("admin") }, { l: "API Reference", action: () => go("admin") }, { l: "SDK", action: () => scrollTo("developer") }, { l: "GitHub", action: () => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank") }] },
+              { h: "Company", links: [{ l: "About", action: () => scrollTo("about") }, { l: "Security", action: () => go("risk") }, { l: "Privacy", action: () => toast("Privacy policy — coming soon", "info") }, { l: "Terms", action: () => toast("Terms of service — coming soon", "info") }] },
+            ].map(col => (
+              <div key={col.h}>
+                <h5 style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 18 }}>{col.h}</h5>
+                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 11 }}>
+                  {col.links.map(({ l, action }) => (
+                    <li key={l}><button onClick={action} style={{ fontSize: 13, color: "var(--paper)", opacity: .55, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "opacity .2s", fontFamily: "var(--body)" }}
+                      onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .55}>{l}</button></li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-          <div style={{ paddingLeft: 72 }}>
-            <div className="rv" style={{ position: "sticky", top: 120, height: 400, background: "var(--ink-3)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent)" }} />
-              <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-                <div className="fv-glyph" style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 50px rgba(200,245,90,.35))" }}>🔐</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: "var(--accent)", marginTop: 14 }}>// secure enclave active</div>
-              </div>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 28, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", flexWrap: "wrap", gap: 8 }}>
+            <span>© 2026 CRYPTON — ALL RIGHTS RESERVED</span><span>V1.0 · MARCH 2026</span>
           </div>
-        </div>
-      </section>
-
-      {/* STATS */}
-      <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-        {[
-          { v: "0", d: "Passwords ever stored\nin the Crypton system" },
-          { v: "100%", d: "Requests cryptographically\nverified, every time" },
-          { v: "<200ms", d: "End-to-end authentication\nlatency on 4G" },
-          { v: "∞", d: "Entropy in each\nhardware-generated key" },
-        ].map((s, i) => (
-          <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-            <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.65, whiteSpace: "pre-line" }}>{s.d}</div>
-          </div>
-        ))}
+        </footer>
       </div>
-
-      {/* DEVELOPER */}
-      <section id="developer" style={{ padding: "140px 52px" }} className="section-pad">
-        <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-          <span>04 — Developer</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "5fr 7fr", alignItems: "stretch" }}>
-          <div className="rv" style={{ padding: "80px 56px 80px 0", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 22 }}>// Integrate in 5 minutes</div>
-            <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,5.5vw,76px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 28 }}>Ship<br />Zero-<br />Trust.</h2>
-            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.85, marginBottom: 36, fontWeight: 300, maxWidth: 320 }}>Our SDK handles all cryptographic operations. Type-safe API. Works with any backend.</p>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 36 }}>
-              {["TypeScript", "Rust", "Python", "Go"].map(l => <span key={l} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "5px 11px", border: "1px solid var(--line)", color: "var(--muted)" }}>{l}</span>)}
-            </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <BtnF onClick={() => toast("Documentation opening...")}>Read the Docs →</BtnF>
-              <BtnO onClick={() => toast("GitHub link")}>GitHub</BtnO>
-            </div>
-          </div>
-          <div className="rv rv-1" style={{ padding: "80px 0 80px 56px" }}>
-            <CodeBlock toast={toast} />
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer style={{ borderTop: "1px solid var(--line)", padding: "72px 52px 36px" }}>
-        <div className="rv" style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 48, paddingBottom: 56, borderBottom: "1px solid var(--line)" }}>
-          <div>
-            <div style={{ fontFamily: "var(--display)", fontSize: 56, letterSpacing: ".08em", lineHeight: 1, marginBottom: 20 }}>CRYPTON</div>
-            <p style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.7, maxWidth: 250 }}>Zero-trust device identity. Authentication powered by cryptography — not passwords, not hope.</p>
-          </div>
-          {[
-            { h: "Product", links: ["Protocol", "Features", "Pricing", "Changelog"] },
-            { h: "Developer", links: ["Documentation", "API Reference", "SDK", "GitHub"] },
-            { h: "Company", links: ["About", "Security", "Privacy", "Terms"] },
-          ].map(col => (
-            <div key={col.h}>
-              <h5 style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 18 }}>{col.h}</h5>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 11 }}>
-                {col.links.map(l => <li key={l}><a href="#" onClick={e => e.preventDefault()} style={{ fontSize: 13, color: "var(--paper)", opacity: .55, textDecoration: "none", transition: "opacity .2s" }}
-                  onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .55}>{l}</a></li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 28, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)" }}>
-          <span>© 2026 CRYPTON — ALL RIGHTS RESERVED</span><span>V1.0 · MARCH 2026</span>
-        </div>
-      </footer>
     </div>
   );
 }
@@ -2108,13 +2149,13 @@ function OrgSettings({ go, toast, auth, onLogout }) {
    ROOT
 ═══════════════════════════════════════════════════════════════ */
 const ROUTES = {
-  "/": "home", "/landing": "landing", "/register": "register", "/login": "login",
+  "/": "landing", "/landing": "landing", "/register": "register", "/login": "login",
   "/dashboard": "dashboard", "/devices": "devices", "/audit-logs": "auditlogs",
   "/risk": "risk", "/sessions": "sessions", "/users": "rbac", "/recovery": "recovery",
   "/policy": "policy", "/org": "orgsettings", "/admin": "admin",
 };
 const PAGE_TO_PATH = Object.fromEntries(Object.entries(ROUTES).map(([k, v]) => [v, k]));
-function getPageFromPath() { return ROUTES[window.location.pathname] || "home"; }
+function getPageFromPath() { return ROUTES[window.location.pathname] || "landing"; }
 
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
