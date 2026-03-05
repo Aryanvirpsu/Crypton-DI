@@ -9,6 +9,7 @@ pub struct AppState {
     pub redis: Option<::redis::Client>,
     pub webauthn: Webauthn,
     pub jwt_secret: String,
+    pub cors_origin: String,
 }
 
 impl AppState {
@@ -39,6 +40,7 @@ impl AppState {
             redis,
             webauthn,
             jwt_secret: cfg.jwt_secret.clone(),
+            cors_origin: cfg.webauthn_origin.clone(),
         })
     }
 
