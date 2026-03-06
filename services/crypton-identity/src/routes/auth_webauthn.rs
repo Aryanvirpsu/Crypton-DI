@@ -148,14 +148,15 @@ async fn register_finish(
         .await
         .map_err(|e| AppError::internal(e.to_string()))?;
 
-    // Persist the credential — cred_id_bytes also fills the public_key placeholder
-    // until we extract it separately; the passkey column is the source of truth.
+    // Persist the credential. The `passkey` TEXT column is the source of truth —
+    // it holds the full serialised Passkey struct (including the public key).
+    // `public_key` is intentionally omitted here; it is now nullable (see
+    // migration 003) and should not be populated with placeholder bytes.
     sqlx::query(
-        "INSERT INTO credentials (user_id, credential_id, public_key, sign_count, passkey) \
-         VALUES ($1, $2, $3, 0, $4)",
+        "INSERT INTO credentials (user_id, credential_id, sign_count, passkey) \
+         VALUES ($1, $2, 0, $3)",
     )
     .bind(user_id)
-    .bind(&cred_id_bytes)
     .bind(&cred_id_bytes)
     .bind(&passkey_json)
     .execute(db)
