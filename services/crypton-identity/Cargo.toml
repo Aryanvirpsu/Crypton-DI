@@ -24,6 +24,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 uuid = { version = "1", features = ["v4", "serde"] }
 tower-http = { version = "0.6", features = ["trace", "cors"] }
+tower_governor = { version = "0.5", features = [] }
 
 webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
 jsonwebtoken = "9"
