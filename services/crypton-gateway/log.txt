@@ -1,0 +1,28 @@
+GitHub Copilot Interpretation Log
+
+2026-03-02 20:30 UTC - Initial gateway-service scaffolding created under `services/gateway-service` with Cargo.toml and src structure (main.rs, middleware, routes, state, audit).
+2026-03-02 20:35 UTC - Added dependencies: axum, tokio, hyper, serde, redis, jsonwebtoken, tracing.
+2026-03-02 20:40 UTC - Implemented JWT validation middleware and simple proxy handler.
+2026-03-02 20:50 UTC - Added rate limiting, nonce enforcement, policy stub.
+2026-03-02 20:55 UTC - Created AppState struct for Redis.
+2026-03-02 21:00 UTC - Added README and .env example.
+2026-03-02 21:10 UTC - Moved gateway service code to `services/crypton-gateway` and updated Cargo.toml/package name.
+2026-03-02 21:15 UTC - Added Postgres (sqlx, uuid) dependencies and updated AppState to include PgPool.
+2026-03-02 21:20 UTC - Implemented audit ingestion, database initialization, and README updates for DATABASE_URL.
+2026-03-02 21:25 UTC - Enhanced middleware with logging, improved rate limit checks, and proxy base URL environment variable.
+2026-03-02 21:30 UTC - Added Dockerfile and rust-toolchain.
+2026-03-02 21:33 UTC - Created log.txt file summarizing all changes (this entry). 
+2026-03-02 21:45 UTC - Enhanced policy engine with account lockout, recovery blocking, and step-up enforcement. Audit ingestion now populates Redis keys for policy decisions.
+2026-03-02 22:00 UTC - Implemented timestamp window validation: all requests now require x-timestamp header (Unix epoch seconds) within ±60 second window. Nonce remaining optional but enforces no replay.
+
+2026-03-16 20:15 UTC - Completed gateway hardening: fixed module wiring (added middleware/routes/audit mod.rs), switched `/api/*` proxy to handle all HTTP methods, and ensured middlewares (auth, rate_limit, policy, nonce) run only on `/api/**` traffic.
+2026-03-16 20:20 UTC - Corrected AppState usage in middlewares to use Axum `State<AppState>`; fixed Redis connection handling for rate limiting and nonce enforcement.
+2026-03-16 20:25 UTC - Updated rate limiting to use client IP from `x-forwarded-for` or ConnectInfo, and scoped limits to sensitive paths (`/auth/*`, `/recovery/*`, `/devices/revoke`) while preserving Redis key scheme (`ratelimit:ip:user:device`).
+2026-03-16 20:30 UTC - Improved policy engine for login lockout (supports `x-user-id` hint), `/private` deny-by-default, device revoke step-up, and recovery-pending device add blocking; all decisions now log structured `tracing` events.
+2026-03-16 20:35 UTC - Tightened proxy logging to record upstream URL and status; kept tracing to stdout only (removed runtime logging to log.txt to keep this file as a human edit log).
+2026-03-16 20:45 UTC - Added in-memory metrics registry to `AppState` (auth, rate_limit, nonce, policy, proxy counters) and exposed Prometheus-compatible `GET /metrics` endpoint.
+2026-03-16 20:50 UTC - Wired metrics increments into auth (JWT/opaque/rejected), rate limiting (ip/user/device blocks), nonce (missing/invalid timestamp, replay), policy (per-rule blocks and dry-run), and proxy (upstream 2xx/4xx/5xx/errors).
+2026-03-16 20:55 UTC - Introduced `POLICY_ENFORCE` environment switch; when set to `false`, policy rules run in dry-run mode (log \"would block\" and increment `gateway_policy_would_block_dry_run_total` without denying the request).
+2026-03-16 21:00 UTC - Extended admin diagnostics with `GET /admin/diagnostics/user/:user_id`, `/device/:device_id`, and `/ip/:ip` for inspecting Redis-backed lockout, recovery, device, and rate-limit state.
+
+Note: Identity service `main.rs` remains untouched per instructions.
