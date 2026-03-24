@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::{delete, get},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Serialize;
@@ -13,6 +13,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/devices", get(list_devices))
         .route("/devices/:id", delete(revoke_device))
+        .route("/devices/:id/revoke", post(revoke_device_post))
 }
 
 // ── GET /devices ──────────────────────────────────────────────────────────────
@@ -95,5 +96,36 @@ async fn revoke_device(
         "device revoked"
     );
 
+    Ok(Json(RevokeResp { status: "revoked" }))
+}
+
+// ── POST /devices/:id/revoke ──────────────────────────────────────────────────
+// Frontend calls this path+method. Same logic as DELETE /devices/:id.
+
+async fn revoke_device_post(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<RevokeResp>, AppError> {
+    let db = state
+        .db
+        .as_ref()
+        .ok_or_else(|| AppError::internal("database_not_configured"))?;
+
+    let result = sqlx::query(
+        "UPDATE credentials SET status = 'revoked' \
+         WHERE id = $1 AND user_id = $2",
+    )
+    .bind(id)
+    .bind(auth.user_id)
+    .execute(db)
+    .await
+    .map_err(|e| AppError::internal(e.to_string()))?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::not_found("credential_not_found"));
+    }
+
+    tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked via POST");
     Ok(Json(RevokeResp { status: "revoked" }))
 }

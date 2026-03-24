@@ -12,6 +12,7 @@ mod auth_webauthn;
 mod devices;
 mod health;
 mod secure;
+mod stubs;
 
 pub fn router() -> Router<AppState> {
     // Rate-limit auth endpoints: 5 requests/second steady-state, burst of 20.
@@ -35,4 +36,5 @@ pub fn router() -> Router<AppState> {
         .merge(auth_router)
         .merge(devices::router())
         .merge(secure::router())
+        .merge(stubs::router())
 }
