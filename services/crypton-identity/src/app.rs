@@ -17,7 +17,7 @@ pub fn app(state: AppState) -> Router {
 
     let cors = CorsLayer::new()
         .allow_origin(cors_origin)
-        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
         .allow_headers([CONTENT_TYPE, AUTHORIZATION]);
 
     Router::<AppState>::new()
