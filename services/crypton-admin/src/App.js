@@ -1,6 +1,84 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ── MOCK DATA (replace with real API calls when backend endpoints exist) ──────
+/* ═══════════════════════════════════════════════════════════════
+   ██████╗  █████╗  ██████╗██╗  ██╗███████╗███╗   ██╗██████╗
+   ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝████╗  ██║██╔══██╗
+   ██████╔╝███████║██║     █████╔╝ █████╗  ██╔██╗ ██║██║  ██║
+   ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔══╝  ██║╚██╗██║██║  ██║
+   ██████╔╝██║  ██║╚██████╗██║  ██╗███████╗██║ ╚████║██████╔╝
+   ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝╚═════╝
+
+   BACKEND INTEGRATION GUIDE
+   ─────────────────────────
+   All hardcoded data lives in this single section.
+   To connect a real backend:
+     1. Set API_BASE to your API URL
+     2. Replace each mock function below with a real fetch() call
+     3. The shape of each object is documented — match it exactly
+     4. Auth token: set CRYPTON_TOKEN or inject via your auth flow
+
+   Every page in this app calls one of these functions.
+   None of the UI components need to change — only this section.
+═══════════════════════════════════════════════════════════════ */
+
+// ── CONFIG ─────────────────────────────────────────────────────
+const API_BASE = "https://api.yourcrypton.io"; // ← change this
+const CRYPTON_TOKEN = null; // ← set your auth token here, or read from localStorage
+
+const api = {
+  headers: () => ({
+    "Content-Type": "application/json",
+    ...(CRYPTON_TOKEN ? { Authorization: `Bearer ${CRYPTON_TOKEN}` } : {}),
+  }),
+  get: async (path) => {
+    // Uncomment when backend is ready:
+    // const res = await fetch(`${API_BASE}${path}`, { headers: api.headers() });
+    // if (!res.ok) throw new Error(`API error ${res.status}`);
+    // return res.json();
+  },
+  post: async (path, body) => {
+    // Uncomment when backend is ready:
+    // const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers: api.headers(), body: JSON.stringify(body) });
+    // if (!res.ok) throw new Error(`API error ${res.status}`);
+    // return res.json();
+  },
+  del: async (path) => {
+    // Uncomment when backend is ready:
+    // const res = await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: api.headers() });
+    // if (!res.ok) throw new Error(`API error ${res.status}`);
+    // return res.json();
+  },
+  patch: async (path, body) => {
+    // Uncomment when backend is ready:
+    // const res = await fetch(`${API_BASE}${path}`, { method: "PATCH", headers: api.headers(), body: JSON.stringify(body) });
+    // if (!res.ok) throw new Error(`API error ${res.status}`);
+    // return res.json();
+  },
+};
+
+// ── MOCK DATA ──────────────────────────────────────────────────
+// Replace each object/array below with the real API call above.
+// The shape shown here is exactly what each page expects.
+
+/* GET /devices
+   Returns: Array<{ id, ico, name, type, status, enrolled, last, fp }> */
+const MOCK_DEVICES = [
+  { id: "dev_001", ico: "💻", name: "MacBook Pro", type: "Laptop · macOS 14", status: "active", enrolled: "Mar 1, 2026", last: "2 min ago", fp: "a3:f7:2c:91..." },
+  { id: "dev_002", ico: "📱", name: "iPhone 15 Pro", type: "Phone · iOS 17", status: "active", enrolled: "Feb 28, 2026", last: "1 hr ago", fp: "b8:12:aa:5e..." },
+  { id: "dev_003", ico: "🖥", name: "Work Desktop", type: "Desktop · Windows 11", status: "inactive", enrolled: "Jan 15, 2026", last: "5 days ago", fp: "c4:9d:0f:77..." },
+];
+
+/* GET /passkeys
+   Returns: Array<{ id, name, attest, device, created, lastUsed, active }> */
+const MOCK_PASSKEYS = [
+  { id: "pk_a3f72c91b8e4", name: "MacBook Pro — Touch ID", attest: "packed", created: "Mar 1, 2026", lastUsed: "2 min ago", device: "MacBook Pro", active: true },
+  { id: "pk_b812aa5e3d71", name: "iPhone 15 Pro — Face ID", attest: "apple", created: "Feb 28, 2026", lastUsed: "1h ago", device: "iPhone 15 Pro", active: true },
+  { id: "pk_c49d0f77aa12", name: "YubiKey 5 — NFC", attest: "fido-u2f", created: "Jan 10, 2026", lastUsed: "12d ago", device: "Hardware Token", active: false },
+];
+
+/* GET /audit-logs?limit=50
+   Returns: Array<{ id, actor, action, device, ip, loc, time, type }>
+   type: "success" | "danger" | "warning" | "info" */
 const MOCK_AUDIT_LOGS = [
   { id: "evt_001", actor: "aryan@crypton.io", action: "LOGIN", device: "MacBook Pro", ip: "192.168.1.1", loc: "San Francisco, CA", time: "2m ago", type: "success" },
   { id: "evt_002", actor: "aryan@crypton.io", action: "DEVICE_ENROLL", device: "iPhone 15 Pro", ip: "192.168.1.1", loc: "San Francisco, CA", time: "1h ago", type: "info" },
@@ -13,11 +91,13 @@ const MOCK_AUDIT_LOGS = [
   { id: "evt_009", actor: "sarah@crypton.io", action: "LOGIN", device: "iPhone 14", ip: "74.125.24.100", loc: "Austin, TX", time: "2d ago", type: "success" },
   { id: "evt_010", actor: "aryan@crypton.io", action: "LOGIN", device: "MacBook Pro", ip: "192.168.1.1", loc: "San Francisco, CA", time: "3d ago", type: "success" },
 ];
-const MOCK_RISK_USERS = [
-  { id: "usr_001", user: "aryan@crypton.io", score: 82, level: "HIGH", device: "Unknown Device", ip: "185.220.101.4", loc: "Tokyo, JP", time: "02:14 AM", reasons: ["New device detected", "Foreign IP address", "Unusual login time", "Geo-velocity anomaly"] },
-  { id: "usr_002", user: "sarah@crypton.io", score: 34, level: "LOW", device: "iPhone 14", ip: "74.125.24.100", loc: "Austin, TX", time: "09:32 AM", reasons: ["Known device", "Familiar location"] },
-  { id: "usr_003", user: "admin@crypton.io", score: 61, level: "MEDIUM", device: "MacBook Pro", ip: "10.0.0.5", loc: "New York, NY", time: "11:58 PM", reasons: ["Unusual login time", "Multiple failed attempts"] },
-];
+
+/* GET /risk/users
+   Returns: Array<{ id, user, score, level, device, ip, loc, time, reasons }>
+   level: "HIGH" | "MEDIUM" | "LOW" */
+/* GET /risk/feed
+   Returns: Array<{ id, ico, type, msg, time }>
+   type: "danger" | "warning" | "info" | "success" */
 const MOCK_RISK_FEED = [
   { id: "feed_001", ico: "🚨", type: "danger", msg: "Geo-velocity alert: 8,400km in 3 hours", time: "2m ago" },
   { id: "feed_002", ico: "⚠", type: "warning", msg: "TOR exit node detected — IP 185.220.101.4", time: "14m ago" },
@@ -25,19 +105,47 @@ const MOCK_RISK_FEED = [
   { id: "feed_004", ico: "🛡", type: "info", msg: "Device reputation verified — MacBook Pro", time: "2h ago" },
   { id: "feed_005", ico: "✓", type: "success", msg: "Behavioral baseline updated — sarah@crypton.io", time: "4h ago" },
 ];
+
+/* GET /risk/users
+   Returns: Array<{ id, user, score, level, device, ip, loc, time, reasons }>
+   level: "HIGH" | "MEDIUM" | "LOW" */
+const MOCK_RISK_USERS = [
+  { id: "risk_001", user: "aryan@crypton.io",  score: 12, level: "LOW",    device: "MacBook Pro",  ip: "192.168.1.1",    loc: "San Francisco, CA", time: "2m ago",  reasons: ["Known device", "Normal hours", "Trusted location"] },
+  { id: "risk_002", user: "admin@crypton.io",  score: 44, level: "MEDIUM", device: "MacBook Pro",  ip: "10.0.0.5",       loc: "New York, NY",      time: "1h ago",  reasons: ["New IP range", "Off-hours login", "Role: Admin"] },
+  { id: "risk_003", user: "sarah@crypton.io",  score: 21, level: "LOW",    device: "iPad Air",     ip: "74.125.24.100",  loc: "Austin, TX",        time: "3h ago",  reasons: ["Known device", "Daytime login"] },
+  { id: "risk_004", user: "unknown@extern.io", score: 87, level: "HIGH",   device: "Unknown",      ip: "185.220.101.4",  loc: "Tokyo, JP",         time: "6h ago",  reasons: ["TOR exit node", "Geo-velocity violation", "Unknown device"] },
+];
+
+/* GET /sessions
+   Returns: Array<{ id, user, device, browser, loc, ip, started, duration, active }> */
 const MOCK_SESSIONS = [
   { id: "ses_001", user: "aryan@crypton.io", device: "MacBook Pro", browser: "Chrome 122", loc: "San Francisco, CA", ip: "192.168.1.1", started: "Today, 09:14 AM", duration: "4h 32m", active: true },
   { id: "ses_002", user: "aryan@crypton.io", device: "iPhone 15 Pro", browser: "Safari Mobile", loc: "San Francisco, CA", ip: "192.168.1.2", started: "Today, 11:02 AM", duration: "2h 44m", active: true },
   { id: "ses_003", user: "sarah@crypton.io", device: "iPad Air", browser: "Safari", loc: "Austin, TX", ip: "74.125.24.100", started: "Today, 08:30 AM", duration: "5h 16m", active: true },
   { id: "ses_004", user: "admin@crypton.io", device: "MacBook Pro", browser: "Firefox 123", loc: "New York, NY", ip: "10.0.0.5", started: "Yesterday, 11:58 PM", duration: "Idle 8h", active: false },
 ];
+
+/* GET /users
+   Returns: Array<{ id, name, email, role, devices, lastActive, avatar }>
+   role: "Super Admin" | "Admin" | "Security Analyst" | "Viewer" */
 const MOCK_USERS = [
   { id: "usr_001", name: "Aryan Vir", email: "aryan@crypton.io", role: "Super Admin", devices: 2, lastActive: "2m ago", avatar: "A" },
   { id: "usr_002", name: "Admin User", email: "admin@crypton.io", role: "Admin", devices: 1, lastActive: "1h ago", avatar: "AU" },
   { id: "usr_003", name: "Sarah Kim", email: "sarah@crypton.io", role: "Security Analyst", devices: 2, lastActive: "3h ago", avatar: "S" },
   { id: "usr_004", name: "Dev Read", email: "dev@crypton.io", role: "Viewer", devices: 1, lastActive: "2d ago", avatar: "D" },
 ];
-const MOCK_DASHBOARD_STATS = { activeDevices: 3, authEvents24h: 47, securityScore: 98 };
+
+/* GET /dashboard/stats
+   Returns: { activeDevices, authEvents24h, securityScore } */
+const MOCK_DASHBOARD_STATS = {
+  activeDevices: 3,
+  authEvents24h: 47,
+  securityScore: 98,
+};
+
+/* GET /dashboard/activity
+   Returns: Array<{ id, ico, type, title, meta, time, link }>
+   link: page id to navigate to on click */
 const MOCK_ACTIVITY = [
   { id: "act_001", ico: "✓", type: "s", title: "Authentication successful", meta: "MacBook Pro · Chrome · San Francisco, CA", time: "2m ago", link: "auditlogs" },
   { id: "act_002", ico: "📱", type: "i", title: "New device enrolled", meta: "iPhone 15 Pro · Passkey created", time: "1h ago", link: "devices" },
@@ -45,7 +153,21 @@ const MOCK_ACTIVITY = [
   { id: "act_004", ico: "⚠", type: "w", title: "Unrecognized device blocked", meta: "Unknown · Tokyo, JP · Request denied", time: "6h ago", link: "risk" },
   { id: "act_005", ico: "🔒", type: "i", title: "Security sweep completed", meta: "All 3 devices verified · Zero anomalies", time: "12h ago", link: "sessions" },
 ];
-const MOCK_ORG = { orgName: "Crypton Labs", domain: "crypton.io", domainVerified: true, mfaEnforced: true, sessionTimeoutHours: 8, allowedCountries: ["US", "CA", "GB", "DE", "AU"] };
+
+/* GET /org
+   Returns: { orgName, domain, domainVerified, mfaEnforced, sessionTimeoutHours, allowedCountries } */
+const MOCK_ORG = {
+  orgName: "Crypton Labs",
+  domain: "crypton.io",
+  domainVerified: true,
+  mfaEnforced: true,
+  sessionTimeoutHours: 8,
+  allowedCountries: ["US", "CA", "GB", "DE", "AU"],
+};
+
+/* GET /policies
+   Returns: Array<{ id, label, desc, active, cat }>
+   cat: "geo" | "risk" | "network" | "device" | "auth" */
 const MOCK_POLICIES = [
   { id: "geo_block", label: "Block High-Risk Countries", desc: "Deny auth from CN, RU, KP, IR and other flagged regions", active: true, cat: "geo" },
   { id: "stepup_risk", label: "Step-Up Auth if Risk > 70", desc: "Require additional verification when risk score exceeds threshold", active: true, cat: "risk" },
@@ -56,6 +178,18 @@ const MOCK_POLICIES = [
   { id: "off_hours", label: "Notify on Off-Hours Login", desc: "Send alert when users authenticate outside 06:00–22:00 local time", active: false, cat: "auth" },
   { id: "new_device", label: "Require Approval for New Devices", desc: "Admin must approve new device enrollment via existing trusted device", active: false, cat: "device" },
 ];
+
+/* ── API ENDPOINTS (replace mock data with these when backend ready)
+   POST /devices/:id/revoke         → revoke a device
+   DELETE /passkeys/:id             → revoke a passkey
+   DELETE /sessions/:id             → kill a session
+   DELETE /sessions                 → kill all sessions
+   PATCH /users/:id/role            → { role: string }
+   POST /risk/scan                  → trigger re-scan, returns updated scores
+   PATCH /policies/:id              → { active: boolean }
+   PATCH /org                       → full org settings object
+   GET /export/audit-logs           → returns CSV download
+─────────────────────────────────────────────────────────────── */
 
 /* ─── FONTS ─── */
 const FontLink = () => (
@@ -75,7 +209,7 @@ const FontLink = () => (
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
-    body{font-family:var(--body);background:var(--ink);color:var(--paper);overflow-x:hidden;line-height:1.5;cursor:auto}
+    body{font-family:var(--body);background:var(--ink);color:var(--paper);overflow-x:hidden;line-height:1.6;cursor:auto;font-size:15px}
     ::selection{background:var(--accent);color:var(--ink)}
     ::-webkit-scrollbar{width:2px}::-webkit-scrollbar-track{background:var(--ink)}::-webkit-scrollbar-thumb{background:var(--accent)}
 
@@ -95,7 +229,7 @@ const FontLink = () => (
     @keyframes fg{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-14px) rotate(3deg)}}
     .fv-glyph{animation:fg 7s ease-in-out infinite}
 
-    /* landing nav */
+    /* nav - only used on landing page */
     .landing-nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:24px 52px;transition:background .3s,backdrop-filter .3s,padding .3s,border-color .3s;border-bottom:1px solid transparent}
     .landing-nav.scrolled{background:rgba(10,10,10,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:16px 52px;border-color:var(--line)}
 
@@ -122,6 +256,8 @@ const FontLink = () => (
 
     /* modal anim */
     @keyframes mIn{from{opacity:0;transform:scale(.96) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes taFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes atkPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.6)}}
     .modal-anim{animation:mIn .4s cubic-bezier(.16,1,.3,1)}
 
     /* toast */
@@ -164,6 +300,7 @@ const FontLink = () => (
     .mob-drawer{position:fixed;inset:0;top:0;background:rgba(10,10,10,0.97);backdrop-filter:blur(20px);z-index:1050;display:flex;flex-direction:column;padding:100px 32px 40px;transform:translateX(100%);transition:transform .4s cubic-bezier(.16,1,.3,1)}
     .mob-drawer.open{transform:translateX(0)}
     .mob-drawer a,.mob-drawer button.mob-link{font-family:var(--display);font-size:clamp(36px,10vw,52px);letter-spacing:.06em;text-transform:uppercase;color:var(--paper);text-decoration:none;background:none;border:none;cursor:pointer;display:block;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;transition:color .2s}
+    .mob-drawer a:last-child,.mob-drawer button.mob-link:last-child{border-bottom:none}
     .mob-drawer-ctas{display:flex;flex-direction:column;gap:12px;margin-top:32px}
 
     /* ── BOTTOM TAB BAR (mobile app shell) ── */
@@ -187,10 +324,15 @@ const FontLink = () => (
     @media(max-width:767px){
       .mob-menu-btn{display:flex}
       .landing-nav .nav-desktop-btns{display:none}
+      /* hide desktop sidebar entirely on mobile */
       .sidebar{display:none!important}
+      /* show bottom tabs */
       .bottom-tabs{display:block}
+      /* push main content above bottom tabs */
       .app-main{padding-bottom:72px!important}
+      /* hero */
       .hero-line{font-size:clamp(58px,17vw,110px)!important}
+      /* landing sections stack */
       .manifesto-grid{grid-template-columns:1fr!important;gap:40px!important}
       .protocol-grid{grid-template-columns:1fr!important}
       .features-grid{grid-template-columns:1fr!important}
@@ -202,21 +344,29 @@ const FontLink = () => (
       .dev-right{padding:0 0 40px!important}
       .footer-grid{grid-template-columns:1fr 1fr!important;gap:32px!important}
       .footer-brand{grid-column:1/-1}
+      /* protocol cards stack */
       .hiw-grid{grid-template-columns:1fr!important}
+      /* dashboard */
       .stat-grid{grid-template-columns:1fr!important}
       .orb-grid{grid-template-columns:1fr!important}
       .orb-vis{display:none!important}
       .page-header{padding:20px 20px 16px!important}
       .page-body{padding:20px 20px 80px!important}
+      /* audit log table → cards */
       .audit-table{display:none!important}
       .audit-cards{display:flex!important}
+      /* sessions table → cards */
       .sessions-table{display:none!important}
       .sessions-cards{display:flex!important}
+      /* risk grid */
       .risk-grid{grid-template-columns:1fr!important}
+      /* rbac */
       .rbac-grid{grid-template-columns:1fr!important}
+      /* register */
       .register-grid{grid-template-columns:1fr!important}
       .register-vis{display:none!important}
       .register-form{padding:48px 24px!important}
+      /* breadcrumb padding */
       .breadcrumb-wrap{padding:10px 20px 0!important}
     }
     @media(max-width:400px){
@@ -231,56 +381,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ─── BASE64URL UTILS ─── */
-const b64url = {
-  decode(str) {
-    const s = str.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = s.length % 4;
-    const padded = pad ? s + '='.repeat(4 - pad) : s;
-    const raw = atob(padded);
-    return Uint8Array.from(raw, c => c.charCodeAt(0)).buffer;
-  },
-  encode(buf) {
-    const bytes = new Uint8Array(buf);
-    let str = '';
-    bytes.forEach(b => { str += String.fromCharCode(b); });
-    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-  }
-};
-
-/* ─── API ─── */
-const API = {
-  async registerStart(username, display_name) {
-    const r = await fetch('/auth/register/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, display_name }) });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  },
-  async registerFinish(challenge_id, attestation) {
-    const r = await fetch('/auth/register/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge_id, attestation }) });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  },
-  async loginStart(username) {
-    const r = await fetch('/auth/login/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  },
-  async loginFinish(challenge_id, assertion) {
-    const r = await fetch('/auth/login/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge_id, assertion }) });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  },
-  async listDevices(token) {
-    const r = await fetch('/devices', { headers: { 'Authorization': `Bearer ${token}` } });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  },
-  async revokeDevice(token, id) {
-    const r = await fetch(`/devices/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  }
-};
+/* ─── CURSOR removed — using default browser cursor ─── */
 
 /* ─── TOAST ─── */
 let toastId = 0;
@@ -311,208 +412,6 @@ function ToastStack({ toasts }) {
 }
 
 /* ─── SCROLL REVEAL ─── */
-/* ─── EASING UTILS (used by sphere intro) ─── */
-const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
-const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
-const clampT = (v,a,b) => Math.max(a, Math.min(b, v));
-
-/* ─── SPHERE INTRO ─── */
-function useSphereIntro() {
-  const canvasRef = useRef(null);
-  const stateRef = useRef({
-    W: 0, H: 0, rotation: 0, rotSpeed: 0.004, sphereAlpha: 0,
-    transitionT: 0, phase: "idle", frame: 0, arcs: [], arcTimer: 0, mouse: { x: 0, y: 0 },
-  });
-  const introRef = useRef(null);
-  const heroRef  = useRef(null);
-  const navRef   = useRef(null);
-  const isMobile = () => window.innerWidth <= 767;
-  const globeRef = useRef(null);
-  if (!globeRef.current) {
-    const dots = [];
-    const latStep = isMobile() ? 14 : 10, lonStep = isMobile() ? 14 : 10;
-    for (let lat = -80; lat <= 80; lat += latStep)
-      for (let lon = 0; lon < 360; lon += lonStep)
-        dots.push({ phi:(lat*Math.PI)/180, theta:(lon*Math.PI)/180, size:Math.random()*1.2+0.4, brightness:Math.random()*.5+.5, pulse:Math.random()*Math.PI*2, pulseSpeed:.02+Math.random()*.03 });
-    const rings = [
-      { tilt:.3,  speed:.007,  angle:0,   r:1.18, opacity:.35, dash:[8,6]  },
-      { tilt:-.5, speed:-.005, angle:1.2, r:1.28, opacity:.25, dash:[4,10] },
-      { tilt:.9,  speed:.009,  angle:2.4, r:1.12, opacity:.2,  dash:[12,8] },
-    ];
-    const pCount = isMobile() ? 30 : 60;
-    const particles = Array.from({ length: pCount }, () => ({
-      ring:Math.floor(Math.random()*3), angle:Math.random()*Math.PI*2,
-      speed:(Math.random()*.008+.004)*(Math.random()>.5?1:-1),
-      size:Math.random()*2+1, brightness:Math.random(), color:Math.random()>.5?"#C8F55A":"#4ADE80",
-    }));
-    globeRef.current = { dots, rings, particles };
-  }
-  const getSphereParams = (s) => {
-    const { W, H, transitionT } = s;
-    const mobile = W <= 767;
-    const introR = Math.min(W,H)*(mobile?.36:.38), settledR = Math.min(W,H)*(mobile?.38:.32);
-    const iCx=W/2, iCy=H/2, sCx=mobile?W/2:W*.62, sCy=mobile?H*.38:H*.48;
-    const t = easeInOutCubic(transitionT);
-    return { r:introR+(settledR-introR)*t, cx:iCx+(sCx-iCx)*t, cy:iCy+(sCy-iCy)*t };
-  };
-  const project = (phi,theta,rot,cx,cy,r) => {
-    const x3=Math.cos(phi)*Math.sin(theta+rot), y3=Math.sin(phi), z3=Math.cos(phi)*Math.cos(theta+rot);
-    const p=2.8, sc=p/(p+z3*.4);
-    return { x:cx+x3*r*sc, y:cy-y3*r*sc, z:z3, sc };
-  };
-  const lerpSphere = (a,b,t,rot,cx,cy,r) => {
-    const ax=Math.cos(a.phi)*Math.sin(a.theta), ay=Math.sin(a.phi), az=Math.cos(a.phi)*Math.cos(a.theta);
-    const bx=Math.cos(b.phi)*Math.sin(b.theta), by=Math.sin(b.phi), bz=Math.cos(b.phi)*Math.cos(b.theta);
-    const dot=Math.min(1,ax*bx+ay*by+az*bz), omega=Math.acos(dot);
-    let rx,ry,rz;
-    if(omega<.001){rx=ax+t*(bx-ax);ry=ay+t*(by-ay);rz=az+t*(bz-az);}
-    else{const s=Math.sin(omega),sa=Math.sin((1-t)*omega)/s,sb=Math.sin(t*omega)/s;rx=sa*ax+sb*bx;ry=sa*ay+sb*by;rz=sa*az+sb*bz;}
-    const lift=1.06+Math.sin(t*Math.PI)*.12; rx*=lift;ry*=lift;rz*=lift;
-    const p=2.8,sc=p/(p+rz*.4);
-    return { x:cx+rx*r*sc, y:cy-ry*r*sc, z:rz, sc };
-  };
-  const spawnArc = (s) => {
-    const d=globeRef.current.dots;
-    const a=d[Math.floor(Math.random()*d.length)], b=d[Math.floor(Math.random()*d.length)];
-    s.arcs.push({ from:{phi:a.phi,theta:a.theta}, to:{phi:b.phi,theta:b.theta}, progress:0, speed:.008+Math.random()*.006, life:1, fadeSpeed:.012 });
-  };
-  const drawFrame = (ctx,s) => {
-    const { W, H, rotation, sphereAlpha, arcs } = s;
-    const { dots, rings, particles } = globeRef.current;
-    const { r, cx, cy } = getSphereParams(s);
-    ctx.clearRect(0,0,W,H);
-    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8);
-    bg.addColorStop(0,`rgba(16,28,16,${.5*sphereAlpha})`); bg.addColorStop(1,"transparent");
-    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
-    const sg=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.1);
-    sg.addColorStop(0,`rgba(74,222,128,${.04*sphereAlpha})`); sg.addColorStop(1,"transparent");
-    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,r*1.1,0,Math.PI*2); ctx.fill();
-    rings.forEach(ring => {
-      ring.angle+=ring.speed;
-      const steps=120, pts=[];
-      for(let i=0;i<=steps;i++){
-        const a=(i/steps)*Math.PI*2+ring.angle;
-        const rx2=Math.cos(a)*ring.r, ry2=Math.sin(a)*Math.cos(ring.tilt)*ring.r, rz2=Math.sin(a)*Math.sin(ring.tilt)*ring.r;
-        const rX=rx2*Math.cos(rotation)+rz2*Math.sin(rotation), rZ=-rx2*Math.sin(rotation)+rz2*Math.cos(rotation);
-        const p2=2.8,sc2=p2/(p2+rZ*.4); pts.push({ x:cx+rX*r*sc2, y:cy-ry2*r*sc2 });
-      }
-      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.setLineDash(ring.dash);
-      ctx.strokeStyle=`rgba(200,245,90,${ring.opacity})`; ctx.lineWidth=.8;
-      ctx.beginPath(); pts.forEach((pt,i)=>i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y)); ctx.stroke(); ctx.restore();
-      const da=Math.cos(ring.angle)*ring.r, db=Math.sin(ring.angle)*Math.cos(ring.tilt)*ring.r, dc=Math.sin(ring.angle)*Math.sin(ring.tilt)*ring.r;
-      const dX=da*Math.cos(rotation)+dc*Math.sin(rotation), dZ=-da*Math.sin(rotation)+dc*Math.cos(rotation);
-      const p3=2.8,dSc=p3/(p3+dZ*.4), px=cx+dX*r*dSc, py=cy-db*r*dSc;
-      const g2=ctx.createRadialGradient(px,py,0,px,py,6*dSc);
-      g2.addColorStop(0,"rgba(200,245,90,0.9)"); g2.addColorStop(1,"transparent");
-      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.beginPath(); ctx.arc(px,py,5*dSc,0,Math.PI*2); ctx.fillStyle=g2; ctx.fill(); ctx.restore();
-    });
-    const visible=[];
-    dots.forEach(dot=>{ dot.pulse+=dot.pulseSpeed; const p4=project(dot.phi,dot.theta,rotation,cx,cy,r); if(p4.z>-0.1) visible.push({...p4,dot}); });
-    visible.sort((a,b2)=>a.z-b2.z);
-    visible.forEach(({x,y,z,sc,dot})=>{
-      const df=(z+1)/2, pulse=.6+.4*Math.sin(dot.pulse), alpha=df*dot.brightness*pulse*sphereAlpha;
-      const size=dot.size*sc*(.5+df*.8), isAcc=dot.brightness>.8&&df>.7;
-      const color=isAcc?`rgba(200,245,90,${alpha})`:`rgba(74,222,128,${alpha*.7})`;
-      if(size>.3){
-        const g=ctx.createRadialGradient(x,y,0,x,y,size*2);
-        g.addColorStop(0,color); g.addColorStop(1,"transparent");
-        ctx.beginPath(); ctx.arc(x,y,size*2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
-        ctx.beginPath(); ctx.arc(x,y,size,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
-      }
-    });
-    if(sphereAlpha>.4){
-      s.arcTimer++;
-      if(s.arcTimer>80){ spawnArc(s); s.arcTimer=0; }
-      for(let i=arcs.length-1;i>=0;i--){
-        const arc=arcs[i]; arc.progress=Math.min(1,arc.progress+arc.speed);
-        if(arc.progress>=1) arc.life-=arc.fadeSpeed;
-        if(arc.life<=0){ arcs.splice(i,1); continue; }
-        const steps=40, du=Math.floor(arc.progress*steps);
-        ctx.save(); ctx.globalAlpha=arc.life*.6*sphereAlpha; let prev=null;
-        for(let k=0;k<=du;k++){
-          const t2=k/steps, pt=lerpSphere(arc.from,arc.to,t2,rotation,cx,cy,r);
-          if(pt.z<-.05){prev=null;continue;}
-          if(prev&&prev.z>-.05){
-            const sa=(1-Math.abs(t2-.5)*2)*.9;
-            ctx.strokeStyle=`rgba(200,245,90,${sa})`; ctx.lineWidth=1.2*pt.sc;
-            ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(pt.x,pt.y); ctx.stroke();
-          }
-          if(k===du){
-            const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,6);
-            g.addColorStop(0,"rgba(200,245,90,1)"); g.addColorStop(1,"transparent");
-            ctx.fillStyle=g; ctx.beginPath(); ctx.arc(pt.x,pt.y,5,0,Math.PI*2); ctx.fill();
-          }
-          prev=pt;
-        }
-        ctx.restore();
-      }
-    }
-    particles.forEach(p5=>{ p5.angle+=p5.speed; const ring=rings[p5.ring]; const rx3=Math.cos(p5.angle)*ring.r, ry3=Math.sin(p5.angle)*Math.cos(ring.tilt)*ring.r, rz3=Math.sin(p5.angle)*Math.sin(ring.tilt)*ring.r; const pX=rx3*Math.cos(rotation)+rz3*Math.sin(rotation), pZ=-rx3*Math.sin(rotation)+rz3*Math.cos(rotation); const pp=2.8,pSc=pp/(pp+pZ*.4), ppx=cx+pX*r*pSc, ppy=cy-ry3*r*pSc; const df=(pZ+1)/2, alpha=(.4+p5.brightness*.6)*df*sphereAlpha; ctx.globalAlpha=alpha; ctx.beginPath(); ctx.arc(ppx,ppy,p5.size*pSc*.8,0,Math.PI*2); ctx.fillStyle=p5.color; ctx.fill(); ctx.globalAlpha=1; });
-    const mx=(s.mouse.x-W/2)/W; const targetRS=.004+mx*.003; s.rotSpeed+=(targetRS-s.rotSpeed)*.05; s.rotation+=s.rotSpeed; s.frame++;
-  };
-  const animVal = (setter,from,to,duration,ease=easeOutCubic) => new Promise(resolve=>{
-    const start=performance.now();
-    const tick=()=>{ const t=clampT((performance.now()-start)/duration,0,1); setter(from+(to-from)*ease(t)); if(t<1) requestAnimationFrame(tick); else { setter(to); resolve(); } };
-    requestAnimationFrame(tick);
-  });
-  const anim = (el,kf,opts) => { if(!el) return Promise.resolve(); return el.animate(kf,{fill:"forwards",...opts}).finished; };
-  const runIntro = useCallback(async () => {
-    const s=stateRef.current; s.phase="fadein"; s.sphereAlpha=0; s.transitionT=0; s.rotation=0;
-    await animVal(v=>{ s.sphereAlpha=v; },0,1,900,easeOutCubic);
-    await new Promise(r=>setTimeout(r,100));
-    const intro=introRef.current;
-    if(intro){
-      const wm=intro.querySelector(".intro-wm"), bar=intro.querySelector(".intro-bar"), tag=intro.querySelector(".intro-tag");
-      if(wm) await anim(wm,[{opacity:0,transform:"scale(.94) translateY(12px)"},{opacity:1,transform:"scale(1) translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)"});
-      await new Promise(r=>setTimeout(r,180));
-      if(bar) await anim(bar,[{transform:"scaleX(0)",transformOrigin:"left"},{transform:"scaleX(1)",transformOrigin:"left"}],{duration:600,easing:"cubic-bezier(.16,1,.3,1)"});
-      await new Promise(r=>setTimeout(r,300));
-      if(tag) await anim(tag,[{opacity:0,transform:"translateY(8px)"},{opacity:1,transform:"translateY(0)"}],{duration:500,easing:"ease"});
-    }
-    await new Promise(r=>setTimeout(r,820));
-    s.phase="transition";
-    const intro2=introRef.current;
-    if(intro2){
-      const wm=intro2.querySelector(".intro-wm"), tag=intro2.querySelector(".intro-tag");
-      if(wm) wm.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.9) translateY(-18px)"}],{duration:550,easing:"cubic-bezier(.4,0,1,1)",fill:"forwards"});
-      if(tag) tag.animate([{opacity:1},{opacity:0}],{duration:380,fill:"forwards"});
-    }
-    animVal(v=>{ s.transitionT=v; },0,1,900,easeInOutCubic);
-    await new Promise(r=>setTimeout(r,180));
-    const hg=heroRef.current?.querySelector(".hero-gradient");
-    if(hg) hg.animate([{opacity:0},{opacity:1}],{duration:800,easing:"ease",fill:"forwards"});
-    const nav=navRef.current;
-    if(nav) nav.animate([{opacity:0,transform:"translateY(-16px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
-    await new Promise(r=>setTimeout(r,150));
-    const hc=heroRef.current;
-    if(hc){
-      const label=hc.querySelector(".hero-label-inner"), line1=hc.querySelector(".hl1"), line2=hc.querySelector(".hl2"), meta=hc.querySelector(".hero-meta"), labelWrap=hc.querySelector(".hero-label-wrap");
-      if(labelWrap) labelWrap.animate([{opacity:0},{opacity:1}],{duration:300,fill:"forwards"});
-      if(label) label.animate([{transform:"translateY(100%)"},{transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
-      await new Promise(r=>setTimeout(r,100));
-      if(line1) line1.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
-      await new Promise(r=>setTimeout(r,70));
-      if(line2) line2.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
-      await new Promise(r=>setTimeout(r,380));
-      if(meta) meta.animate([{opacity:0,transform:"translateY(14px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"ease",fill:"forwards"});
-    }
-    s.phase="done";
-  }, []);
-  useEffect(()=>{
-    const canvas=canvasRef.current; if(!canvas) return;
-    const ctx=canvas.getContext("2d"), s=stateRef.current;
-    const resize=()=>{ s.W=canvas.width=canvas.offsetWidth; s.H=canvas.height=canvas.offsetHeight; s.mouse.x=s.W/2; s.mouse.y=s.H/2; };
-    resize();
-    const onMouse=e=>{ s.mouse.x=e.clientX; s.mouse.y=e.clientY; };
-    const onTouch=e=>{ if(e.touches[0]){ s.mouse.x=e.touches[0].clientX; } };
-    window.addEventListener("resize",resize); window.addEventListener("mousemove",onMouse); window.addEventListener("touchmove",onTouch,{passive:true});
-    let raf; const loop=()=>{ drawFrame(ctx,s); raf=requestAnimationFrame(loop); }; loop();
-    document.fonts.ready.then(()=>setTimeout(runIntro,200));
-    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener("resize",resize); window.removeEventListener("mousemove",onMouse); window.removeEventListener("touchmove",onTouch); };
-  }, [runIntro]);
-  return { canvasRef, introRef, heroRef, navRef };
-}
-
 function useReveal(deps = []) {
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -524,7 +423,7 @@ function useReveal(deps = []) {
 }
 
 /* ─── SIDEBAR ─── */
-function Sidebar({ active, go, auth, onLogout }) {
+function Sidebar({ active, go }) {
   const navItems = [
     { id: "dashboard", ico: "◈", label: "Dashboard" },
     { id: "devices", ico: "📱", label: "Devices", badge: "3" },
@@ -541,92 +440,83 @@ function Sidebar({ active, go, auth, onLogout }) {
     { id: "policy", ico: "📜", label: "Policy Engine" },
     { id: "orgsettings", ico: "🏢", label: "Org Settings" },
   ];
-  const NavBtn = ({ item }) => (
-    <button key={item.id} onClick={() => go(item.id)} className="si" style={{
-      display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
-      cursor: "pointer", fontSize: 13, color: active === item.id ? "var(--paper)" : "var(--muted)",
-      border: "none", background: active === item.id ? "rgba(200,245,90,.07)" : "none",
-      width: "100%", textAlign: "left", fontFamily: "var(--body)", position: "relative",
-      borderLeft: active === item.id ? "2px solid var(--accent)" : "2px solid transparent",
-      transition: "background .15s, color .15s", marginBottom: 1
-    }}>
-      <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{item.ico}</span>
-      <span className="si-label">{item.label}</span>
-      {item.badge && <span className="si-badge" style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: 8, background: "var(--accent)", color: "var(--ink)", padding: "2px 6px" }}>{item.badge}</span>}
-    </button>
-  );
-  const SectionLabel = ({ label, topBorder }) => (
-    <div className="sb-label-txt" style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted2)", padding: "4px 4px 6px", marginBottom: 2, ...(topBorder ? { marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 } : {}) }}>{label}</div>
-  );
   return (
     <aside style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", overflowX: "hidden" }}>
+      {/* Logo */}
       <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: "pointer" }} onClick={() => go("landing")}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
           <span className="sb-mark" style={{ fontFamily: "var(--display)", fontSize: 16, letterSpacing: ".12em" }}>CRYPTON</span>
         </div>
-        <button onClick={() => go("home")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "rgba(255,255,255,.03)", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, background .2s" }}
+        {/* Back to Home button */}
+        <button onClick={() => go("landing")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "rgba(255,255,255,.03)", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, background .2s" }}
           onMouseEnter={e => { e.currentTarget.style.color = "var(--paper)"; e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "rgba(255,255,255,.03)"; }}>
           <span style={{ fontSize: 10 }}>←</span>
           <span className="si-label">Back to Home</span>
         </button>
       </div>
+
       <nav style={{ padding: "16px 12px", flex: 1 }}>
-        <SectionLabel label="Main" />
-        {navItems.map(item => <NavBtn key={item.id} item={item} />)}
-        <SectionLabel label="Security" topBorder />
-        {secItems.map(item => <NavBtn key={item.id} item={item} />)}
-        <SectionLabel label="Admin" topBorder />
-        {adminItems.map(item => <NavBtn key={item.id} item={item} />)}
-      </nav>
-      <div style={{ padding: 16, borderTop: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, background: "rgba(255,255,255,.025)" }}>
-          <div style={{ width: 30, height: 30, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--display)", fontSize: 14, color: "var(--ink)", flexShrink: 0 }}>
-            {auth?.username ? auth.username[0].toUpperCase() : "?"}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="user-name" style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auth?.username || "Not signed in"}</div>
-            <div className="user-role" style={{ fontFamily: "var(--mono)", fontSize: 9, color: auth?.token ? "var(--success)" : "var(--muted)", letterSpacing: ".06em", textTransform: "uppercase" }}>
-              {auth?.token ? "Authenticated" : "No session"}
-            </div>
-          </div>
-        </div>
-        {onLogout && (
-          <button onClick={onLogout} style={{ width: "100%", marginTop: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, border-color .2s" }}
-            onMouseEnter={e => { e.currentTarget.style.color = "var(--danger)"; e.currentTarget.style.borderColor = "rgba(248,113,113,.4)"; }}
-            onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.borderColor = "var(--line)"; }}>
-            Sign Out
+        <div className="sb-label-txt" style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted2)", padding: "4px 4px 6px", marginBottom: 2 }}>Main</div>
+        {navItems.map(item => (
+          <button key={item.id} onClick={() => go(item.id)} style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+            cursor: "pointer", fontSize: 13, color: active === item.id ? "var(--paper)" : "var(--muted)",
+            border: "none", background: active === item.id ? "rgba(200,245,90,.07)" : "none",
+            width: "100%", textAlign: "left", fontFamily: "var(--body)", position: "relative",
+            borderLeft: active === item.id ? "2px solid var(--accent)" : "2px solid transparent",
+            transition: "background .15s, color .15s", marginBottom: 1
+          }}>
+            <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{item.ico}</span>
+            <span className="si-label">{item.label}</span>
+            {item.badge && <span className="si-badge" style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: 8, background: "var(--accent)", color: "var(--ink)", padding: "2px 6px" }}>{item.badge}</span>}
           </button>
-        )}
-      </div>
+        ))}
+
+        <div className="sb-label-txt" style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted2)", padding: "4px 4px 6px", marginBottom: 2, marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>Security</div>
+        {secItems.map(item => (
+          <button key={item.id} onClick={() => go(item.id)} style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+            cursor: "pointer", fontSize: 13, color: active === item.id ? "var(--paper)" : "var(--muted)",
+            border: "none", background: active === item.id ? "rgba(200,245,90,.07)" : "none",
+            width: "100%", textAlign: "left", fontFamily: "var(--body)", position: "relative",
+            borderLeft: active === item.id ? "2px solid var(--accent)" : "2px solid transparent",
+            transition: "background .15s, color .15s", marginBottom: 1
+          }}>
+            <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{item.ico}</span>
+            <span className="si-label">{item.label}</span>
+          </button>
+        ))}
+
+        <div className="sb-label-txt" style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted2)", padding: "4px 4px 6px", marginBottom: 2, marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>Admin</div>
+        {adminItems.map(item => (
+          <button key={item.id} onClick={() => go(item.id)} style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+            cursor: "pointer", fontSize: 13, color: active === item.id ? "var(--paper)" : "var(--muted)",
+            border: "none", background: active === item.id ? "rgba(200,245,90,.07)" : "none",
+            width: "100%", textAlign: "left", fontFamily: "var(--body)", position: "relative",
+            borderLeft: active === item.id ? "2px solid var(--accent)" : "2px solid transparent",
+            transition: "background .15s, color .15s", marginBottom: 1
+          }}>
+            <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{item.ico}</span>
+            <span className="si-label">{item.label}</span>
+          </button>
+        ))}
+
+      </nav>
     </aside>
   );
 }
 
-/* ─── APP SHELL (pages with sidebar) ─── */
-const PAGE_LABELS = {
-  dashboard: "Dashboard", devices: "Devices", auditlogs: "Audit Logs", rbac: "Users & Roles",
-  recovery: "Recovery", risk: "Risk Intelligence", sessions: "Sessions",
-  admin: "Admin", policy: "Policy Engine", orgsettings: "Org Settings",
-};
-function Breadcrumb({ page, go }) {
-  return (
-    <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted2)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-      <button onClick={() => go("landing")} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", padding: 0, transition: "color .2s" }}
-        onMouseEnter={e => e.target.style.color = "var(--accent)"} onMouseLeave={e => e.target.style.color = "var(--muted)"}>CRYPTON</button>
-      <span>/</span>
-      <span style={{ color: "var(--paper)" }}>{PAGE_LABELS[page] || page}</span>
-    </div>
-  );
-}
+/* ─── BOTTOM TAB BAR (mobile only) ─── */
 function BottomTabBar({ active, go }) {
   const tabs = [
-    { id: "dashboard", ico: "◈",  label: "Home"    },
-    { id: "devices",   ico: "📱", label: "Devices"  },
-    { id: "auditlogs", ico: "📋", label: "Logs"     },
-    { id: "risk",      ico: "🛡", label: "Risk"     },
-    { id: "admin",     ico: "⚙",  label: "Admin"    },
+    { id: "dashboard", ico: "◈", label: "Home" },
+    { id: "devices",   ico: "📱", label: "Devices" },
+    { id: "auditlogs", ico: "📋", label: "Logs" },
+    { id: "risk",      ico: "🛡", label: "Risk" },
+    { id: "admin",     ico: "⚙", label: "Admin" },
   ];
   return (
     <div className="bottom-tabs">
@@ -642,17 +532,35 @@ function BottomTabBar({ active, go }) {
   );
 }
 
-function AppShell({ active, go, auth, onLogout, children }) {
+/* ─── APP SHELL (pages with sidebar) ─── */
+function AppShell({ active, go, children }) {
   return (
     <div style={{ display: "flex", flexDirection: "row", minHeight: "100vh", overflow: "hidden" }}>
-      <Sidebar active={active} go={go} auth={auth} onLogout={onLogout} />
+      <Sidebar active={active} go={go} />
       <main className="app-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div className="breadcrumb-wrap" style={{ padding: "14px 44px 0" }}>
+        <div className="breadcrumb-wrap" style={{ padding: "14px 44px 0", borderBottom: "none" }}>
           <Breadcrumb page={active} go={go} />
         </div>
         {children}
       </main>
       <BottomTabBar active={active} go={go} />
+    </div>
+  );
+}
+
+/* ─── BREADCRUMB ─── */
+const PAGE_LABELS = {
+  dashboard: "Dashboard", devices: "Devices", auditlogs: "Audit Logs", rbac: "Users & Roles",
+  recovery: "Recovery", risk: "Risk Intelligence", sessions: "Sessions",
+  admin: "Admin", policy: "Policy Engine", orgsettings: "Org Settings",
+};
+function Breadcrumb({ page, go }) {
+  return (
+    <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted2)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+      <button onClick={() => go("landing")} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", padding: 0, transition: "color .2s" }}
+        onMouseEnter={e => e.target.style.color = "var(--accent)"} onMouseLeave={e => e.target.style.color = "var(--muted)"}>CRYPTON</button>
+      <span>/</span>
+      <span style={{ color: "var(--paper)" }}>{PAGE_LABELS[page] || page}</span>
     </div>
   );
 }
@@ -681,50 +589,411 @@ const BtnO = ({ children, onClick, style = {} }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   LANDING PAGE
+   LANDING PAGE — SPHERE ENGINE + INTRO
 ═══════════════════════════════════════════════════════════════ */
-function HeroCanvas() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const ctx = c.getContext("2d");
-    const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
-    resize(); window.addEventListener("resize", resize);
-    const nodes = Array.from({ length: 55 }, () => ({
-      x: Math.random(), y: Math.random(),
-      vx: (Math.random() - .5) * .00025, vy: (Math.random() - .5) * .00025
+
+/* Module-level flag — resets on hard refresh, persists within same tab session */
+let _introHasPlayed = false;
+
+/* shared ease helpers */
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+const clampT = (v,a,b) => Math.max(a, Math.min(b, v));
+
+function useSphereIntro() {
+  /* Returns { canvasRef, introVisible, introPhase }
+     Manages the full intro sequence imperatively via canvas + DOM refs */
+  const canvasRef = useRef(null);
+  const stateRef = useRef({
+    W: 0, H: 0,
+    rotation: 0, rotSpeed: 0.004,
+    sphereAlpha: 0,
+    transitionT: 0,      // 0=center 1=settled
+    phase: "idle",       // idle → fadein → wordmark → transition → done
+    frame: 0,
+    arcs: [], arcTimer: 0,
+    mouse: { x: 0, y: 0 },
+  });
+  const introRef = useRef(null);   // the intro overlay div
+  const heroRef  = useRef(null);   // hero content div
+  const navRef   = useRef(null);
+
+  const isMobile = () => window.innerWidth <= 767;
+
+  /* build static dot/ring/particle arrays once */
+  const globeRef = useRef(null);
+  if (!globeRef.current) {
+    const dots = [];
+    const latStep = isMobile() ? 14 : 10;
+    const lonStep = isMobile() ? 14 : 10;
+    for (let lat = -80; lat <= 80; lat += latStep)
+      for (let lon = 0; lon < 360; lon += lonStep)
+        dots.push({
+          phi: (lat*Math.PI)/180, theta: (lon*Math.PI)/180,
+          size: Math.random()*1.2+0.4, brightness: Math.random()*.5+.5,
+          pulse: Math.random()*Math.PI*2, pulseSpeed: .02+Math.random()*.03
+        });
+    const rings = [
+      { tilt:.3,  speed:.007,  angle:0,   r:1.18, opacity:.35, dash:[8,6]  },
+      { tilt:-.5, speed:-.005, angle:1.2, r:1.28, opacity:.25, dash:[4,10] },
+      { tilt:.9,  speed:.009,  angle:2.4, r:1.12, opacity:.2,  dash:[12,8] },
+    ];
+    const pCount = isMobile() ? 30 : 60;
+    const particles = Array.from({ length: pCount }, () => ({
+      ring: Math.floor(Math.random()*3),
+      angle: Math.random()*Math.PI*2,
+      speed: (Math.random()*.008+.004) * (Math.random()>.5?1:-1),
+      size: Math.random()*2+1, brightness: Math.random(),
+      color: Math.random()>.5 ? "#C8F55A" : "#4ADE80",
     }));
-    let raf;
-    const draw = () => {
-      ctx.clearRect(0, 0, c.width, c.height);
-      nodes.forEach(n => {
-        n.x += n.vx; n.y += n.vy;
-        if (n.x < 0 || n.x > 1) n.vx *= -1;
-        if (n.y < 0 || n.y > 1) n.vy *= -1;
-      });
-      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-        const dx = (nodes[i].x - nodes[j].x) * c.width, dy = (nodes[i].y - nodes[j].y) * c.height;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 110) {
-          ctx.beginPath(); ctx.moveTo(nodes[i].x * c.width, nodes[i].y * c.height);
-          ctx.lineTo(nodes[j].x * c.width, nodes[j].y * c.height);
-          ctx.strokeStyle = `rgba(200,245,90,${.12 * (1 - d / 110)})`; ctx.lineWidth = .6; ctx.stroke();
-        }
-      }
-      nodes.forEach(n => { ctx.beginPath(); ctx.arc(n.x * c.width, n.y * c.height, 1.2, 0, Math.PI * 2); ctx.fillStyle = "rgba(200,245,90,.35)"; ctx.fill(); });
-      raf = requestAnimationFrame(draw);
+    globeRef.current = { dots, rings, particles };
+  }
+
+  const getSphereParams = (s) => {
+    const { W, H, transitionT } = s;
+    const mobile = W <= 767;
+    const introR   = Math.min(W,H) * (mobile ? .36 : .38);
+    const settledR = Math.min(W,H) * (mobile ? .38 : .32);
+    const iCx = W/2, iCy = H/2;
+    const sCx = mobile ? W/2 : W*.62;
+    const sCy = mobile ? H*.38 : H*.48;
+    const t = easeInOutCubic(transitionT);
+    return {
+      r:  introR  + (settledR - introR)  * t,
+      cx: iCx    + (sCx     - iCx)     * t,
+      cy: iCy    + (sCy     - iCy)     * t,
     };
-    draw();
-    return () => { window.removeEventListener("resize", resize); cancelAnimationFrame(raf); };
+  };
+
+  const project = (phi, theta, rot, cx, cy, r) => {
+    const x3 = Math.cos(phi)*Math.sin(theta+rot);
+    const y3 = Math.sin(phi);
+    const z3 = Math.cos(phi)*Math.cos(theta+rot);
+    const p = 2.8, sc = p/(p+z3*.4);
+    return { x: cx+x3*r*sc, y: cy-y3*r*sc, z: z3, sc };
+  };
+
+  const lerpSphere = (a, b, t, rot, cx, cy, r) => {
+    const ax=Math.cos(a.phi)*Math.sin(a.theta), ay=Math.sin(a.phi), az=Math.cos(a.phi)*Math.cos(a.theta);
+    const bx=Math.cos(b.phi)*Math.sin(b.theta), by=Math.sin(b.phi), bz=Math.cos(b.phi)*Math.cos(b.theta);
+    const dot=Math.min(1,ax*bx+ay*by+az*bz), omega=Math.acos(dot);
+    let rx,ry,rz;
+    if(omega<.001){rx=ax+t*(bx-ax);ry=ay+t*(by-ay);rz=az+t*(bz-az);}
+    else{const s=Math.sin(omega),sa=Math.sin((1-t)*omega)/s,sb=Math.sin(t*omega)/s;rx=sa*ax+sb*bx;ry=sa*ay+sb*by;rz=sa*az+sb*bz;}
+    const lift=1.06+Math.sin(t*Math.PI)*.12; rx*=lift;ry*=lift;rz*=lift;
+    const p=2.8,sc=p/(p+rz*.4);
+    return { x:cx+rx*r*sc, y:cy-ry*r*sc, z:rz, sc };
+  };
+
+  const spawnArc = (s) => {
+    const d = globeRef.current.dots;
+    const a=d[Math.floor(Math.random()*d.length)], b=d[Math.floor(Math.random()*d.length)];
+    s.arcs.push({ from:{phi:a.phi,theta:a.theta}, to:{phi:b.phi,theta:b.theta},
+      progress:0, speed:.008+Math.random()*.006, life:1, fadeSpeed:.012 });
+  };
+
+  /* draw one frame */
+  const drawFrame = (ctx, s) => {
+    const { W, H, rotation, sphereAlpha, arcs } = s;
+    /* Guard against uninitialized dimensions — prevents non-finite gradient errors */
+    if (!W || !H || W <= 0 || H <= 0 || !isFinite(W) || !isFinite(H)) return;
+    const { dots, rings, particles } = globeRef.current;
+    const sp = getSphereParams(s);
+    const { r, cx, cy } = sp;
+    if (!r || !isFinite(r) || !isFinite(cx) || !isFinite(cy)) return;
+
+    ctx.clearRect(0,0,W,H);
+
+    /* bg glow */
+    const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.8);
+    bg.addColorStop(0,`rgba(16,28,16,${.5*sphereAlpha})`);
+    bg.addColorStop(1,"transparent");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    const sg = ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.1);
+    sg.addColorStop(0,`rgba(74,222,128,${.04*sphereAlpha})`);
+    sg.addColorStop(1,"transparent");
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(cx,cy,r*1.1,0,Math.PI*2); ctx.fill();
+
+    /* rings */
+    rings.forEach(ring => {
+      ring.angle += ring.speed;
+      const steps=120, pts=[];
+      for(let i=0;i<=steps;i++){
+        const a=(i/steps)*Math.PI*2+ring.angle;
+        const rx=Math.cos(a)*ring.r, ry=Math.sin(a)*Math.cos(ring.tilt)*ring.r, rz=Math.sin(a)*Math.sin(ring.tilt)*ring.r;
+        const rX=rx*Math.cos(rotation)+rz*Math.sin(rotation), rZ=-rx*Math.sin(rotation)+rz*Math.cos(rotation);
+        const p=2.8,sc=p/(p+rZ*.4);
+        pts.push({ x:cx+rX*r*sc, y:cy-ry*r*sc });
+      }
+      ctx.save(); ctx.globalAlpha=sphereAlpha; ctx.setLineDash(ring.dash);
+      ctx.strokeStyle=`rgba(200,245,90,${ring.opacity})`; ctx.lineWidth=.8;
+      ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
+      ctx.restore();
+      /* travelling dot on ring */
+      const da=Math.cos(ring.angle)*ring.r, db=Math.sin(ring.angle)*Math.cos(ring.tilt)*ring.r, dc=Math.sin(ring.angle)*Math.sin(ring.tilt)*ring.r;
+      const dX=da*Math.cos(rotation)+dc*Math.sin(rotation), dZ=-da*Math.sin(rotation)+dc*Math.cos(rotation);
+      const p2=2.8,dSc=p2/(p2+dZ*.4);
+      const px=cx+dX*r*dSc, py=cy-db*r*dSc;
+      const g2=ctx.createRadialGradient(px,py,0,px,py,6*dSc);
+      g2.addColorStop(0,"rgba(200,245,90,0.9)"); g2.addColorStop(1,"transparent");
+      ctx.save(); ctx.globalAlpha=sphereAlpha;
+      ctx.beginPath(); ctx.arc(px,py,5*dSc,0,Math.PI*2); ctx.fillStyle=g2; ctx.fill();
+      ctx.restore();
+    });
+
+    /* globe dots */
+    const visible=[];
+    dots.forEach(dot=>{
+      dot.pulse+=dot.pulseSpeed;
+      const p=project(dot.phi,dot.theta,rotation,cx,cy,r);
+      if(p.z>-0.1) visible.push({...p,dot});
+    });
+    visible.sort((a,b)=>a.z-b.z);
+    visible.forEach(({x,y,z,sc,dot})=>{
+      const df=(z+1)/2, pulse=.6+.4*Math.sin(dot.pulse), alpha=df*dot.brightness*pulse*sphereAlpha;
+      const size=dot.size*sc*(.5+df*.8);
+      const isAcc=dot.brightness>.8&&df>.7;
+      const color=isAcc?`rgba(200,245,90,${alpha})`:`rgba(74,222,128,${alpha*.7})`;
+      if(size>.3){
+        const g=ctx.createRadialGradient(x,y,0,x,y,size*2);
+        g.addColorStop(0,color); g.addColorStop(1,"transparent");
+        ctx.beginPath(); ctx.arc(x,y,size*2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+        ctx.beginPath(); ctx.arc(x,y,size,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+      }
+    });
+
+    /* arcs */
+    if(sphereAlpha>.4){
+      s.arcTimer++;
+      if(s.arcTimer>80){ spawnArc(s); s.arcTimer=0; }
+      for(let i=arcs.length-1;i>=0;i--){
+        const arc=arcs[i];
+        arc.progress=Math.min(1,arc.progress+arc.speed);
+        if(arc.progress>=1) arc.life-=arc.fadeSpeed;
+        if(arc.life<=0){ arcs.splice(i,1); continue; }
+        const steps=40,du=Math.floor(arc.progress*steps);
+        ctx.save(); ctx.globalAlpha=arc.life*.6*sphereAlpha;
+        let prev=null;
+        for(let k=0;k<=du;k++){
+          const t2=k/steps, pt=lerpSphere(arc.from,arc.to,t2,rotation,cx,cy,r);
+          if(pt.z<-.05){prev=null;continue;}
+          if(prev&&prev.z>-.05){
+            const sa=(1-Math.abs(t2-.5)*2)*.9;
+            ctx.strokeStyle=`rgba(200,245,90,${sa})`; ctx.lineWidth=1.2*pt.sc;
+            ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(pt.x,pt.y); ctx.stroke();
+          }
+          if(k===du){
+            const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,6);
+            g.addColorStop(0,"rgba(200,245,90,1)"); g.addColorStop(1,"transparent");
+            ctx.fillStyle=g; ctx.beginPath(); ctx.arc(pt.x,pt.y,5,0,Math.PI*2); ctx.fill();
+          }
+          prev=pt;
+        }
+        ctx.restore();
+      }
+    }
+
+    /* particles */
+    particles.forEach(p=>{
+      p.angle+=p.speed;
+      const ring=rings[p.ring];
+      const rx=Math.cos(p.angle)*ring.r, ry=Math.sin(p.angle)*Math.cos(ring.tilt)*ring.r, rz=Math.sin(p.angle)*Math.sin(ring.tilt)*ring.r;
+      const pX=rx*Math.cos(rotation)+rz*Math.sin(rotation), pZ=-rx*Math.sin(rotation)+rz*Math.cos(rotation);
+      const pp=2.8,pSc=pp/(pp+pZ*.4);
+      const ppx=cx+pX*r*pSc, ppy=cy-ry*r*pSc;
+      const df=(pZ+1)/2, alpha=(.4+p.brightness*.6)*df*sphereAlpha;
+      ctx.globalAlpha=alpha;
+      ctx.beginPath(); ctx.arc(ppx,ppy,p.size*pSc*.8,0,Math.PI*2);
+      ctx.fillStyle=p.color; ctx.fill();
+      ctx.globalAlpha=1;
+    });
+
+    /* rotate */
+    const mx=(s.mouse.x-W/2)/W;
+    const targetRS=.004+mx*.003;
+    s.rotSpeed+=(targetRS-s.rotSpeed)*.05;
+    s.rotation+=s.rotSpeed;
+    s.frame++;
+  };
+
+  /* animate one value with a promise */
+  const animVal = (setter, from, to, duration, ease=easeOutCubic) =>
+    new Promise(resolve=>{
+      const start=performance.now();
+      const tick=()=>{
+        const t=clampT((performance.now()-start)/duration,0,1);
+        setter(from+(to-from)*ease(t));
+        if(t<1) requestAnimationFrame(tick); else { setter(to); resolve(); }
+      };
+      requestAnimationFrame(tick);
+    });
+
+  /* DOM helper */
+  const anim = (el, kf, opts) => {
+    if(!el) return Promise.resolve();
+    return el.animate(kf,{fill:"forwards",...opts}).finished;
+  };
+
+  /* MAIN INTRO SEQUENCE */
+  const runIntro = useCallback(async () => {
+    const s = stateRef.current;
+    s.phase="fadein"; s.sphereAlpha=0; s.transitionT=0; s.rotation=0;
+
+    /* Phase 1 — sphere fades in centered */
+    await animVal(v=>{ s.sphereAlpha=v; }, 0, 1, 900, easeOutCubic);
+    await new Promise(r=>setTimeout(r,100));
+
+    /* Phase 2 — wordmark + bar + tagline */
+    const intro = introRef.current;
+    if(intro){
+      const wm = intro.querySelector(".intro-wm");
+      const bar = intro.querySelector(".intro-bar");
+      const tag = intro.querySelector(".intro-tag");
+      if(wm) await anim(wm,[{opacity:0,transform:"scale(.94) translateY(12px)"},{opacity:1,transform:"scale(1) translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,180));
+      if(bar) await anim(bar,[{transform:"scaleX(0)",transformOrigin:"left"},{transform:"scaleX(1)",transformOrigin:"left"}],{duration:600,easing:"cubic-bezier(.16,1,.3,1)"});
+      await new Promise(r=>setTimeout(r,300));
+      if(tag) await anim(tag,[{opacity:0,transform:"translateY(8px)"},{opacity:1,transform:"translateY(0)"}],{duration:500,easing:"ease"});
+    }
+    await new Promise(r=>setTimeout(r,820));
+
+    /* Phase 3 — sphere moves, intro dissolves, hero content arrives */
+    s.phase="transition";
+
+    const intro2 = introRef.current;
+    if(intro2){
+      const wm=intro2.querySelector(".intro-wm");
+      const tag=intro2.querySelector(".intro-tag");
+      if(wm) wm.animate([{opacity:1,transform:"scale(1)"},{opacity:0,transform:"scale(.9) translateY(-18px)"}],{duration:550,easing:"cubic-bezier(.4,0,1,1)",fill:"forwards"});
+      if(tag) tag.animate([{opacity:1},{opacity:0}],{duration:380,fill:"forwards"});
+    }
+
+    /* sphere transition: 0→1 over 900ms */
+    animVal(v=>{ s.transitionT=v; }, 0, 1, 900, easeInOutCubic);
+
+    await new Promise(r=>setTimeout(r,180));
+
+    /* hero gradient */
+    const hg = heroRef.current?.querySelector(".hero-gradient");
+    if(hg) hg.animate([{opacity:0},{opacity:1}],{duration:800,easing:"ease",fill:"forwards"});
+
+    /* nav */
+    const nav = navRef.current;
+    if(nav) nav.animate([{opacity:0,transform:"translateY(-16px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+
+    await new Promise(r=>setTimeout(r,150));
+
+    /* hero content */
+    const hc = heroRef.current;
+    if(hc){
+      const label = hc.querySelector(".hero-label-inner");
+      const line1 = hc.querySelector(".hl1");
+      const line2 = hc.querySelector(".hl2");
+      const meta  = hc.querySelector(".hero-meta");
+      const labelWrap = hc.querySelector(".hero-label-wrap");
+      if(labelWrap) labelWrap.animate([{opacity:0},{opacity:1}],{duration:300,fill:"forwards"});
+      if(label) label.animate([{transform:"translateY(100%)"},{transform:"translateY(0)"}],{duration:700,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,100));
+      if(line1) line1.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,70));
+      if(line2) line2.animate([{transform:"translateY(110%)"},{transform:"translateY(0)"}],{duration:1000,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+      await new Promise(r=>setTimeout(r,380));
+      if(meta) meta.animate([{opacity:0,transform:"translateY(14px)"},{opacity:1,transform:"translateY(0)"}],{duration:700,easing:"ease",fill:"forwards"});
+    }
+
+    s.phase="done";
   }, []);
-  return <canvas ref={ref} style={{ position: "absolute", inset: 0, opacity: .3, width: "100%", height: "100%" }} />;
+
+  useEffect(()=>{
+    const canvas = canvasRef.current; if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const s = stateRef.current;
+
+    const resize = () => {
+      const w = canvas.offsetWidth, h = canvas.offsetHeight;
+      if (w > 0 && h > 0) {
+        s.W = canvas.width = w;
+        s.H = canvas.height = h;
+      }
+      s.mouse.x = s.W/2; s.mouse.y = s.H/2;
+    };
+    /* Do NOT call resize() here — canvas may have 0 dimensions before paint.
+       introRO will do the first sizing. */
+
+    const onMouse = e => { s.mouse.x=e.clientX; s.mouse.y=e.clientY; };
+    const onTouch = e => { if(e.touches[0]){ s.mouse.x=e.touches[0].clientX; } };
+    window.addEventListener("resize", resize);
+    window.addEventListener("mousemove", onMouse);
+    window.addEventListener("touchmove", onTouch, {passive:true});
+
+    let raf;
+    const loop = () => {
+      /* Only draw once canvas has been sized by introRO */
+      if (s.W > 0 && s.H > 0) drawFrame(ctx, s);
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+
+    /* Size the canvas using window dimensions (canvas is position:fixed).
+       On first tab load: play full intro.
+       On return visits within same tab (e.g. back from dashboard): settle instantly. */
+    const startIntro = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      if (!w || !h) { requestAnimationFrame(startIntro); return; }
+      /* Set canvas pixel dimensions */
+      s.W = canvas.width = w;
+      s.H = canvas.height = h;
+      if (_introHasPlayed) {
+        /* Return visit — snap to settled state, no animation */
+        s.sphereAlpha = 1; s.transitionT = 1; s.phase = "done";
+        const intro = introRef.current;
+        if (intro) { intro.style.opacity = "0"; intro.style.pointerEvents = "none"; }
+        const nav = navRef.current;
+        if (nav) { nav.style.opacity = "1"; nav.style.transform = "translateY(0)"; }
+        /* Wait one more frame so DOM elements exist before applying styles */
+        requestAnimationFrame(() => {
+          const hc = heroRef.current;
+          if (hc) {
+            [".hero-gradient",".hero-label-wrap",".hero-meta"].forEach(sel => {
+              const el = hc.querySelector(sel); if (el) el.style.opacity = "1";
+            });
+            [".hl1",".hl2",".hero-label-inner"].forEach(sel => {
+              const el = hc.querySelector(sel); if (el) el.style.transform = "translateY(0)";
+            });
+          }
+        });
+      } else {
+        /* First load — run the full intro sequence */
+        document.fonts.ready.then(() => setTimeout(() => {
+          runIntro().then(() => { _introHasPlayed = true; });
+        }, 120));
+      }
+    };
+    requestAnimationFrame(startIntro);
+
+    return ()=>{
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouse);
+      window.removeEventListener("touchmove", onTouch);
+    };
+  }, [runIntro]);
+
+  return { canvasRef, introRef, heroRef, navRef };
 }
 
-function Landing({ go, toast }) {
+
+function Landing({ go, toast, openSim }) {
   useReveal([]);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { canvasRef, introRef, heroRef, navRef } = useSphereIntro();
+
+  // Auth-aware nav — check if user has a session
+  const isLoggedIn = (() => {
+    try { return !!localStorage.getItem("crypton_session"); } catch { return false; }
+  })();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -738,9 +1007,22 @@ function Landing({ go, toast }) {
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };
 
+  const NAV_LINKS = [
+    { label: "Features",  target: "features"  },
+    { label: "Protocol",  target: "protocol"  },
+    { label: "Customers", target: "who"       },
+    { label: "Attacks",   target: "attacks"   },
+    { label: "Pricing",   target: "pricing"   },
+    { label: "About",     target: "about"     },
+  ];
+
   return (
     <div style={{ background: "var(--ink)" }}>
+
+      {/* ── SPHERE CANVAS ── */}
       <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+
+      {/* ── INTRO OVERLAY ── */}
       <div ref={introRef} style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
         <div className="intro-wm" style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,10vw,120px)", letterSpacing: ".14em", textTransform: "uppercase", opacity: 0, position: "relative", textAlign: "center" }}>
           CRYPTON
@@ -750,10 +1032,12 @@ function Landing({ go, toast }) {
           Zero-trust · Device identity · No passwords
         </div>
       </div>
-      <div ref={navRef} className={"landing-nav" + (scrolled ? " scrolled" : "")} style={{ opacity: 0, zIndex: 600 }}>
+
+      {/* ── NAV ── */}
+      <div ref={navRef} className={`landing-nav${scrolled ? " scrolled" : ""}`} style={{ opacity: 0, zIndex: 600 }}>
         <a onClick={() => scrollTo("hero")} style={{ fontFamily: "var(--display)", fontSize: 20, letterSpacing: ".14em", color: "var(--paper)", textDecoration: "none", cursor: "pointer" }}>CRYPTON</a>
         <ul className="nav-links-wrap" style={{ display: "flex", gap: 36, listStyle: "none" }}>
-          {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
+          {NAV_LINKS.map(l => (
             <li key={l.label}>
               <button onClick={() => scrollTo(l.target)} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", border: "none", opacity: .7, transition: "opacity .2s", cursor: "pointer" }}
                 onMouseEnter={e => e.target.style.opacity = 1} onMouseLeave={e => e.target.style.opacity = .7}>{l.label}</button>
@@ -761,26 +1045,34 @@ function Landing({ go, toast }) {
           ))}
         </ul>
         <div className="nav-desktop-btns" style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => go("dashboard")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "10px 18px", border: "1px solid var(--line2)", cursor: "pointer", transition: "all .2s" }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--paper)"}
-            onMouseLeave={e => e.currentTarget.style.borderColor = "var(--line2)"}>Dashboard</button>
-          <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
-            onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
-            onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Enroll Device</button>
+          {isLoggedIn
+            ? <button onClick={() => go("dashboard")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
+                onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Dashboard</button>
+            : <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--paper)", padding: "10px 22px", border: "none", cursor: "pointer", transition: "background .2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--accent)"}
+                onMouseLeave={e => e.currentTarget.style.background = "var(--paper)"}>Enroll Device</button>
+          }
         </div>
-        <button className={"mob-menu-btn" + (menuOpen ? " open" : "")} onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+        <button className={`mob-menu-btn${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
         </button>
       </div>
-      <div className={"mob-drawer" + (menuOpen ? " open" : "")}>
-        {[{ label: "About", target: "about" }, { label: "Protocol", target: "protocol" }, { label: "Features", target: "features" }, { label: "Developer", target: "developer" }].map(l => (
+
+      {/* ── MOBILE DRAWER ── */}
+      <div className={`mob-drawer${menuOpen ? " open" : ""}`}>
+        {NAV_LINKS.map(l => (
           <button key={l.label} className="mob-link" onClick={() => scrollTo(l.target)}>{l.label}</button>
         ))}
         <div className="mob-drawer-ctas">
-          <button onClick={() => { setMenuOpen(false); go("dashboard"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--paper)", background: "none", padding: "14px 0", border: "1px solid var(--line2)", cursor: "pointer", textAlign: "center" }}>Dashboard</button>
-          <button onClick={() => { setMenuOpen(false); go("register"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--accent)", padding: "14px 0", border: "none", cursor: "pointer", textAlign: "center" }}>Enroll Device</button>
+          {isLoggedIn
+            ? <button onClick={() => { setMenuOpen(false); go("dashboard"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--accent)", padding: "14px 0", border: "none", cursor: "pointer", textAlign: "center" }}>Dashboard</button>
+            : <button onClick={() => { setMenuOpen(false); go("register"); }} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink)", background: "var(--accent)", padding: "14px 0", border: "none", cursor: "pointer", textAlign: "center" }}>Enroll Device</button>
+          }
         </div>
       </div>
+
+      {/* ── HERO SECTION (untouched) ── */}
       <section id="hero" style={{ height: "100vh", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 52px 56px", zIndex: 10 }} className="hero-pad">
         <div ref={heroRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
           <div className="hero-gradient" style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,10,.9) 0%,rgba(10,10,10,.25) 45%,transparent 72%)", opacity: 0 }} />
@@ -807,6 +1099,8 @@ function Landing({ go, toast }) {
           </div>
         </div>
       </section>
+
+      {/* ── TICKER ── */}
       <div style={{ background: "var(--accent)", overflow: "hidden", padding: "13px 0", whiteSpace: "nowrap", position: "relative", zIndex: 10 }} aria-hidden="true">
         <div className="ticker-track">
           {["Zero Trust","Device Identity","Hardware Keys","No Passwords","Cryptographic Proof","Instant Revocation"].flatMap(t => [
@@ -819,107 +1113,186 @@ function Landing({ go, toast }) {
           ])}
         </div>
       </div>
+
+      {/* ── CONTENT SECTIONS ── */}
       <div style={{ position: "relative", zIndex: 10, background: "var(--ink)" }}>
-        <section id="about" style={{ padding: "140px 52px" }} className="section-pad">
-          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-            <span>01 — Manifesto</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+
+        {/* ══ 01 — MANIFESTO / FEATURES ══ */}
+        <section id="features" style={{ padding: "140px 52px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>01 — Features</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div className="rv manifesto-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "end" }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(34px,3.8vw,54px)", lineHeight: 1.15, letterSpacing: "-.01em" }}>
-              Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
-            </div>
+          <div className="rv manifesto-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "start" }}>
+            {/* Left — headline */}
             <div>
-              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.85, maxWidth: 360, fontWeight: 300, marginBottom: 36 }}>
-                Crypton is a zero-trust identity platform where authentication is tied to cryptographic device keys — not passwords, not secrets, not human memory. Your private key never leaves your hardware.
-              </p>
-              <BtnO onClick={() => scrollTo("developer")}>Read the whitepaper →</BtnO>
-              <div style={{ marginTop: 16 }}><BtnF onClick={() => go("register")}>Enroll Your Device →</BtnF></div>
+              <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(40px,4.5vw,66px)", lineHeight: 1.1, letterSpacing: "-.01em", marginBottom: 48 }}>
+                Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+              </div>
+              <BtnF onClick={() => go("register")}>Enroll Your Device →</BtnF>
             </div>
-          </div>
-        </section>
-        <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
-          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-            <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
-          <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,7vw,92px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
-          <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
-          <div className="rv rv-1 hiw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
-            {[
-              { n: "01", t: "Challenge", b: "Server issues a unique, time-bound cryptographic nonce. Non-repeatable. Expires in milliseconds. Cannot be predicted or pre-computed." },
-              { n: "02", t: "Sign", b: "Your device’s hardware security module signs the nonce using its private key. The key never leaves the chip. Face ID. Touch ID. Hardware token." },
-              { n: "03", t: "Verify", b: "The server verifies the signature against your registered public key. Match means access. Mismatch means instant rejection. Sub-200ms total." },
-            ].map(c => <HiWCard key={c.n} {...c} />)}
-          </div>
-        </section>
-        <section id="features" style={{ padding: "0 52px 140px" }} className="section-pad">
-          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-            <span>03 — Capabilities</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
-          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-            <div className="features-list" style={{ paddingRight: 72, borderRight: "1px solid var(--line)" }}>
+            {/* Right — bullet features */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: "1px solid var(--line)" }}>
               {[
                 { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
                 { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
                 { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
-                { i: "F.04", t: "Instant Revocation", b: "Revoke a compromised device in under 500ms. Propagates globally. No stale sessions. No grace periods." },
-                { i: "F.05", t: "Audit Trail", b: "Cryptographically signed, tamper-proof log of every authentication event. Export to CSV or JSON for compliance." },
-                { i: "F.06", t: "Time-Lock Recovery", b: "24-hour mandatory waiting period on recovery. Existing trusted devices can cancel unauthorized attempts." },
               ].map((f, idx) => (
-                <div key={f.i} className="feat-item rv" style={{ padding: "32px 0", borderBottom: idx < 5 ? "1px solid var(--line)" : "none", display: "flex", alignItems: "flex-start", gap: 20 }}>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 3, flexShrink: 0 }}>{f.i}</span>
-                  <div>
-                    <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 7 }}>{f.t}</div>
-                    <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{f.b}</div>
-                  </div>
+                <FeatureBullet key={f.i} f={f} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══ 02 — PROTOCOL (untouched) ══ */}
+        <section id="protocol" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>02 — Protocol</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(52px,8vw,112px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 6 }}>Three-step<br />verification</h2>
+          <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
+          <div className="rv rv-1 hiw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
+            {[
+              { n: "01", t: "Challenge", b: "Server issues a time-bound nonce. Non-repeatable. Cannot be predicted." },
+              { n: "02", t: "Sign", b: "Device hardware signs the nonce. Private key never leaves the chip." },
+              { n: "03", t: "Verify", b: "Server verifies the signature against your public key. Sub-200ms." },
+            ].map(c => <HiWCard key={c.n} {...c} />)}
+          </div>
+          {/* Live animation — merged into protocol */}
+          <div className="rv" style={{ marginTop: 56, paddingTop: 40, borderTop: "1px solid var(--line)" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ color: "var(--accent)" }}>// live</span> — click any node to simulate a failure
+              <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            </div>
+            <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,6.5vw,88px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 48 }}>
+              Every request.<br /><span style={{ color: "var(--accent)" }}>Cryptographically proven.</span>
+            </h2>
+            <TrustAnimation />
+          </div>
+        </section>
+
+        {/* ══ WHO IT'S FOR ══ */}
+        <section id="who" style={{ padding: "40px 52px 72px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>03 — Who It's For</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, border: "1px solid var(--line)" }}>
+            {[
+              { tag: "FOR DEVELOPERS", icon: "</>", title: "Developers", line: "Ship zero-trust auth in a single SDK call.", chips: ["SaaS","Dev Tools","Open Source","API-first"] },
+              { tag: "FOR TEAMS",      icon: "⬡⬡",  title: "Teams",      line: "Replace passwords across your org without friction.", chips: ["Fintech","HealthTech","Legal","Remote-first"] },
+              { tag: "FOR ENTERPRISE", icon: "▣",   title: "Enterprises", line: "Hardware-attested identity with compliance built in.", chips: ["Banking","Defence","Gov","Critical Infra"] },
+            ].map((c, idx) => <WhoCard key={c.tag} card={c} idx={idx} scrollTo={scrollTo} />)}
+          </div>
+        </section>
+
+
+        {/* ══ ATTACK SURFACE ══ */}
+        <section id="attacks" style={{ padding: "0 52px 80px", borderTop: "1px solid var(--line)" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 100 }}>
+            <span>05 — Attack Surface</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            <AttackSimTrigger openSim={openSim} />
+          </div>
+          <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(52px,7.5vw,104px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 16 }}>
+            Every attack.<br /><span style={{ color: "var(--accent)" }}>Already blocked.</span>
+          </h2>
+          <p className="rv" style={{ fontSize: 14, color: "var(--muted)", fontWeight: 300, lineHeight: 1.75, maxWidth: 480, marginBottom: 72 }}>
+            Hover any attack type to see how Crypton stops it. Or try it yourself.
+          </p>
+          <AttackTerminal />
+        </section>
+
+        {/* ══ BEFORE VS AFTER ══ */}
+        <section style={{ padding: "0 52px 80px", borderTop: "1px solid var(--line)" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 100 }}>
+            <span>06 — Before vs After</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <BeforeAfter />
+        </section>
+
+        {/* ══ PRICING ══ */}
+        <section id="pricing" style={{ padding: "0 52px 100px", borderTop: "1px solid var(--line)" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 140 }}>
+            <span>07 — Pricing</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
+            {[
+              { badge: "Free",       sub: "Developer / Startup",    price: "$0",     note: "",        features: ["Up to 5 users / 10 devices","Passkey-based login","Basic device enrollment","Simple admin dashboard","Manual device approval"], cta: "Start Free" },
+              { badge: "Starter",    sub: "Small Teams",            price: "$5",     note: "per user / mo",  features: ["Up to 50 users","Multiple devices per user","Device trust policies","Admin controls + logs","Email support"], cta: "Get Started" },
+              { badge: "Growth",     sub: "Scaling Companies",      price: "$10",    note: "per user / mo",  features: ["Unlimited users & devices","Advanced trust policies","Risk-based access decisions","API access & integrations","Audit logs + compliance"], cta: "Start Growing" },
+              { badge: "Enterprise", sub: "Security-First Orgs",    price: "Custom", note: "contact us",     features: ["Custom deployment","SOC2 / HIPAA alignment","Dedicated support","On-prem / hybrid options","SLA guarantees"], cta: "Get in Touch" },
+            ].map((p, i) => <PricingCard2 key={p.badge} plan={p} go={go} toast={toast} />)}
+          </div>
+        </section>
+
+        {/* ══ 04 — ABOUT ══ */}
+        <section id="about" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>07 — About</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <div className="rv about-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "start" }}>
+            {/* Left — what Crypton is */}
+            <div>
+              <h2 style={{ fontFamily: "var(--serif)", fontSize: "clamp(32px,3.5vw,52px)", lineHeight: 1.12, letterSpacing: "-.01em", marginBottom: 36 }}>
+                A new foundation<br />for <em style={{ fontStyle: "italic", color: "var(--muted)" }}>device identity.</em>
+              </h2>
+              <div style={{ width: 40, height: 1, background: "var(--accent)", marginBottom: 36 }} />
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.9, fontWeight: 300, marginBottom: 24 }}>
+                Crypton is a zero-trust identity platform built on hardware cryptography. We replace passwords, OTPs, and shared secrets with device-bound keys that never leave your hardware.
+              </p>
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.9, fontWeight: 300, marginBottom: 36 }}>
+                Every authentication is a cryptographic proof. Every device is independently verified. Every session is visible and revocable in real time.
+              </p>
+
+            </div>
+            {/* Right — product highlights */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "var(--line)" }}>
+              {[
+                { label: "Authentication",  value: "Hardware-bound passkeys. No passwords. No OTPs." },
+                { label: "Device Control",  value: "Enroll, monitor, and revoke devices in under 500ms." },
+                { label: "Session Map",     value: "See every active session across every device, live." },
+                { label: "Trust Policies",  value: "Define rules for which devices can access what, when." },
+                { label: "Audit Trail",     value: "Cryptographically signed logs of every auth event." },
+                { label: "Recovery",        value: "24-hour time-lock. Trusted devices cancel bad actors." },
+              ].map(item => (
+                <div key={item.label} style={{ background: "var(--ink)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)" }}>{item.label}</div>
+                  <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, fontWeight: 300 }}>{item.value}</div>
                 </div>
               ))}
             </div>
-            <div className="features-sticky" style={{ paddingLeft: 72 }}>
-              <div className="rv" style={{ position: "sticky", top: 120, height: 400, background: "var(--ink-3)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%,black,transparent)" }} />
-                <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-                  <div className="fv-glyph" style={{ fontSize: 100, lineHeight: 1, filter: "drop-shadow(0 0 50px rgba(200,245,90,.35))" }}>🔐</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".15em", textTransform: "uppercase", color: "var(--accent)", marginTop: 14 }}>// secure enclave active</div>
-                </div>
-              </div>
+          </div>
+        </section>
+
+        {/* ══ 05 — VISION ══ */}
+        <section id="vision" style={{ padding: "0 52px 140px" }} className="section-pad">
+          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
+            <span>08 — Vision</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          {/* Big headline */}
+          <div className="rv" style={{ marginBottom: 96 }}>
+            <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(52px,8vw,110px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .92, maxWidth: 900 }}>
+              Trust as a<br /><span style={{ color: "var(--accent)" }}>built-in</span><br />property.
+            </h2>
+          </div>
+          {/* Two column layout — pull quote left, body right */}
+          <div className="rv" style={{ display: "grid", gridTemplateColumns: "5fr 7fr", gap: 80, alignItems: "start", paddingTop: 56, borderTop: "1px solid var(--line)" }}>
+            <div>
+              <p style={{ fontFamily: "var(--serif)", fontSize: "clamp(20px,2.2vw,30px)", lineHeight: 1.45, color: "var(--paper)", letterSpacing: "-.01em" }}>
+                "Not something layered on after the fact — but a fundamental property of how systems interact."
+              </p>
+              <div style={{ width: 40, height: 1, background: "var(--accent)", marginTop: 36 }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+              <p style={{ fontSize: 15, color: "var(--muted)", lineHeight: 1.9, fontWeight: 300 }}>
+                Software has evolved faster than the systems we use to trust it. We're focused on closing that gap — moving beyond reactive security toward continuous trust across people, devices, and environments, without added friction.
+              </p>
+              <p style={{ fontSize: 15, color: "var(--paper)", lineHeight: 1.9, fontWeight: 300 }}>
+                We're building toward a future where trust becomes a built-in property of how systems interact, not something layered on after the fact.
+              </p>
             </div>
           </div>
         </section>
-        <div className="rv stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "var(--ink-2)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-          {[
-            { v: "0", d: "Passwords ever stored\nin the Crypton system" },
-            { v: "100%", d: "Requests cryptographically\nverified, every time" },
-            { v: "<200ms", d: "End-to-end authentication\nlatency on 4G" },
-            { v: "∞", d: "Entropy in each\nhardware-generated key" },
-          ].map((s, i) => (
-            <div key={i} className="stat-c" style={{ padding: "52px 36px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-              <div style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,5.5vw,76px)", lineHeight: 1, letterSpacing: ".02em", marginBottom: 10 }}>{s.v}</div>
-              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.65, whiteSpace: "pre-line" }}>{s.d}</div>
-            </div>
-          ))}
-        </div>
-        <section id="developer" style={{ padding: "140px 52px" }} className="section-pad">
-          <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", color: "var(--muted)", marginBottom: 72, display: "flex", alignItems: "center", gap: 16 }}>
-            <span>04 — Developer</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
-          <div className="dev-grid" style={{ display: "grid", gridTemplateColumns: "5fr 7fr", alignItems: "stretch" }}>
-            <div className="rv dev-left" style={{ padding: "80px 56px 80px 0", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 22 }}>// Integrate in 5 minutes</div>
-              <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(44px,5.5vw,76px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 28 }}>Ship<br />Zero-<br />Trust.</h2>
-              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.85, marginBottom: 36, fontWeight: 300, maxWidth: 320 }}>Our SDK handles all cryptographic operations. Type-safe API. Works with any backend.</p>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 36 }}>
-                {["TypeScript", "Rust", "Python", "Go"].map(l => <span key={l} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "5px 11px", border: "1px solid var(--line)", color: "var(--muted)" }}>{l}</span>)}
-              </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <BtnF onClick={() => go("admin")}>Read the Docs →</BtnF>
-                <BtnO onClick={() => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank")}>GitHub ↗</BtnO>
-              </div>
-            </div>
-            <div className="rv rv-1 dev-right" style={{ padding: "80px 0 80px 56px" }}>
-              <CodeBlock toast={toast} />
-            </div>
-          </div>
-        </section>
+
+        {/* ══ FOOTER ══ */}
         <footer style={{ borderTop: "1px solid var(--line)", padding: "72px 52px 36px" }} className="section-pad">
           <div className="rv footer-grid" style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr", gap: 48, paddingBottom: 56, borderBottom: "1px solid var(--line)" }}>
             <div className="footer-brand">
@@ -927,9 +1300,26 @@ function Landing({ go, toast }) {
               <p style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300, lineHeight: 1.7, maxWidth: 250 }}>Zero-trust device identity. Authentication powered by cryptography — not passwords, not hope.</p>
             </div>
             {[
-              { h: "Product", links: [{ l: "Protocol", action: () => scrollTo("protocol") }, { l: "Features", action: () => scrollTo("features") }, { l: "Pricing", action: () => toast("Pricing — coming soon", "info") }, { l: "Changelog", action: () => go("auditlogs") }] },
-              { h: "Developer", links: [{ l: "Documentation", action: () => go("admin") }, { l: "API Reference", action: () => go("admin") }, { l: "SDK", action: () => scrollTo("developer") }, { l: "GitHub", action: () => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank") }] },
-              { h: "Company", links: [{ l: "About", action: () => scrollTo("about") }, { l: "Security", action: () => go("risk") }, { l: "Privacy", action: () => toast("Privacy policy — coming soon", "info") }, { l: "Terms", action: () => toast("Terms of service — coming soon", "info") }] },
+              { h: "Product", links: [
+                { l: "Features",     action: () => scrollTo("features") },
+                { l: "Protocol",     action: () => scrollTo("protocol") },
+                { l: "Who It's For", action: () => scrollTo("who") },
+                { l: "Attack Surface",action: () => scrollTo("attacks") },
+                { l: "Pricing",      action: () => scrollTo("pricing") },
+              ]},
+              { h: "Developer", links: [
+                { l: "Documentation", action: () => go("admin") },
+                { l: "API Reference",  action: () => go("admin") },
+                { l: "Dashboard",      action: () => go("dashboard") },
+                { l: "GitHub",         action: () => window.open("https://github.com/Aryanvirpsu/Crypton-DI", "_blank") },
+              ]},
+              { h: "Company", links: [
+                { l: "About",   action: () => scrollTo("about") },
+                { l: "Vision",  action: () => scrollTo("vision") },
+                { l: "Security",action: () => go("risk") },
+                { l: "Privacy", action: () => toast("Privacy policy — coming soon", "info") },
+                { l: "Terms",   action: () => toast("Terms of service — coming soon", "info") },
+              ]},
             ].map(col => (
               <div key={col.h}>
                 <h5 style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 18 }}>{col.h}</h5>
@@ -946,19 +1336,999 @@ function Landing({ go, toast }) {
             <span>© 2026 CRYPTON — ALL RIGHTS RESERVED</span><span>V1.0 · MARCH 2026</span>
           </div>
         </footer>
+
       </div>
     </div>
   );
 }
+
+/* ── Trust Animation ───────────────────────────────────────────── */
+function TrustAnimation() {
+  const canvasRef = useRef(null);
+  const rafRef    = useRef(null);
+  const roRef     = useRef(null);
+  const stRef     = useRef({ packets:[], nextSpawn:55, t:0, brokenAt:-1,
+                             W:0, H:0, nodeXs:[], ny:0, ready:false, hoveredNode:-1 });
+  const [broken,      setBroken]      = useState(-1);
+  const [hoveredNode, setHoveredNode] = useState(-1);
+  const [dims,        setDims]        = useState({ W:0, nodeXs:[], ny:0 });
+
+  const NODES = [
+    { label:'DEVICE ENCLAVE', sub:'TPM / Secure Element',
+      tip:'Private key generated on-device. Never exported — not even to Crypton.',
+      broke:'Without Crypton: password stored in a database. One breach exposes every user.' },
+    { label:'SIGNED NONCE',   sub:'Cryptographic signature',
+      tip:'Device signs a one-time challenge. Replay attacks are impossible.',
+      broke:'Without Crypton: plain credentials sent over the wire. Interceptable. Replayable.' },
+    { label:'CRYPTON SERVER', sub:'Signature verification',
+      tip:'Server checks the signature against your public key. No secret stored server-side.',
+      broke:'Without Crypton: server holds password hashes. Leaked DB = instant compromise for all users.' },
+    { label:'ACCESS GRANTED', sub:'Sub-200ms, zero secrets',
+      tip:'Access granted by cryptographic proof alone. No password, no OTP, no shared secret.',
+      broke:'Without Crypton: session token issued — stealable, reusable, and impossible to audit.' },
+  ];
+  const N = NODES.length, NW = 185, NH = 72;
+
+  const layout = (cssW, cssH) => {
+    const span = cssW * 0.72, sx = (cssW-span)/2, sp = span/(N-1);
+    return { nodeXs: NODES.map((_,i)=>sx+i*sp), ny: cssH*0.50 };
+  };
+
+  useEffect(()=>{
+    const canvas = canvasRef.current; if (!canvas) return;
+    const startLoop = () => {
+      const ctx = canvas.getContext('2d');
+      const s   = stRef.current;
+      const setSize = ()=>{
+        const dpr=window.devicePixelRatio||1, cssW=canvas.offsetWidth, cssH=canvas.offsetHeight;
+        if (!cssW||!cssH) return false;
+        canvas.width=cssW*dpr; canvas.height=cssH*dpr; ctx.scale(dpr,dpr);
+        const {nodeXs,ny}=layout(cssW,cssH);
+        s.W=cssW; s.H=cssH; s.nodeXs=nodeXs; s.ny=ny; s.ready=true;
+        setDims({W:cssW,nodeXs,ny}); return true;
+      };
+      if (!setSize()) return;
+
+      const spawn=()=>{
+        if (s.brokenAt>=0) return;
+        s.packets.push({pos:0,speed:0.003+Math.random()*0.002,reject:Math.random()<0.18,alpha:1,done:false,trail:[]});
+      };
+
+      const draw=()=>{
+        if (!s.ready){rafRef.current=requestAnimationFrame(draw);return;}
+        const {W,H,nodeXs,ny}=s;
+        const dpr=window.devicePixelRatio||1;
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        ctx.clearRect(0,0,W,H);
+        const isBroken=s.brokenAt>=0;
+
+        for (let i=0;i<N-1;i++){
+          const x1=nodeXs[i],x2=nodeXs[i+1];
+          const dead=isBroken&&i>=s.brokenAt, hov=s.hoveredNode===i||s.hoveredNode===i+1;
+          ctx.save();
+          ctx.strokeStyle=dead?'rgba(248,113,113,0.25)':hov?'rgba(200,245,90,0.32)':'rgba(200,245,90,0.09)';
+          ctx.lineWidth=1; ctx.setLineDash([5,8]);
+          ctx.beginPath(); ctx.moveTo(x1,ny); ctx.lineTo(x2,ny); ctx.stroke();
+          ctx.setLineDash([]);
+          const ax=(x1+x2)/2;
+          ctx.strokeStyle=dead?'rgba(248,113,113,0.38)':'rgba(200,245,90,0.3)';
+          ctx.lineWidth=1.3;
+          ctx.beginPath(); ctx.moveTo(ax-7,ny-5); ctx.lineTo(ax+1,ny); ctx.lineTo(ax-7,ny+5); ctx.stroke();
+          ctx.restore();
+        }
+
+        nodeXs.forEach((x,i)=>{
+          const hov=s.hoveredNode===i, dead=isBroken&&i>=s.brokenAt, isLast=i===N-1;
+          if (hov||isLast||dead){
+            const rgb=dead?'248,113,113':'200,245,90';
+            const alpha=dead?0.13:isLast?0.06:0.09;
+            const g=ctx.createRadialGradient(x,ny,0,x,ny,NW*0.85);
+            g.addColorStop(0,`rgba(${rgb},${alpha})`); g.addColorStop(1,'transparent');
+            ctx.fillStyle=g; ctx.fillRect(x-NW,ny-NH,NW*2,NH*2);
+          }
+        });
+
+        if (!isBroken){
+          s.packets.forEach(pkt=>{
+            if (pkt.done) return;
+            const si=Math.min(Math.floor(pkt.pos*(N-1)),N-2);
+            const st=pkt.pos*(N-1)-si;
+            const px=nodeXs[si]+(nodeXs[si+1]-nodeXs[si])*st, py=ny;
+            const rgb=pkt.reject?'248,113,113':'200,245,90';
+            pkt.trail.push({x:px,y:py});
+            if (pkt.trail.length>20) pkt.trail.shift();
+            pkt.trail.forEach((pt,ti)=>{
+              const ta=(ti/pkt.trail.length)*0.38*pkt.alpha;
+              ctx.save(); ctx.beginPath(); ctx.arc(pt.x,pt.y,1.4+ti*0.1,0,Math.PI*2);
+              ctx.fillStyle=`rgba(${rgb},${ta})`; ctx.fill(); ctx.restore();
+            });
+            ctx.save(); ctx.beginPath(); ctx.arc(px,py,5.5,0,Math.PI*2);
+            ctx.fillStyle=`rgba(${rgb},${pkt.alpha})`;
+            ctx.shadowBlur=20; ctx.shadowColor=pkt.reject?'#F87171':'#C8F55A';
+            ctx.fill(); ctx.restore();
+            pkt.pos+=pkt.speed;
+            if (pkt.pos>=1){if(pkt.reject){pkt.alpha-=0.055;if(pkt.alpha<=0)pkt.done=true;}else pkt.done=true;}
+          });
+          s.packets=s.packets.filter(p=>!p.done);
+          s.nextSpawn--;
+          if (s.nextSpawn<=0){spawn();s.nextSpawn=60+Math.floor(Math.random()*50);}
+        } else {
+          const pulse=0.05+0.04*Math.sin(s.t*0.07);
+          nodeXs.forEach((x,i)=>{
+            if (i<s.brokenAt) return;
+            const pg=ctx.createRadialGradient(x,ny,0,x,ny,NW*0.8);
+            pg.addColorStop(0,`rgba(248,113,113,${pulse})`); pg.addColorStop(1,'transparent');
+            ctx.fillStyle=pg; ctx.fillRect(x-NW,ny-NH,NW*2,NH*2);
+          });
+        }
+        s.t++; rafRef.current=requestAnimationFrame(draw);
+      };
+
+      roRef.current=new ResizeObserver(()=>{
+        const dpr=window.devicePixelRatio||1,cssW=canvas.offsetWidth,cssH=canvas.offsetHeight;
+        if (!cssW||!cssH) return;
+        canvas.width=cssW*dpr; canvas.height=cssH*dpr;
+        const {nodeXs,ny}=layout(cssW,cssH);
+        const s2=stRef.current; s2.W=cssW;s2.H=cssH;s2.nodeXs=nodeXs;s2.ny=ny;s2.ready=true;
+        setDims({W:cssW,nodeXs,ny});
+      });
+      roRef.current.observe(canvas);
+      spawn(); rafRef.current=requestAnimationFrame(draw);
+    };
+    const wait=()=>{if(canvas.offsetWidth>0)startLoop();else requestAnimationFrame(wait);};
+    wait();
+    return ()=>{cancelAnimationFrame(rafRef.current);roRef.current?.disconnect();};
+  },[]);
+
+  useEffect(()=>{stRef.current.brokenAt=broken;},[broken]);
+  useEffect(()=>{stRef.current.hoveredNode=hoveredNode;},[hoveredNode]);
+
+  const handleMouseMove=e=>{
+    const canvas=canvasRef.current; if(!canvas) return;
+    const rect=canvas.getBoundingClientRect(), mx=e.clientX-rect.left;
+    const {nodeXs}=stRef.current;
+    let found=-1;
+    nodeXs.forEach((x,i)=>{if(mx>=x-NW/2&&mx<=x+NW/2)found=i;});
+    setHoveredNode(found);
+  };
+  const handleClick=e=>{
+    const canvas=canvasRef.current; if(!canvas) return;
+    const rect=canvas.getBoundingClientRect(), mx=e.clientX-rect.left;
+    const {nodeXs}=stRef.current;
+    let found=-1;
+    nodeXs.forEach((x,i)=>{if(mx>=x-NW/2&&mx<=x+NW/2)found=i;});
+    if (found>=0){setBroken(b=>b===found?-1:found);stRef.current.packets=[];}
+    else setBroken(-1);
+  };
+
+  const activeInfo=broken>=0?NODES[broken]:hoveredNode>=0?NODES[hoveredNode]:null;
+  const isBrokenInfo=broken>=0;
+
+  return (
+    <div style={{position:'relative'}}>
+      <div style={{position:'relative',width:'100%'}}
+        onMouseMove={handleMouseMove} onMouseLeave={()=>setHoveredNode(-1)} onClick={handleClick}>
+        <canvas ref={canvasRef} style={{width:'100%',height:240,display:'block',cursor:'pointer'}}/>
+        {dims.W>0&&dims.nodeXs.map((x,i)=>{
+          const isLast=i===N-1,isHov=hoveredNode===i;
+          const isDead=broken>=0&&i>=broken;
+          return (
+            <div key={i} style={{
+              position:'absolute',left:x-NW/2,top:dims.ny-NH/2,width:NW,height:NH,
+              border:`1px solid ${isDead?'rgba(248,113,113,0.55)':isHov?'rgba(200,245,90,0.5)':isLast?'rgba(200,245,90,0.35)':'rgba(244,241,236,0.1)'}`,
+              background:isDead?'rgba(248,113,113,0.06)':isHov?'rgba(200,245,90,0.06)':isLast?'rgba(200,245,90,0.04)':'rgba(244,241,236,0.02)',
+              borderRadius:6,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+              transition:'border-color .2s,background .2s',pointerEvents:'none',userSelect:'none',
+            }}>
+              <div style={{fontFamily:"'DM Mono','Courier New',monospace",fontSize:11,fontWeight:700,
+                letterSpacing:'.1em',color:isDead?'#F87171':isLast?'#C8F55A':'rgba(244,241,236,0.9)',
+                lineHeight:1,marginBottom:6,transition:'color .2s'}}>{NODES[i].label}</div>
+              <div style={{fontFamily:"'DM Mono','Courier New',monospace",fontSize:9,
+                color:'rgba(122,117,112,0.8)',letterSpacing:'.06em',lineHeight:1}}>{NODES[i].sub}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{minHeight:60,marginTop:14,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        {activeInfo?(
+          <div style={{display:'flex',alignItems:'flex-start',gap:14,padding:'14px 22px',
+            border:`1px solid ${isBrokenInfo?'rgba(251,191,36,0.3)':'rgba(200,245,90,0.18)'}`,
+            background:isBrokenInfo?'rgba(251,191,36,0.05)':'rgba(200,245,90,0.04)',
+            maxWidth:520}}>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+              color:isBrokenInfo?'var(--warning)':'var(--accent)',letterSpacing:'.12em',marginTop:3,flexShrink:0,fontSize:8}}>
+              {isBrokenInfo?'WITHOUT CRYPTON':'INFO'}
+            </div>
+            <div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                color:isBrokenInfo?'var(--danger)':'var(--accent)',letterSpacing:'.12em',textTransform:'uppercase',marginBottom:5}}>
+                {activeInfo.label}
+              </div>
+              <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.7,fontWeight:300}}>
+                {isBrokenInfo?activeInfo.broke:activeInfo.tip}
+              </div>
+            </div>
+          </div>
+        ):(
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'rgba(122,117,112,0.32)',letterSpacing:'.14em'}}>
+            // hover to inspect · click to simulate failure
+          </div>
+        )}
+      </div>
+      {broken>=0&&(
+        <div style={{display:'flex',justifyContent:'center',marginTop:8}}>
+          <button onClick={()=>{setBroken(-1);stRef.current.packets=[];}}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:9,letterSpacing:'.14em',textTransform:'uppercase',
+              color:'var(--accent)',background:'rgba(200,245,90,0.06)',border:'1px solid rgba(200,245,90,0.22)',
+              padding:'7px 16px',cursor:'pointer',transition:'all .2s'}}>
+            ↺ RESET FLOW
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function WhoCard({ card, idx, scrollTo }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={() => scrollTo("pricing")}
+      style={{
+        padding: "52px 44px 48px",
+        borderRight: idx < 2 ? "1px solid var(--line)" : "none",
+        background: hov ? "var(--ink-2)" : "var(--ink)",
+        cursor: "pointer",
+        transition: "background .3s",
+        position: "relative", overflow: "hidden",
+      }}
+    >
+      {/* accent top bar on hover */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "var(--accent)", transform: hov ? "scaleX(1)" : "scaleX(0)", transformOrigin: "left", transition: "transform .45s cubic-bezier(.16,1,.3,1)" }} />
+      {/* tag */}
+      <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 28 }}>{card.tag}</div>
+      {/* icon */}
+      <div style={{ fontFamily: "var(--display)", fontSize: 52, lineHeight: 1, color: hov ? "rgba(200,245,90,.22)" : "rgba(244,241,236,.07)", marginBottom: 28, transition: "color .3s" }}>{card.icon}</div>
+      {/* title */}
+      <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px,3vw,40px)", letterSpacing: ".05em", textTransform: "uppercase", lineHeight: 1, marginBottom: 16 }}>{card.title}</div>
+      {/* one-liner */}
+      <div style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300, marginBottom: 28 }}>{card.line}</div>
+      {/* chips */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {card.chips.map(ch => (
+          <span key={ch} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "4px 10px", border: "1px solid var(--line)", color: "var(--muted)" }}>{ch}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Architecture Diagram ───────────────────────────────────────── */
+/* ── Architecture Diagram ───────────────────────────────────────── */
+function ArchDiagram() {
+  const [activeStep, setActiveStep] = useState(-1);
+  const steps = [
+    { n: "01", label: "Device Enclave",  sub: "TPM / Secure Element", detail: "Private key is generated on-device during enrollment. It is bound to the hardware and never exported — not even to Crypton.", color: "rgba(200,245,90," },
+    { n: "02", label: "SDK Challenge",   sub: "Client library",        detail: "The Crypton SDK requests a one-time nonce from the server and passes it to the device enclave for signing.",               color: "rgba(200,245,90," },
+    { n: "03", label: "Nonce + Sign",    sub: "Time-bound, single use", detail: "The enclave signs the nonce using the device private key. The signature is returned to the SDK. The key never moves.",        color: "rgba(200,245,90," },
+    { n: "04", label: "Verification",    sub: "Crypton Server",         detail: "The server verifies the signature against the registered public key. No password. No secret. Just math.",                   color: "rgba(200,245,90," },
+    { n: "05", label: "Access Granted",  sub: "Cryptographic proof",    detail: "Access is granted. The session is created, signed, and logged. Revocation is instant at any point.",                        color: "rgba(200,245,90," },
+  ];
+  return (
+    <div className="rv">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 0, border: "1px solid var(--line)" }}>
+        {steps.map((step, idx) => {
+          const isActive = activeStep === idx;
+          const isLast   = idx === steps.length - 1;
+          return (
+            <div
+              key={step.n}
+              onMouseEnter={() => setActiveStep(idx)}
+              onMouseLeave={() => setActiveStep(-1)}
+              style={{
+                borderRight: idx < 4 ? "1px solid var(--line)" : "none",
+                background: isActive ? (isLast ? "rgba(200,245,90,0.08)" : "var(--ink-2)") : isLast ? "rgba(200,245,90,0.03)" : "var(--ink)",
+                transition: "background .25s",
+                cursor: "default",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              {/* Top accent bar on hover */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: isLast ? "var(--accent)" : "var(--accent)", transform: isActive ? "scaleX(1)" : "scaleX(0)", transformOrigin: "left", transition: "transform .35s cubic-bezier(.16,1,.3,1)" }} />
+              <div style={{ padding: "44px 28px 40px" }}>
+                {/* Number */}
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".18em", marginBottom: 28, opacity: isActive ? 1 : 0.5, transition: "opacity .2s" }}>{step.n}</div>
+                {/* Connector arrow (except last) */}
+                {idx < 4 && (
+                  <div style={{ position: "absolute", right: -7, top: "38%", width: 12, height: 12, borderTop: `1.5px solid ${isActive ? "rgba(200,245,90,0.7)" : "rgba(200,245,90,0.2)"}`, borderRight: `1.5px solid ${isActive ? "rgba(200,245,90,0.7)" : "rgba(200,245,90,0.2)"}`, transform: "rotate(45deg)", transition: "border-color .25s", zIndex: 2 }} />
+                )}
+                {/* Label */}
+                <div style={{ fontFamily: "var(--display)", fontSize: "clamp(15px,1.5vw,20px)", letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.1, marginBottom: 10, color: isLast ? "var(--accent)" : "var(--paper)", transition: "color .2s" }}>{step.label}</div>
+                {/* Sub */}
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 20 }}>{step.sub}</div>
+                {/* Detail — reveals on hover */}
+                <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, maxHeight: isActive ? "120px" : "0", overflow: "hidden", opacity: isActive ? 1 : 0, transition: "max-height .35s ease, opacity .3s ease" }}>{step.detail}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", letterSpacing: ".1em", marginTop: 16, textAlign: "right", opacity: 0.5 }}>// hover any step to expand</div>
+    </div>
+  );
+}
+
+/* ── Feature card (F.01 / F.02 / F.03) ─────────────────────── */
+function FeatureCard({ f, last }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: hov ? "var(--ink-2)" : "var(--ink)",
+        padding: "52px 40px",
+        position: "relative",
+        overflow: "hidden",
+        cursor: "default",
+        transition: "background .35s",
+        borderRight: last ? "none" : "1px solid var(--line)",
+      }}
+    >
+      <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginBottom: 28 }}>{f.i}</div>
+      <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px,3vw,40px)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 18, lineHeight: 1 }}>{f.t}</div>
+      <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, maxWidth: 280 }}>{f.b}</div>
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
+        background: "var(--accent)",
+        transform: hov ? "scaleX(1)" : "scaleX(0)",
+        transformOrigin: "left",
+        transition: "transform .5s cubic-bezier(.16,1,.3,1)",
+      }} />
+    </div>
+  );
+}
+
+/* ── Feature bullet (F.01 / F.02 / F.03) ───────────────────── */
+function FeatureBullet({ f }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "flex-start", gap: 20,
+        padding: "28px 0", borderBottom: "1px solid var(--line)",
+        transition: "all .2s", cursor: "default",
+      }}
+    >
+      <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginTop: 4, flexShrink: 0 }}>{f.i}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: "var(--display)", fontSize: "clamp(20px,2.2vw,28px)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8, color: hov ? "var(--paper)" : "var(--paper)", transition: "color .2s" }}>{f.t}</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300 }}>{f.b}</div>
+      </div>
+      <div style={{ width: 6, height: 6, borderRadius: "50%", background: hov ? "var(--accent)" : "transparent", border: "1px solid var(--line)", marginTop: 6, flexShrink: 0, transition: "background .25s" }} />
+    </div>
+  );
+}
+
+/* ── PricingCard2 — single row, hover border, expand on hover ── */
+function PricingCard2({ plan, go, toast }) {
+  const [hov, setHov] = useState(false);
+  const isEnt = plan.badge === 'Enterprise';
+  return (
+    <div
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      style={{
+        background: hov ? 'var(--ink-3)' : 'var(--ink-2)',
+        borderRight: '1px solid var(--line)',
+        outline: hov ? '1px solid var(--accent)' : '1px solid transparent',
+        outlineOffset: '-1px',
+        padding: '40px 28px',
+        position: 'relative',
+        transition: 'background .25s, outline-color .25s, box-shadow .25s',
+        boxShadow: hov ? '0 0 40px rgba(200,245,90,0.08)' : 'none',
+        display: 'flex', flexDirection: 'column',
+      }}>
+      {/* Accent top bar on hover */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:2,
+        background:'var(--accent)',
+        transform:hov?'scaleX(1)':'scaleX(0)',
+        transformOrigin:'left',
+        transition:'transform .35s cubic-bezier(.16,1,.3,1)'}}/>
+      {/* Tier name — big and first */}
+      <div style={{fontFamily:'var(--display)',fontSize:'clamp(28px,2.8vw,40px)',letterSpacing:'.05em',
+        textTransform:'uppercase',lineHeight:1,marginBottom:6}}>{plan.badge}</div>
+      <div style={{fontSize:12,color:'var(--muted)',fontWeight:300,marginBottom:20}}>{plan.sub}</div>
+      {/* Price — below tier name */}
+      <div style={{fontFamily:'var(--display)',fontSize:'clamp(44px,4vw,60px)',letterSpacing:'.02em',
+        color:hov?'var(--accent)':'var(--paper)',lineHeight:1,marginBottom:4,transition:'color .25s'}}>{plan.price}</div>
+      <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--muted)',letterSpacing:'.08em',marginBottom:0}}>{plan.note}</div>
+      {/* Divider */}
+      <div style={{height:1,background:'var(--line)',margin:'20px 0 0',transition:'margin .35s'}}/>
+      {/* Features — expand on hover */}
+      <div style={{maxHeight:hov?`${plan.features.length*40}px`:'0',overflow:'hidden',
+        transition:'max-height .45s cubic-bezier(.16,1,.3,1)',marginBottom:hov?20:0}}>
+        <ul style={{listStyle:'none',paddingTop:16,display:'flex',flexDirection:'column',gap:0}}>
+          {plan.features.map((f,fi)=>(
+            <li key={f} style={{display:'flex',gap:10,alignItems:'flex-start',fontSize:12,
+              color:'var(--muted)',fontWeight:300,paddingBottom:8,
+              borderBottom:fi<plan.features.length-1?'1px solid var(--line)':'none',
+              marginBottom:fi<plan.features.length-1?8:0}}>
+              <span style={{color:'var(--accent)',fontFamily:'var(--mono)',fontSize:9,flexShrink:0,marginTop:2}}>→</span>{f}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {/* CTA */}
+      <div style={{paddingTop:hov?0:16,transition:'padding .35s',marginTop:'auto'}}>
+        {isEnt
+          ? <BtnO onClick={()=>toast('Enterprise — contact@crypton.dev','info')} style={{fontSize:9,padding:'9px 16px',width:'100%',justifyContent:'center'}}>Get in Touch →</BtnO>
+          : <BtnF onClick={()=>go('register')} style={{fontSize:9,padding:'9px 16px',width:'100%',justifyContent:'center'}}>{plan.cta} →</BtnF>
+        }
+      </div>
+    </div>
+  );
+}
+
+
+/* ── Vision card ────────────────────────────────────────────── */
+function VisionCard({ item, idx }) {
+  const [hov, setHov] = useState(false);
+  const col = idx % 3;
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: hov ? "var(--ink-2)" : "var(--ink)",
+        padding: "44px 36px",
+        position: "relative",
+        overflow: "hidden",
+        cursor: "default",
+        transition: "background .3s",
+        borderRight: col < 2 ? "1px solid var(--line)" : "none",
+        borderBottom: idx < 3 ? "1px solid var(--line)" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em" }}>{item.tag}</span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 8, letterSpacing: ".1em", textTransform: "uppercase", color: item.accent ? "var(--accent)" : "var(--muted)", padding: "3px 8px", border: `1px solid ${item.accent ? "var(--accent)" : "var(--line)"}` }}>{item.status}</span>
+      </div>
+      <div style={{ fontFamily: "var(--display)", fontSize: 26, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 14, lineHeight: 1 }}>{item.t}</div>
+      <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{item.b}</div>
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
+        background: "var(--accent)",
+        transform: hov ? "scaleX(1)" : "scaleX(0)",
+        transformOrigin: "left",
+        transition: "transform .45s cubic-bezier(.16,1,.3,1)",
+      }} />
+    </div>
+  );
+}
+
+
+/* ── AttackTerminal — visual attack cards + terminal trace ──── */
+/* ── Attack Simulator — animated fullscreen takeover ──────────── */
+function AttackSimTrigger({ openSim }) {
+  return (
+    <button onClick={openSim} style={{
+      fontFamily:'var(--mono)',fontSize:9,letterSpacing:'.14em',textTransform:'uppercase',
+      color:'var(--accent)',background:'rgba(200,245,90,0.06)',
+      border:'1px solid rgba(200,245,90,0.3)',padding:'8px 18px',
+      cursor:'pointer',transition:'all .2s',display:'flex',alignItems:'center',gap:8,flexShrink:0,
+    }}
+      onMouseEnter={e=>e.currentTarget.style.background='rgba(200,245,90,0.14)'}
+      onMouseLeave={e=>e.currentTarget.style.background='rgba(200,245,90,0.06)'}
+    >
+      <span style={{fontSize:11}}>⌨</span> Try It →
+    </button>
+  );
+}
+
+function AttackSim({ animState, onClose }) {
+  const [chosen,  setChosen]  = useState(null);
+  const [phase,   setPhase]   = useState('pick');
+  const [lines,   setLines]   = useState([]);
+  const [defIdx,  setDefIdx]  = useState(0);
+  const [blink,   setBlink]   = useState(true);
+  const inputRef = useRef(null);
+  const termRef  = useRef(null);
+
+  const isOpen    = animState === 'open';
+  const isClosing = animState === 'closing';
+
+  // Cursor blink
+  useEffect(() => {
+    const id = setInterval(() => setBlink(b => !b), 530);
+    return () => clearInterval(id);
+  }, []);
+
+  const ATTACKS = [
+    { id:'phishing',  label:'Phishing',           severity:'CRITICAL', color:'#F87171',
+      desc:'Fake login page harvests credentials',
+      attack:['> Launching PhishKit v4.2...','> Cloning crypton.io login page...','> Hosting on phish-secure-login.net','> Sending phishing email to target@org.com','> Waiting for credentials input...','> Connection established — capturing...'],
+      defense:['$ crypton auth:verify --origin','  ✗ Origin mismatch: phish-secure-login.net','  ✗ Expected: crypton.io','$ crypton auth:method --user target@org.com','  Method → passkey (hardware-bound)','  Password field → DOES NOT EXIST','  [BLOCKED] No credentials to harvest.','  [SECURE] Hardware key required. Phishing yields nothing.'],
+    },
+    { id:'bruteforce', label:'Brute Force',        severity:'HIGH',     color:'#FBBF24',
+      desc:'10,000 password attempts per second',
+      attack:['> Loading rockyou.txt — 14.3M entries','> Target: aryan@crypton.io','> Rate limiter: disabled','> Trying: password123 ✗','> Trying: crypton2026 ✗','> Trying: qwerty!@#$ ✗'],
+      defense:['$ crypton auth:surface --check','  Password auth → DISABLED','  Required → hardware device signature','$ crypton shield:status','  14,000,000 attempts → 0 success rate','  Attack surface → 0 bytes','  [BLOCKED] No password to brute force.','  [SECURE] Guessing is mathematically irrelevant.'],
+    },
+    { id:'mitm',       label:'Man in the Middle',  severity:'CRITICAL', color:'#F87171',
+      desc:'Intercepts auth tokens in transit',
+      attack:['> ARP poisoning local gateway...','> mitmproxy active on :8080','> Intercepting TLS session...','> Captured: Authorization: Bearer eyJhbGc...','> Replaying token → POST /api/auth','> Awaiting 200 OK...'],
+      defense:['$ crypton nonce:validate eyJhbGc...','  Issued: 14:33:01.042','  Now:    14:33:01.891  (+849ms)','  TTL: 500ms → EXPIRED','  Status → CONSUMED','  [REJECTED] Nonce already spent.','  [BLOCKED] Replayed token is worthless.','  [SECURE] Every nonce is single-use, time-bound.'],
+    },
+    { id:'stuffing',   label:'Credential Stuffing', severity:'HIGH',    color:'#FBBF24',
+      desc:'2.4M leaked passwords tried at once',
+      attack:['> breach2024.txt loaded — 2.4M pairs','> Targeting crypton.io endpoint','> aryan@crypton.io:LeakedPass#99 →','> aryan@crypton.io:Summer2024! →','> aryan@crypton.io:Crypton123 →','> 2,400,000 pairs queued...'],
+      defense:['$ crypton account:method aryan@crypton.io','  Auth type → passkey','  Password hash → NONE (never set)','$ crypton threat:assess','  Leaked credentials applicable → 0','  Surface area for stuffing → 0 bytes','  [BLOCKED] Nothing to stuff.','  [SECURE] Leaked passwords are useless here.'],
+    },
+    { id:'session',    label:'Session Hijack',      severity:'CRITICAL', color:'#F87171',
+      desc:'Stolen cookie replayed for access',
+      attack:['> XSS payload injected in comment field','> Script executing in victim browser...','> Exfiltrating document.cookie','> session_id=a3f7x9 captured','> Forged request → GET /dashboard','> Cookie attached — awaiting response...'],
+      defense:['$ crypton session:validate a3f7x9','  Enrolled device → MacBook-A3F7','  Request device → UNKNOWN','  Attestation → FAILED','$ crypton session:policy','  Sessions are hardware-bound.','  [REJECTED] Cookie without device is worthless.','  [SECURE] Session hijack blocked at attestation layer.'],
+    },
+    { id:'replay',     label:'Replay Attack',       severity:'HIGH',     color:'#FBBF24',
+      desc:'Valid signed request sent again later',
+      attack:['> Listening on network interface...','> Captured: POST /auth','> Payload: {sig:"d4f2a1",nonce:"n_882"}','> Waiting 900ms to avoid detection...','> Replaying identical request...','> Expecting session token...'],
+      defense:['$ crypton nonce:check n_882','  Issued:  20:19:30.100','  Used at: 20:19:30.412','  Status → CONSUMED (single-use)','  Current: 20:19:31.312 (+900ms)','  [REJECTED] Nonce TTL: 500ms. Window closed.','  [BLOCKED] Replay is impossible by design.','  [SECURE] Each request requires a fresh nonce.'],
+    },
+  ];
+
+  const scrollBottom = () => setTimeout(() => { if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight; }, 30);
+
+  const startAttack = (atk) => {
+    setChosen(atk);
+    setPhase('attacking');
+    setLines([{ text: `┌─ SIMULATING: ${atk.label.toUpperCase()} `, type:'system' }]);
+    setDefIdx(0);
+    let i = 0;
+    const typeNext = () => {
+      if (i >= atk.attack.length) {
+        setTimeout(() => {
+          setPhase('defending');
+          setLines(prev => [...prev,
+            { text:'', type:'gap' },
+            { text:'┌─ CRYPTON SHIELD ACTIVATED ─────────────────', type:'intercept' },
+            { text:'│  Press ENTER to execute each defense step.', type:'intercept' },
+            { text:'└────────────────────────────────────────────', type:'intercept' },
+            { text:'', type:'gap' },
+          ]);
+          scrollBottom();
+          setTimeout(() => inputRef.current?.focus(), 80);
+        }, 600);
+        return;
+      }
+      setLines(prev => [...prev, { text: atk.attack[i], type:'attack' }]);
+      scrollBottom();
+      i++;
+      setTimeout(typeNext, 240 + Math.random() * 160);
+    };
+    setTimeout(typeNext, 300);
+  };
+
+  const handleKey = (e) => {
+    if (e.key !== 'Enter') return;
+    const atk = ATTACKS.find(a => a.id === chosen?.id);
+    if (!atk) return;
+    if (defIdx < atk.defense.length) {
+      setLines(prev => [...prev, { text: atk.defense[defIdx], type:'defense' }]);
+      setDefIdx(d => d + 1);
+      scrollBottom();
+    } else if (phase !== 'done') {
+      setPhase('done');
+      setLines(prev => [...prev,
+        { text:'', type:'gap' },
+        { text:'╔══════════════════════════════════════════╗', type:'success' },
+        { text:'║   ✓  ATTACK NEUTRALISED — ACCESS SECURED  ║', type:'success' },
+        { text:'╚══════════════════════════════════════════╝', type:'success' },
+      ]);
+      scrollBottom();
+    }
+  };
+
+  useEffect(() => {
+    const fn = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [onClose]);
+
+  useEffect(() => { if (phase === 'defending') inputRef.current?.focus(); }, [phase]);
+
+  const defLen = chosen ? chosen.defense.length : 0;
+  const allDefDone = defIdx >= defLen;
+
+  const easeIn  = 'cubic-bezier(.4,0,1,1)';
+  const easeOut = 'cubic-bezier(.16,1,.3,1)';
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:10001,
+      background: '#030303',
+      opacity: isOpen ? 1 : 0,
+      transition: `opacity ${isClosing ? `0.3s ${easeIn}` : `0.25s ease`}`,
+      display:'flex', alignItems:'stretch', justifyContent:'stretch',
+      fontFamily:"'DM Mono','Courier New',monospace",
+    }}>
+      {/* Scanline overlay */}
+      <div style={{
+        position:'absolute', inset:0, pointerEvents:'none', zIndex:1,
+        backgroundImage:'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
+      }}/>
+
+      {/* Main window */}
+      <div style={{
+        width:'100vw', height:'100vh', position:'relative', zIndex:2,
+        display:'flex', flexDirection:'column', overflow:'hidden',
+        border:'none',
+        opacity: isOpen ? 1 : 0,
+        transform: isOpen ? 'translateY(0) scale(1)' : isClosing ? 'translateY(16px) scale(0.98)' : 'translateY(32px) scale(0.96)',
+        transition: isClosing
+          ? `opacity 0.3s ${easeIn}, transform 0.3s ${easeIn}`
+          : `opacity 0.4s ${easeOut}, transform 0.45s ${easeOut}`,
+      }}>
+        {/* Title bar */}
+        <div style={{
+          padding:'12px 20px', flexShrink:0,
+          background:'#0d0d0d', borderBottom:'1px solid rgba(200,245,90,0.15)',
+          display:'flex', alignItems:'center', gap:12,
+        }}>
+          <div style={{display:'flex',gap:8}}>
+            {[['#F87171',onClose],['#FBBF24',null],['#3d9e3d',null]].map(([c,fn],i)=>(
+              <div key={i} onClick={fn||undefined} style={{
+                width:13,height:13,borderRadius:'50%',background:c,
+                cursor:fn?'pointer':'default',
+                boxShadow:`0 0 8px ${c}66`,
+                transition:'transform .15s',
+              }}
+              onMouseEnter={e=>{if(fn)e.currentTarget.style.transform='scale(1.2)';}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';}}
+              />
+            ))}
+          </div>
+          {/* Tab */}
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 16px',
+            border:'1px solid rgba(200,245,90,0.15)',background:'rgba(200,245,90,0.04)'}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:'var(--accent)',display:'inline-block',boxShadow:'0 0 6px #C8F55A'}}/>
+            <span style={{fontSize:10,color:'rgba(200,245,90,0.7)',letterSpacing:'.1em',textTransform:'uppercase'}}>
+              crypton — attack simulator
+            </span>
+          </div>
+          <div style={{marginLeft:'auto',fontSize:9,color:'rgba(255,255,255,0.2)',letterSpacing:'.12em',cursor:'pointer'}} onClick={onClose}>
+            ESC TO EXIT
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{flex:1,display:'grid',gridTemplateColumns:'280px 1fr',overflow:'hidden'}}>
+
+          {/* ── Left: Attack picker ── */}
+          <div style={{
+            background:'#0a0a0a', borderRight:'1px solid rgba(200,245,90,0.12)',
+            display:'flex', flexDirection:'column', overflow:'hidden',
+          }}>
+            <div style={{padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+              <div style={{fontSize:9,color:'rgba(200,245,90,0.4)',letterSpacing:'.18em',textTransform:'uppercase',marginBottom:4}}>
+                // attack vectors
+              </div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.25)',lineHeight:1.5}}>
+                Select a vector. Watch it fail.
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:'8px'}}>
+              {ATTACKS.map(atk => {
+                const isChosen = chosen?.id === atk.id;
+                return (
+                  <div key={atk.id} onClick={()=>startAttack(atk)} style={{
+                    padding:'14px 16px', marginBottom:4, cursor:'pointer',
+                    background: isChosen ? `rgba(${atk.color==='#F87171'?'248,113,113':'251,191,36'},0.1)` : 'transparent',
+                    border:`1px solid ${isChosen ? atk.color+'55' : 'rgba(255,255,255,0.05)'}`,
+                    transition:'all .18s', position:'relative', overflow:'hidden',
+                  }}
+                  onMouseEnter={e=>{if(!isChosen){e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(255,255,255,0.12)';}}}
+                  onMouseLeave={e=>{if(!isChosen){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor='rgba(255,255,255,0.05)';}}}
+                  >
+                    {isChosen && <div style={{position:'absolute',top:0,left:0,bottom:0,width:2,background:atk.color}}/>}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                      <div style={{fontSize:11,color:isChosen?atk.color:'rgba(255,255,255,0.55)',letterSpacing:'.05em',fontWeight:500}}>
+                        {atk.label}
+                      </div>
+                      <div style={{fontSize:8,letterSpacing:'.1em',padding:'2px 7px',
+                        color:atk.color,border:`1px solid ${atk.color}44`,
+                        background:`${atk.color}11`}}>
+                        {atk.severity}
+                      </div>
+                    </div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,0.25)',lineHeight:1.4}}>{atk.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Legend */}
+            <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,0.05)',
+              display:'flex',flexDirection:'column',gap:6}}>
+              {[['#F87171','Attack'],['#C8F55A','Defense'],['#4ADE80','Secured']].map(([c,l])=>(
+                <div key={l} style={{display:'flex',alignItems:'center',gap:8,fontSize:9,
+                  color:'rgba(255,255,255,0.2)',letterSpacing:'.1em'}}>
+                  <div style={{width:6,height:6,borderRadius:'50%',background:c,boxShadow:`0 0 5px ${c}88`}}/>
+                  {l}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Right: Terminal ── */}
+          <div style={{display:'flex',flexDirection:'column',background:'#030303'}}>
+            {/* Terminal tab bar */}
+            <div style={{
+              padding:'8px 16px', flexShrink:0,
+              background:'#0a0a0a', borderBottom:'1px solid rgba(255,255,255,0.05)',
+              display:'flex', alignItems:'center', gap:10,
+            }}>
+              <span style={{fontSize:9,color:'rgba(200,245,90,0.5)',letterSpacing:'.1em'}}>●</span>
+              <span style={{fontSize:10,color:'rgba(255,255,255,0.2)',letterSpacing:'.08em'}}>
+                bash — crypton@shield:~
+              </span>
+              {chosen && (
+                <span style={{fontSize:9,color:`${chosen.color}77`,marginLeft:4,letterSpacing:'.06em'}}>
+                  [{chosen.label}]
+                </span>
+              )}
+              <div style={{marginLeft:'auto',display:'flex',gap:4}}>
+                {phase==='done' && (
+                  <div style={{fontSize:9,color:'#4ADE80',letterSpacing:'.1em',
+                    padding:'3px 10px',border:'1px solid #4ADE8044',background:'#4ADE8011'}}>
+                    SECURED
+                  </div>
+                )}
+                {phase==='attacking' && (
+                  <div style={{fontSize:9,color:'#F87171',letterSpacing:'.1em',
+                    padding:'3px 10px',border:'1px solid #F8717144',background:'#F8717111'}}>
+                    ATTACK IN PROGRESS
+                  </div>
+                )}
+                {phase==='defending' && (
+                  <div style={{fontSize:9,color:'#C8F55A',letterSpacing:'.1em',
+                    padding:'3px 10px',border:'1px solid #C8F55A44',background:'#C8F55A11'}}>
+                    DEFENSE {defIdx}/{defLen}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Output area */}
+            <div ref={termRef} style={{
+              flex:1, overflowY:'auto', padding:'20px 24px',
+              lineHeight:1.85, fontSize:12,
+            }}>
+              {lines.length === 0 && (
+                <div style={{color:'rgba(255,255,255,0.12)',lineHeight:1.8}}>
+                  <div>crypton@shield:~ $</div>
+                  <div style={{marginTop:8,color:'rgba(255,255,255,0.08)'}}>
+                    ← select an attack vector to begin
+                  </div>
+                </div>
+              )}
+              {lines.map((line, i) => {
+                if (line.type==='gap') return <div key={i} style={{height:8}}/>;
+                const style = {
+                  attack:   { color:'#F87171' },
+                  defense:  { color:'#C8F55A' },
+                  system:   { color:'rgba(255,255,255,0.18)', fontStyle:'italic' },
+                  intercept:{ color:'rgba(200,245,90,0.45)' },
+                  success:  { color:'#4ADE80', fontWeight:600 },
+                  hint:     { color:'rgba(200,245,90,0.3)', fontStyle:'italic' },
+                }[line.type] || { color:'rgba(255,255,255,0.35)' };
+                return (
+                  <div key={i} style={{...style, whiteSpace:'pre-wrap', wordBreak:'break-all', marginBottom:1}}>
+                    {line.text}
+                  </div>
+                );
+              })}
+              {/* Input prompt */}
+              {phase==='defending' && (
+                <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
+                  <span style={{color:'#C8F55A'}}>$</span>
+                  <input ref={inputRef} onKeyDown={handleKey}
+                    placeholder={allDefDone ? 'press ENTER to complete' : 'press ENTER to run next defense'}
+                    style={{
+                      flex:1, background:'transparent', border:'none', outline:'none',
+                      color:'#C8F55A', fontSize:12, fontFamily:"'DM Mono',monospace",
+                      letterSpacing:'.04em', caretColor:'#C8F55A',
+                    }}
+                  />
+                  <span style={{color:'#C8F55A',opacity:blink?1:0,fontSize:14,lineHeight:1}}>█</span>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom status */}
+            <div style={{
+              padding:'8px 20px', flexShrink:0,
+              borderTop:'1px solid rgba(255,255,255,0.05)',
+              background:'#0a0a0a',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              fontSize:9, letterSpacing:'.1em', color:'rgba(255,255,255,0.15)',
+            }}>
+              <div style={{display:'flex',gap:20}}>
+                <span>CRYPTON SHIELD v1.0</span>
+                <span style={{color:'rgba(200,245,90,0.3)'}}>ZERO-TRUST ACTIVE</span>
+              </div>
+              <div>PRESS ESC TO EXIT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+function AttackTerminal() {
+  const [active, setActive] = useState(null);
+  const ATTACKS = [
+    {
+      id:'phishing', label:'Phishing', color:'#F87171', blocked:'14.2M',
+      what:'A fake login page tricks the user into entering credentials.',
+      how:'Phishing link clicked — no credentials exist to steal. Crypton uses hardware-bound keys, not passwords. The fake form captures nothing.',
+    },
+    {
+      id:'bruteforce', label:'Brute Force', color:'#FBBF24', blocked:'892K',
+      what:'Automated tool tries millions of passwords per second.',
+      how:'10,000 requests per second hit the auth endpoint — every one rejected. No password surface exists. Crypton requires a device signature, not a guess.',
+    },
+    {
+      id:'mitm', label:'Man in the Middle', color:'#F87171', blocked:'3.1M',
+      what:'Attacker sits between client and server, intercepting traffic.',
+      how:'Auth token captured in transit — useless. The nonce it signed expired in 500ms and is single-use. Replaying it returns an immediate rejection.',
+    },
+    {
+      id:'stuffing', label:'Credential Stuffing', color:'#FBBF24', blocked:'7.8M',
+      what:'Leaked password databases are tried across other services.',
+      how:'2.4M leaked credentials loaded and attempted — all fail. Crypton accounts have no passwords. Leaked credentials have zero attack surface here.',
+    },
+    {
+      id:'session', label:'Session Hijack', color:'#F87171', blocked:'521K',
+      what:'A stolen session cookie is used to impersonate a logged-in user.',
+      how:'Cookie exfiltrated via XSS and presented — rejected. Sessions are cryptographically bound to the originating device. Cookie alone is worthless.',
+    },
+    {
+      id:'replay', label:'Replay Attack', color:'#FBBF24', blocked:'2.3M',
+      what:'A valid auth request is captured and resent later.',
+      how:'Signed request replayed 1 second later — expired. Each nonce is server-issued, single-use, and has a 500ms window. Replay is mathematically impossible.',
+    },
+  ];
+
+  return (
+    <div className="rv">
+      {/* Single container owns hover — panel is inside so mouse doesn't leave */}
+      <div
+        onMouseLeave={()=>setActive(null)}
+        style={{border:'1px solid var(--line)'}}
+      >
+        {/* 6-card row */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:0}}>
+          {ATTACKS.map((atk,i)=>{
+            const isActive = active===atk.id;
+            return (
+              <div key={atk.id}
+                onMouseEnter={()=>setActive(atk.id)}
+                style={{
+                  padding:'28px 20px 24px',
+                  borderRight:i<5?'1px solid var(--line)':'none',
+                  background:isActive?`rgba(${atk.color==='#F87171'?'248,113,113':'251,191,36'},0.07)`:'var(--ink-2)',
+                  cursor:'default', position:'relative', transition:'background .2s',
+                }}>
+                <div style={{position:'absolute',top:0,left:0,right:0,height:2,
+                  background:atk.color,transform:isActive?'scaleX(1)':'scaleX(0)',
+                  transformOrigin:'left',transition:'transform .3s cubic-bezier(.16,1,.3,1)'}}/>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+                  <div style={{width:7,height:7,borderRadius:'50%',background:atk.color,
+                    boxShadow:isActive?`0 0 10px ${atk.color}`:'none',
+                    animation:isActive?'atkPulse 1.2s ease-in-out infinite':undefined}}/>
+                  <div style={{fontFamily:'var(--mono)',fontSize:8,
+                    color:isActive?atk.color:'rgba(122,117,112,0.4)',letterSpacing:'.06em',
+                    transition:'color .2s'}}>{atk.blocked}/yr</div>
+                </div>
+                <div style={{fontFamily:'var(--display)',fontSize:17,letterSpacing:'.05em',
+                  textTransform:'uppercase',lineHeight:1.1,marginBottom:8,
+                  color:isActive?'var(--paper)':'rgba(244,241,236,0.6)',transition:'color .2s'}}>{atk.label}</div>
+                <div style={{fontSize:11,color:'var(--muted)',lineHeight:1.55,fontWeight:300}}>{atk.what}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Explanation panel — inside same container so hover stays active */}
+        <div style={{
+          borderTop: active ? '1px solid var(--line)' : 'none',
+          background:'var(--ink-2)', overflow:'hidden',
+          maxHeight:active?'140px':'0',
+          transition:'max-height .35s cubic-bezier(.16,1,.3,1), border-color .1s',
+        }}>
+          {ATTACKS.map(atk=>(
+            <div key={atk.id} style={{
+              display: active===atk.id ? 'grid' : 'none',
+              gridTemplateColumns:'1fr 2fr',gap:0,
+            }}>
+              <div style={{padding:'24px 28px',borderRight:'1px solid var(--line)',
+                display:'flex',flexDirection:'column',justifyContent:'center',
+                background:`rgba(${atk.color==='#F87171'?'248,113,113':'251,191,36'},0.05)`}}>
+                <div style={{fontFamily:'var(--mono)',fontSize:9,color:atk.color,
+                  letterSpacing:'.14em',textTransform:'uppercase',marginBottom:6}}>{atk.label}</div>
+                <div style={{fontFamily:'var(--display)',fontSize:24,letterSpacing:'.04em',
+                  textTransform:'uppercase',color:'var(--paper)',lineHeight:1,marginBottom:6}}>Blocked.</div>
+                <div style={{fontFamily:'var(--mono)',fontSize:9,color:'rgba(122,117,112,0.5)',
+                  letterSpacing:'.06em'}}>{atk.blocked} attempts / year</div>
+              </div>
+              <div style={{padding:'24px 32px',display:'flex',alignItems:'center'}}>
+                <div style={{fontSize:13.5,color:'var(--paper)',lineHeight:1.8,fontWeight:300}}>{atk.how}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+
+/* ── BeforeAfter — pure visual, no prose ────────────────────── */
+function BeforeAfter() {
+  const rows = [
+    { label:'Passwords stored',    before:'Yes — in DB',      after:'Never',           cat:'storage'  },
+    { label:'Breach exposure',     before:'All users',        after:'Zero',             cat:'attack'   },
+    { label:'Auth factor',         before:'Memory',           after:'Hardware key',     cat:'method'   },
+    { label:'Replay attacks',      before:'Possible',         after:'Math prevents it', cat:'attack'   },
+    { label:'Recovery if lost',    before:'Email reset link', after:'Time-lock + trust','cat':'recovery'},
+  ];
+  return (
+    <div className="rv">
+      {/* Header row */}
+      <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',border:'1px solid var(--line)',borderBottom:'none'}}>
+        <div style={{padding:'14px 24px',fontFamily:'var(--mono)',fontSize:9,letterSpacing:'.12em',color:'var(--muted)',textTransform:'uppercase',borderRight:'1px solid var(--line)'}}>Capability</div>
+        <div style={{padding:'14px 24px',fontFamily:'var(--mono)',fontSize:9,letterSpacing:'.12em',color:'#F87171',textTransform:'uppercase',borderRight:'1px solid var(--line)',background:'rgba(248,113,113,0.04)'}}>✗ Password Model</div>
+        <div style={{padding:'14px 24px',fontFamily:'var(--mono)',fontSize:9,letterSpacing:'.12em',color:'var(--accent)',textTransform:'uppercase',background:'rgba(200,245,90,0.04)'}}>✓ Crypton</div>
+      </div>
+      {/* Data rows */}
+      {rows.map((r,i)=>(
+        <div key={r.label} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',
+          border:'1px solid var(--line)',borderBottom:i<rows.length-1?'none':'1px solid var(--line)'}}>
+          <div style={{padding:'16px 24px',fontSize:13,color:'var(--paper)',fontWeight:500,
+            borderRight:'1px solid var(--line)',display:'flex',alignItems:'center',
+            background:i%2===0?'var(--ink-2)':'var(--ink)'}}>{r.label}</div>
+          <div style={{padding:'16px 24px',fontFamily:'var(--mono)',fontSize:11,color:'rgba(248,113,113,0.7)',
+            borderRight:'1px solid var(--line)',background:i%2===0?'rgba(248,113,113,0.03)':'rgba(248,113,113,0.05)',
+            display:'flex',alignItems:'center'}}>{r.before}</div>
+          <div style={{padding:'16px 24px',fontFamily:'var(--mono)',fontSize:11,color:'rgba(200,245,90,0.85)',
+            background:i%2===0?'rgba(200,245,90,0.03)':'rgba(200,245,90,0.05)',
+            display:'flex',alignItems:'center'}}>{r.after}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function HiWCard({ n, t, b }) {
   const [hov, setHov] = useState(false);
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: hov ? "var(--ink-2)" : "var(--ink)", padding: "44px 32px", position: "relative", overflow: "hidden", cursor: "default", transition: "background .35s", borderRight: "1px solid var(--line)" }}>
-      <div style={{ fontFamily: "var(--display)", fontSize: 72, color: hov ? "rgba(200,245,90,.18)" : "rgba(244,241,236,.07)", lineHeight: 1, marginBottom: 28, transition: "color .3s" }}>{n}</div>
-      <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 14 }}>{t}</div>
-      <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{b}</div>
+      {/* Step number — visible accent color, smaller so it doesn't dominate */}
+      <div style={{ fontFamily: "var(--display)", fontSize: 64, color: hov ? "rgba(200,245,90,0.55)" : "rgba(200,245,90,0.22)", lineHeight: 1, marginBottom: 16, transition: "color .3s", letterSpacing: ".02em" }}>{n}</div>
+      <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 14, lineHeight: 1 }}>{t}</div>
+      <div style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300 }}>{b}</div>
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "var(--accent)", transform: hov ? "scaleX(1)" : "scaleX(0)", transformOrigin: "left", transition: "transform .5s cubic-bezier(.16,1,.3,1)" }} />
     </div>
   );
@@ -997,113 +2367,35 @@ if (verified) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   HOME / SPLASH
-═══════════════════════════════════════════════════════════════ */
-function Home({ go }) {
-  return (
-    <div className="pg-in" style={{ background: "var(--ink)", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "52px 24px", textAlign: "center", gap: 0 }}>
-      <div style={{ fontFamily: "var(--display)", fontSize: "clamp(64px,14vw,160px)", letterSpacing: ".06em", lineHeight: .9, marginBottom: 32 }}>CRYPTON</div>
-      <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 400, lineHeight: 1.75, fontWeight: 300, marginBottom: 52 }}>Zero-trust identity. Navigate the full platform below.</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: "var(--line)", maxWidth: 640, width: "100%", border: "1px solid var(--line)" }}>
-        {[
-          { id: "register", n: "01", t: "Register", d: "Create a new identity — triggers Windows Hello / Touch ID passkey creation" },
-          { id: "login", n: "02", t: "Sign In", d: "Authenticate an existing account — Windows Hello passkey verification" },
-          { id: "dashboard", n: "03", t: "Dashboard", d: "Security status, Trust Orb, and real-time activity feed" },
-          { id: "devices", n: "04", t: "Devices", d: "Manage enrolled passkeys, view trust status, revoke access" },
-          { id: "recovery", n: "05", t: "Recovery", d: "Time-lock vault, 24hr countdown, and zero-trust recovery flow" },
-          { id: "landing", n: "00", t: "Landing Page", d: "Marketing site — hero, manifesto, features, developer docs" },
-        ].map((c, i) => (
-          <HomeCell key={c.id} {...c} go={go} full={i === 5} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HomeCell({ id, n, t, d, go, full }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} onClick={() => go(id)}
-      style={{ background: hov ? "var(--ink-3)" : "var(--ink-2)", padding: "32px 28px", cursor: "pointer", transition: "background .25s", textAlign: "left", gridColumn: full ? "1/-1" : undefined }}>
-      <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>{n}</div>
-      <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
-        {t} <span style={{ display: "inline-block", transition: "transform .25s", transform: hov ? "translateX(4px)" : "none", fontFamily: "var(--mono)" }}>→</span>
-      </div>
-      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.65, fontWeight: 300 }}>{d}</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
    REGISTER
 ═══════════════════════════════════════════════════════════════ */
-function Register({ go, toast, setAuth }) {
+function Register({ go, toast }) {
   const [step, setStep] = useState(0);
   const [ident, setIdent] = useState("");
   const [identErr, setIdentErr] = useState(false);
   const [pkDone, setPkDone] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errMsg, setErrMsg] = useState("");
-  const challengeRef = useRef(null);
 
   const gotoStep = s => setStep(s);
 
-  const nextStep = async (from) => {
+  const nextStep = from => {
     if (from === 0) {
       if (!ident || ident.length < 2 || !/^[a-zA-Z0-9-]+$/.test(ident)) { setIdentErr(true); return; }
-      setIdentErr(false);
-      setLoading(true); setErrMsg("");
-      try {
-        const resp = await API.registerStart(ident, ident);
-        challengeRef.current = { challenge_id: resp.challenge_id, publicKey: resp.publicKey };
-        gotoStep(1);
-      } catch (e) {
-        setErrMsg("Server error: " + e.message);
-      } finally { setLoading(false); }
-    } else if (from === 1 && pkDone) {
-      gotoStep(2);
-    }
+      setIdentErr(false); gotoStep(1);
+    } else if (from === 1 && pkDone) gotoStep(2);
   };
 
-  const activatePK = async () => {
-    if (loading || pkDone || !challengeRef.current) return;
-    setLoading(true); setErrMsg("");
-    try {
-      const ch = challengeRef.current;
-      const options = {
-        publicKey: {
-          ...ch.publicKey,
-          challenge: b64url.decode(ch.publicKey.challenge),
-          user: { ...ch.publicKey.user, id: b64url.decode(ch.publicKey.user.id) }
-        }
-      };
-      const credential = await navigator.credentials.create(options);
-      const attestation = {
-        id: credential.id,
-        rawId: b64url.encode(credential.rawId),
-        type: credential.type,
-        response: {
-          clientDataJSON: b64url.encode(credential.response.clientDataJSON),
-          attestationObject: b64url.encode(credential.response.attestationObject),
-        }
-      };
-      await API.registerFinish(ch.challenge_id, attestation);
-      if (setAuth) setAuth({ token: null, username: ident });
-      setPkDone(true);
-      toast("Passkey created — key sealed in hardware", "success");
-    } catch (e) {
-      if (e.name === "NotAllowedError") setErrMsg("Passkey creation cancelled or timed out.");
-      else setErrMsg(e.message || "Passkey creation failed");
-    } finally { setLoading(false); }
+  const activatePK = () => {
+    setPkDone(true);
+    toast("Passkey created — key sealed in hardware", "success");
   };
 
   const devClass = ["rv-device", "rv-device s2", "rv-device s3"][step];
   const devLabel = ["Waiting for identity...", "Creating passkey...", "Device enrolled ✓"][step];
 
   return (
-    <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "3fr 2fr", minHeight: "100vh" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "72px 80px" }}>
-        <button onClick={() => go("home")} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", marginBottom: 48, display: "flex", alignItems: "center", gap: 10, transition: "color .2s" }}
+    <div className="pg-in register-grid" style={{ display: "grid", gridTemplateColumns: "3fr 2fr", minHeight: "100vh" }}>
+      <div className="register-form" style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "72px 80px" }}>
+        <button onClick={() => go("landing")} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", marginBottom: 48, display: "flex", alignItems: "center", gap: 10, transition: "color .2s" }}
           onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>← Back to Home</button>
 
         {/* PIPS */}
@@ -1116,42 +2408,30 @@ function Register({ go, toast, setAuth }) {
         {step === 0 && (
           <div className="pg-in">
             <h2 style={{ fontFamily: "var(--display)", fontSize: 52, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 16 }}>Create your<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>identity</em></h2>
-            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, marginBottom: 32 }}>Choose a username. This is how you'll be identified across the Crypton network.</p>
+            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, marginBottom: 32 }}>Choose an alias for this device. This is how you'll be identified across the Crypton network.</p>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 8 }}>Username</label>
-              <input type="text" value={ident} onChange={e => setIdent(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && nextStep(0)}
-                placeholder="e.g. alex" maxLength={32}
+              <label style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 8 }}>Identity Label</label>
+              <input type="text" value={ident} onChange={e => setIdent(e.target.value)} placeholder="e.g. alex-macbook-pro" maxLength={32}
                 style={{ width: "100%", padding: "14px 16px", background: "var(--ink-3)", border: `1px solid ${identErr ? "var(--danger)" : "var(--line2)"}`, color: "var(--paper)", fontFamily: "var(--body)", fontSize: 14, outline: "none" }} />
-              {identErr && <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginTop: 6 }}>2–32 chars, letters, numbers, hyphens only</div>}
-              {errMsg && <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginTop: 6 }}>{errMsg}</div>}
+              {identErr && <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginTop: 6 }}>2–32 chars, alphanumeric and hyphens only</div>}
             </div>
-            <BtnF onClick={() => nextStep(0)} style={{ opacity: loading ? .5 : 1, pointerEvents: loading ? "none" : "auto" }}>
-              {loading ? "Connecting..." : "Continue →"}
-            </BtnF>
+            <BtnF onClick={() => nextStep(0)}>Continue →</BtnF>
           </div>
         )}
 
         {step === 1 && (
           <div className="pg-in">
             <h2 style={{ fontFamily: "var(--display)", fontSize: 52, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 16 }}>Create your<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>passkey</em></h2>
-            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, marginBottom: 32 }}>Your device generates a hardware-bound key pair. Windows Hello / Touch ID will prompt for biometric confirmation.</p>
-            <div onClick={!pkDone && !loading ? activatePK : undefined} style={{
-              width: "100%", padding: 28,
-              border: pkDone ? "1px solid var(--success)" : errMsg ? "1px dashed var(--danger)" : "1px dashed rgba(200,245,90,.25)",
-              background: pkDone ? "rgba(74,222,128,.08)" : errMsg ? "rgba(248,113,113,.05)" : "var(--accent-dim)",
-              cursor: pkDone || loading ? "default" : "pointer",
-              textAlign: "center", transition: "all .25s", marginBottom: errMsg ? 12 : 28
+            <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, marginBottom: 32 }}>Your device generates a hardware-bound key pair. The private key is sealed in your secure enclave — forever.</p>
+            <div onClick={!pkDone ? activatePK : undefined} style={{
+              width: "100%", padding: 28, border: pkDone ? "1px solid var(--success)" : "1px dashed rgba(200,245,90,.25)",
+              background: pkDone ? "rgba(74,222,128,.08)" : "var(--accent-dim)", cursor: pkDone ? "default" : "pointer",
+              textAlign: "center", transition: "all .25s", marginBottom: 28
             }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>{pkDone ? "✅" : loading ? "⏳" : "🔑"}</div>
-              <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 6 }}>
-                {pkDone ? "Passkey Created ✓" : loading ? "Waiting for Windows Hello..." : "Create Passkey"}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300 }}>
-                {pkDone ? "Hardware key sealed in secure enclave" : loading ? "Complete the biometric prompt on your device" : "Click to trigger Windows Hello / Touch ID"}
-              </div>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>{pkDone ? "✅" : "🔑"}</div>
+              <div style={{ fontFamily: "var(--display)", fontSize: 22, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 6 }}>{pkDone ? "Passkey Created ✓" : "Create Passkey"}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 300 }}>{pkDone ? "Hardware key sealed in secure enclave" : "Tap to trigger Face ID / Touch ID / hardware key"}</div>
             </div>
-            {errMsg && <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginBottom: 20, padding: "10px 14px", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)" }}>{errMsg}</div>}
             <BtnF onClick={() => nextStep(1)} style={{ opacity: pkDone ? 1 : .4, pointerEvents: pkDone ? "auto" : "none" }}>Continue →</BtnF>
           </div>
         )}
@@ -1173,7 +2453,7 @@ function Register({ go, toast, setAuth }) {
       </div>
 
       {/* VIZ PANEL */}
-      <div style={{ background: "#080808", borderLeft: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div className="register-vis" style={{ background: "#080808", borderLeft: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 70% at 50% 50%,rgba(200,245,90,.06),transparent)" }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, position: "relative", zIndex: 1 }}>
           <div className={devClass}>
@@ -1190,92 +2470,6 @@ function Register({ go, toast, setAuth }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LOGIN
-═══════════════════════════════════════════════════════════════ */
-function Login({ go, toast, setAuth }) {
-  const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errMsg, setErrMsg] = useState("");
-
-  const handleLogin = async () => {
-    if (!username || username.length < 2) { setErrMsg("Enter your username"); return; }
-    setLoading(true); setErrMsg("");
-    try {
-      const startResp = await API.loginStart(username);
-      const options = {
-        publicKey: {
-          ...startResp.publicKey,
-          challenge: b64url.decode(startResp.publicKey.challenge),
-          allowCredentials: (startResp.publicKey.allowCredentials || []).map(c => ({
-            ...c, id: b64url.decode(c.id)
-          }))
-        }
-      };
-      const credential = await navigator.credentials.get(options);
-      const assertion = {
-        id: credential.id,
-        rawId: b64url.encode(credential.rawId),
-        type: credential.type,
-        response: {
-          clientDataJSON: b64url.encode(credential.response.clientDataJSON),
-          authenticatorData: b64url.encode(credential.response.authenticatorData),
-          signature: b64url.encode(credential.response.signature),
-          userHandle: credential.response.userHandle ? b64url.encode(credential.response.userHandle) : null
-        }
-      };
-      const finishResp = await API.loginFinish(startResp.challenge_id, assertion);
-      localStorage.setItem('crypton_token', finishResp.token);
-      localStorage.setItem('crypton_username', username);
-      setAuth({ token: finishResp.token, username });
-      toast("Authentication verified ✓", "success");
-      go("dashboard");
-    } catch (e) {
-      if (e.name === "NotAllowedError") setErrMsg("Authentication cancelled or timed out.");
-      else setErrMsg(e.message || "Authentication failed");
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "3fr 2fr", minHeight: "100vh" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "72px 80px" }}>
-        <button onClick={() => go("home")} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", marginBottom: 48, display: "flex", alignItems: "center", gap: 10, transition: "color .2s" }}
-          onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>← Back to Home</button>
-        <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Passkey Authentication</div>
-        <h2 style={{ fontFamily: "var(--display)", fontSize: 52, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 16 }}>Sign in<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>without passwords</em></h2>
-        <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, marginBottom: 36 }}>Enter your username. Your device will verify your identity using Windows Hello or Touch ID — no password needed.</p>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 8 }}>Username</label>
-          <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder="e.g. alex" maxLength={32}
-            style={{ width: "100%", padding: "14px 16px", background: "var(--ink-3)", border: `1px solid ${errMsg ? "var(--danger)" : "var(--line2)"}`, color: "var(--paper)", fontFamily: "var(--body)", fontSize: 14, outline: "none", marginBottom: 8 }} />
-          {errMsg && <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", padding: "10px 14px", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)" }}>{errMsg}</div>}
-        </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <BtnF onClick={handleLogin} style={{ opacity: loading ? .5 : 1, pointerEvents: loading ? "none" : "auto" }}>
-            {loading ? "Waiting for biometric..." : "Authenticate →"}
-          </BtnF>
-          <button onClick={() => go("register")} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", transition: "color .2s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "var(--accent)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>No account? Register →</button>
-        </div>
-      </div>
-      <div style={{ background: "#080808", borderLeft: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 70% at 50% 50%,rgba(200,245,90,.06),transparent)" }} />
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, position: "relative", zIndex: 1, textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 72, marginBottom: 8 }}>{loading ? "⏳" : "🔐"}</div>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--accent)" }}>
-            {loading ? "Awaiting biometric..." : "Zero-knowledge proof"}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", maxWidth: 200, lineHeight: 1.7 }}>
-            {loading ? "Complete the Windows Hello prompt on your device" : "Your private key never leaves your hardware. No password to steal."}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
    DASHBOARD
 ═══════════════════════════════════════════════════════════════ */
 const ORB_DATA = [
@@ -1284,20 +2478,11 @@ const ORB_DATA = [
   { title: "Threat Detected", desc: "Suspicious authentication attempt detected on Work Desktop. Immediate review recommended.", cls: "r", ico: "🚨", type: "danger" },
 ];
 
-function Dashboard({ go, toast, auth, onLogout }) {
+function Dashboard({ go, toast }) {
   const [orbIdx, setOrbIdx] = useState(0);
-  const [activeDeviceCount, setActiveDeviceCount] = useState(MOCK_DASHBOARD_STATS.activeDevices);
   const orb = ORB_DATA[orbIdx];
 
   useReveal([orbIdx]);
-
-  // Fetch real active device count if authenticated
-  useEffect(() => {
-    if (!auth?.token) return;
-    API.listDevices(auth.token)
-      .then(data => setActiveDeviceCount(data.filter(d => d.status === "active").length))
-      .catch(() => {}); // fall back to mock on error
-  }, [auth?.token]);
 
   const setOrb = i => {
     setOrbIdx(i);
@@ -1312,24 +2497,24 @@ function Dashboard({ go, toast, auth, onLogout }) {
       : { background: "radial-gradient(circle at 35% 35%,rgba(74,222,128,.85),rgba(74,222,128,.35),rgba(5,150,105,.1))", animation: "orbPulse 3s ease-in-out infinite" };
 
   return (
-    <AppShell active="dashboard" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="dashboard" go={go}>
+      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--line)" }} className="page-header">
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Dashboard</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Security overview</div></div>
         <BtnF onClick={() => go("register")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Enroll Device</BtnF>
       </div>
-      <div style={{ padding: "36px 44px 60px", flex: 1 }}>
+      <div style={{ padding: "36px 44px 60px", flex: 1 }} className="page-body">
         {/* STAT CARDS */}
-        <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", marginBottom: 28, border: "1px solid var(--line)" }}>
+        <div className="pg-in stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", marginBottom: 28, border: "1px solid var(--line)" }}>
           {[
-            { l: "Active Devices", v: String(activeDeviceCount), d: "↑ 1 this week", i: "📱", link: "devices" },
+            { l: "Active Devices", v: String(MOCK_DASHBOARD_STATS.activeDevices), d: "↑ 1 this week", i: "📱", link: "devices" },
             { l: "Auth Events (24h)", v: String(MOCK_DASHBOARD_STATS.authEvents24h), d: "All verified", i: "⚡", link: "auditlogs" },
             { l: "Security Score", v: `${MOCK_DASHBOARD_STATS.securityScore}%`, d: "No issues found", i: "🛡", vc: "var(--success)", link: "risk" },
           ].map((s, i) => <StatCard key={i} {...s} go={go} />)}
         </div>
 
         {/* ORB */}
-        <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "auto 1fr", border: "1px solid var(--line)", marginBottom: 28, background: "var(--ink-2)" }}>
-          <div onClick={() => setOrb((orbIdx + 1) % 3)} style={{ width: 180, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, borderRight: "1px solid var(--line)", cursor: "pointer", position: "relative" }}>
+        <div className="pg-in orb-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", border: "1px solid var(--line)", marginBottom: 28, background: "var(--ink-2)" }}>
+          <div className="orb-vis" onClick={() => setOrb((orbIdx + 1) % 3)} style={{ width: 180, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, borderRight: "1px solid var(--line)", cursor: "pointer", position: "relative" }}>
             <div className="orb-pulse r1" style={{ position: "absolute" }} />
             <div className="orb-pulse r2" style={{ position: "absolute" }} />
             <div style={{ width: 96, height: 96, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, position: "relative", zIndex: 1, ...orbStyle }}>{orb.ico}</div>
@@ -1357,7 +2542,7 @@ function Dashboard({ go, toast, auth, onLogout }) {
           <button onClick={() => go("auditlogs")} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", letterSpacing: ".08em" }}>View All →</button>
         </div>
         <div className="pg-in" style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)" }}>
-          {MOCK_ACTIVITY.map((a) => <ActivityItem key={a.id} ico={a.ico} t={a.type} title={a.title} meta={a.meta} time={a.time} link={a.link} go={go} />)}
+          {MOCK_ACTIVITY.map((a) => <ActivityItem key={a.id} {...a} t={a.type} go={go} />)}
         </div>
       </div>
     </AppShell>
@@ -1399,26 +2584,17 @@ function ActivityItem({ ico, t, title, meta, time, go, link }) {
 /* ═══════════════════════════════════════════════════════════════
    DEVICES
 ═══════════════════════════════════════════════════════════════ */
-function Devices({ go, toast, auth, onLogout }) {
+function Devices({ go, toast }) {
   const [showRevoke, setShowRevoke] = useState(false);
-  const [revTarget, setRevTarget] = useState(null); // { id, name }
+  const [revTarget, setRevTarget] = useState(null);
   const [countdown, setCountdown] = useState(3);
   const [canRevoke, setCanRevoke] = useState(false);
-  const [devices, setDevices] = useState([]);
-  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [tab, setTab] = useState("devices");
+  const [passkeys, setPasskeys] = useState(MOCK_PASSKEYS);
   const timerRef = useRef(null);
 
-  useEffect(() => {
-    if (!auth?.token) return;
-    setLoadingDevices(true);
-    API.listDevices(auth.token)
-      .then(data => setDevices(data))
-      .catch(e => toast("Failed to load devices: " + e.message, "danger"))
-      .finally(() => setLoadingDevices(false));
-  }, [auth?.token]);
-
-  const openRevoke = (id, name) => {
-    setRevTarget({ id, name }); setShowRevoke(true); setCountdown(3); setCanRevoke(false);
+  const openRevoke = name => {
+    setRevTarget(name); setShowRevoke(true); setCountdown(3); setCanRevoke(false);
     timerRef.current = setInterval(() => {
       setCountdown(c => {
         if (c <= 1) { clearInterval(timerRef.current); setCanRevoke(true); return 0; }
@@ -1427,34 +2603,23 @@ function Devices({ go, toast, auth, onLogout }) {
     }, 1000);
   };
   const closeRevoke = () => { clearInterval(timerRef.current); setShowRevoke(false); };
-  const doRevoke = async () => {
-    if (!revTarget || !auth?.token) return;
-    closeRevoke();
-    try {
-      await API.revokeDevice(auth.token, revTarget.id);
-      setDevices(prev => prev.map(d => d.id === revTarget.id ? { ...d, status: "revoked" } : d));
-      toast(`${revTarget.name} revoked — access blocked`, "danger");
-    } catch (e) {
-      toast("Revoke failed: " + e.message, "danger");
-    }
-  };
+  const doRevoke = () => { closeRevoke(); toast("Device revoked — access blocked in <500ms", "danger"); };
+  const revokePasskey = id => { setPasskeys(p => p.filter(x => x.id !== id)); toast("Passkey revoked — credential invalidated", "danger"); };
 
-  const deviceCards = auth?.token ? devices : [];
+  const devices = MOCK_DEVICES;
 
   return (
-    <AppShell active="devices" go={go} auth={auth} onLogout={onLogout}>
+    <AppShell active="devices" go={go}>
       {showRevoke && (
         <div onClick={e => { if (e.target === e.currentTarget) closeRevoke(); }} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.88)", backdropFilter: "blur(14px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="modal-anim" style={{ background: "var(--ink-2)", border: "1px solid var(--line2)", padding: 48, maxWidth: 440, width: "90%", position: "relative" }}>
             <button onClick={closeRevoke} style={{ position: "absolute", top: 18, right: 18, background: "none", border: "none", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 16, cursor: "pointer" }}>×</button>
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Destructive Action</div>
             <h3 style={{ fontFamily: "var(--display)", fontSize: 44, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 14 }}>Revoke<br />Device?</h3>
-            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, marginBottom: 24, fontWeight: 300 }}>
-              <strong style={{ color: "var(--paper)" }}>{revTarget?.name}</strong> will lose all access immediately. Cannot be undone without re-enrollment.
-            </p>
+            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, marginBottom: 24, fontWeight: 300 }}>This device will lose all access immediately. Cannot be undone without re-enrollment.</p>
             <div style={{ background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)", padding: 14, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginBottom: 24 }}>⚠ DEVICE BLOCKED WITHIN 500MS OF CONFIRMATION</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-              <div style={{ width: 38, height: 38, position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--danger)", borderRadius: "50%" }}>
+              <div style={{ width: 38, height: 38, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--danger)", borderRadius: "50%" }}>
                 <span style={{ fontFamily: "var(--display)", fontSize: 14, color: "var(--danger)" }}>{countdown}</span>
               </div>
               <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", color: "var(--muted)", lineHeight: 1.6 }}>Confirm button activates in {countdown}s —<br />mandatory delay for destructive operations</div>
@@ -1467,37 +2632,51 @@ function Devices({ go, toast, auth, onLogout }) {
         </div>
       )}
 
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--line)" }}>
-        <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Devices</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Enrolled hardware · Trust registry</div></div>
-        <BtnF onClick={() => go("register")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Enroll New</BtnF>
+      <div style={{ padding: "36px 44px 0", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
+          <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Devices</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Enrolled hardware · Trust registry</div></div>
+          <BtnF onClick={() => go("register")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Enroll New</BtnF>
+        </div>
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 0 }}>
+          {[{ id: "devices", label: "Devices" }, { id: "passkeys", label: "Passkeys" }].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", padding: "10px 20px", background: "none", border: "none", borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent", color: tab === t.id ? "var(--paper)" : "var(--muted)", cursor: "pointer", transition: "all .2s" }}>{t.label}</button>
+          ))}
+        </div>
       </div>
-      <div style={{ padding: "36px 44px 60px" }}>
-        {!auth?.token && (
-          <div style={{ padding: 28, border: "1px solid var(--line)", background: "var(--ink-2)", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>
-            Sign in to view your enrolled devices.{" "}
-            <button onClick={() => go("login")} style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11 }}>Sign in →</button>
-          </div>
-        )}
-        {auth?.token && loadingDevices && (
-          <div style={{ padding: 28, border: "1px solid var(--line)", background: "var(--ink-2)", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>Loading devices...</div>
-        )}
-        {auth?.token && !loadingDevices && deviceCards.length === 0 && (
-          <div style={{ padding: 28, border: "1px solid var(--line)", background: "var(--ink-2)", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>
-            No devices enrolled yet.{" "}
-            <button onClick={() => go("register")} style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11 }}>Enroll one →</button>
-          </div>
-        )}
-        {auth?.token && !loadingDevices && deviceCards.length > 0 && (
+
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+        {tab === "devices" && (
           <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
-            {deviceCards.map(d => {
-              const name = d.nickname || `Device-${d.id.slice(0, 8)}`;
-              return <DeviceCard key={d.id}
-                ico="💻" name={name} type="WebAuthn · Passkey"
-                status={d.status} enrolled="—" last="—"
-                fp={d.id.slice(0, 8) + "..."}
-                canRevoke={d.status !== "revoked"}
-                onRevoke={() => openRevoke(d.id, name)} toast={toast} />;
-            })}
+            {devices.map(d => <DeviceCard key={d.name} {...d} onRevoke={() => openRevoke(d.name)} toast={toast} />)}
+          </div>
+        )}
+        {tab === "passkeys" && (
+          <div className="pg-in">
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 20 }}>// {passkeys.length} registered credentials</div>
+            <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
+                {["Credential","Attestation","Device","Created","Last Used","Action"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
+              </div>
+              {passkeys.length === 0 && <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>No passkeys registered</div>}
+              {passkeys.map((pk, i) => (
+                <div key={pk.id} style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr 0.8fr", padding: "14px 16px", borderBottom: i < passkeys.length - 1 ? "1px solid var(--line)" : "none", background: "var(--ink-2)", alignItems: "center", transition: "background .15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--ink-3)"} onMouseLeave={e => e.currentTarget.style.background = "var(--ink-2)"}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{pk.name}</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)", letterSpacing: ".04em" }}>{pk.id}</div>
+                  </div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--accent)", letterSpacing: ".06em" }}>{pk.attest}</span>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{pk.device}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)" }}>{pk.created}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: pk.active ? "var(--success)" : "var(--muted2)" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)" }}>{pk.lastUsed}</span>
+                  </div>
+                  <button onClick={() => revokePasskey(pk.id)} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--danger)", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)", padding: "5px 10px", cursor: "pointer" }}>Revoke</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1505,7 +2684,7 @@ function Devices({ go, toast, auth, onLogout }) {
   );
 }
 
-function DeviceCard({ ico, name, type, status, enrolled, last, fp, onRevoke, toast, canRevoke = true }) {
+function DeviceCard({ ico, name, type, status, enrolled, last, fp, onRevoke, toast }) {
   const [hov, setHov] = useState(false);
   const ringC = status === "active" ? "var(--success)" : status === "revoked" ? "var(--danger)" : "var(--muted2)";
   const statusC = status === "active" ? { background: "var(--s-success)", color: "var(--success)" } : status === "revoked" ? { background: "var(--s-danger)", color: "var(--danger)" } : { background: "rgba(90,85,80,.15)", color: "var(--muted)" };
@@ -1533,12 +2712,9 @@ function DeviceCard({ ico, name, type, status, enrolled, last, fp, onRevoke, toa
         ))}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {canRevoke && (
-          <button onClick={onRevoke} style={{ display: "inline-flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer", transition: "all .25s" }}>Revoke</button>
-        )}
-        {!canRevoke && (
-          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--danger)", padding: "8px 16px", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)" }}>Revoked</div>
-        )}
+        <BtnO onClick={() => toast("Rename — full app only", "info")} style={{ padding: "8px 16px", fontSize: 9 }}>Rename</BtnO>
+        <BtnO onClick={() => toast("Activity loaded", "info")} style={{ padding: "8px 16px", fontSize: 9 }}>Activity</BtnO>
+        <button onClick={onRevoke} style={{ display: "inline-flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer", transition: "all .25s" }}>Revoke</button>
       </div>
     </div>
   );
@@ -1547,7 +2723,7 @@ function DeviceCard({ ico, name, type, status, enrolled, last, fp, onRevoke, toa
 /* ═══════════════════════════════════════════════════════════════
    RECOVERY
 ═══════════════════════════════════════════════════════════════ */
-function Recovery({ go, toast, auth, onLogout }) {
+function Recovery({ go, toast }) {
   const [secs, setSecs] = useState(86400 - 76);
   const [done, setDone] = useState(false);
   const intRef = useRef(null);
@@ -1570,8 +2746,8 @@ function Recovery({ go, toast, auth, onLogout }) {
   };
 
   return (
-    <AppShell active="recovery" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="recovery" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Recovery</div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Time-lock zero-trust protocol</div>
       </div>
@@ -1659,14 +2835,14 @@ function NetworkCanvas() {
   return <canvas ref={ref} style={{ display: "block", width: "100%", height: 220 }} height={220} />;
 }
 
-function Admin({ go, toast, auth, onLogout }) {
+function Admin({ go, toast }) {
   return (
-    <AppShell active="admin" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="admin" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Admin</div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>System management · Analytics</div>
       </div>
-      <div style={{ padding: "36px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "36px 44px 60px" }}>
         <div className="pg-in" style={{ border: "1px solid var(--line)", background: "var(--ink-2)", marginBottom: 28, overflow: "hidden" }}>
           <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Network Topology — Live Trust Graph</span>
@@ -1710,9 +2886,10 @@ function AdminCard({ ico, t, b, link, go, toast }) {
 /* ═══════════════════════════════════════════════════════════════
    AUDIT LOGS
 ═══════════════════════════════════════════════════════════════ */
-function AuditLogs({ go, toast, auth, onLogout }) {
+function AuditLogs({ go, toast }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
+  const filters = ["ALL", "LOGIN", "DEVICE_ENROLL", "ROLE_CHANGE", "LOGIN_BLOCKED", "POLICY_UPDATE", "DEVICE_REVOKE", "PASSKEY_REVOKE"];
   const filtered = MOCK_AUDIT_LOGS.filter(r =>
     (filter === "ALL" || r.action === filter) &&
     (search === "" || r.actor.includes(search) || r.action.includes(search.toUpperCase()) || r.loc.toLowerCase().includes(search.toLowerCase()))
@@ -1725,12 +2902,13 @@ function AuditLogs({ go, toast, auth, onLogout }) {
     toast("Audit log exported as CSV", "success");
   };
   return (
-    <AppShell active="auditlogs" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="auditlogs" go={go}>
+      <div className="page-header" className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Audit Logs</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Full cryptographic event stream</div></div>
         <BtnF onClick={exportCSV} style={{ padding: "8px 16px", fontSize: 9 }}>↓ Export CSV</BtnF>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" className="page-body" style={{ padding: "28px 44px 60px" }}>
+        {/* Search + Filter */}
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search actor, action, location..."
             style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "var(--ink-3)", border: "1px solid var(--line2)", color: "var(--paper)", fontFamily: "var(--body)", fontSize: 13, outline: "none" }} />
@@ -1741,7 +2919,8 @@ function AuditLogs({ go, toast, auth, onLogout }) {
             })}
           </div>
         </div>
-        <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+        {/* Desktop Table */}
+        <div className="audit-table" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.2fr 1.2fr 1.5fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
             {["Actor","Action","Device","IP","Location","Time"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
           </div>
@@ -1758,6 +2937,22 @@ function AuditLogs({ go, toast, auth, onLogout }) {
             </div>
           ))}
         </div>
+        {/* Mobile Cards */}
+        <div className="audit-cards" style={{ display: "none", flexDirection: "column", gap: 8 }}>
+          {filtered.length === 0 && <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>No results found</div>}
+          {filtered.map((r, i) => (
+            <div key={i} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${typeColor[r.type]}`, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.type], letterSpacing: ".05em" }}>{r.action}</span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>{r.time}</span>
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>{r.actor}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <span>{r.device}</span><span>{r.loc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)", marginTop: 12, letterSpacing: ".06em" }}>{filtered.length} of {MOCK_AUDIT_LOGS.length} events shown</div>
       </div>
     </AppShell>
@@ -1767,117 +2962,70 @@ function AuditLogs({ go, toast, auth, onLogout }) {
 /* ═══════════════════════════════════════════════════════════════
    RISK & THREAT INTELLIGENCE
 ═══════════════════════════════════════════════════════════════ */
-function RiskIntel({ go, toast, auth, onLogout }) {
-  const [selected, setSelected] = useState(0);
-  const [scanning, setScanning] = useState(false);
-  const [scores, setScores] = useState(MOCK_RISK_USERS.map(u => u.score));
-  const user = MOCK_RISK_USERS[selected];
-  const score = scores[selected];
-  const levelColor = s => s >= 70 ? "var(--danger)" : s >= 40 ? "var(--warning)" : "var(--success)";
-  const levelLabel = s => s >= 70 ? "HIGH" : s >= 40 ? "MEDIUM" : "LOW";
-  const levelBg = s => s >= 70 ? "var(--s-danger)" : s >= 40 ? "var(--s-warning)" : "var(--s-success)";
-  const rescan = () => {
-    setScanning(true);
-    toast("Running threat intelligence scan...", "info");
-    setTimeout(() => {
-      setScores(s => s.map((v, i) => i === selected ? Math.max(5, Math.min(95, v + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 12))) : v));
-      setScanning(false);
-      toast("Scan complete — scores updated", "success");
-    }, 2000);
-  };
+function RiskIntel({ go, toast }) {
   return (
-    <AppShell active="risk" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
-        <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Risk Intelligence</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Behavioral anomaly · Geo-velocity · Threat scoring</div></div>
-        <BtnF onClick={rescan} style={{ padding: "8px 16px", fontSize: 9, opacity: scanning ? .6 : 1 }}>{scanning ? "Scanning..." : "↻ Re-scan"}</BtnF>
+    <AppShell active="risk" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", borderBottom: "1px solid var(--line)" }}>
+        <div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Risk Intelligence</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Behavioral anomaly · Geo-velocity · Threat scoring</div>
+        </div>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-          <div style={{ border: "1px solid var(--line)", background: "var(--ink-2)", overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Select User</div>
-            {MOCK_RISK_USERS.map((u, i) => (
-              <div key={i} onClick={() => setSelected(i)} style={{ padding: "14px 18px", cursor: "pointer", background: selected === i ? "rgba(200,245,90,.05)" : "none", borderLeft: selected === i ? "2px solid var(--accent)" : "2px solid transparent", borderBottom: i < MOCK_RISK_USERS.length - 1 ? "1px solid var(--line)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "background .15s" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{u.user}</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", letterSpacing: ".05em" }}>{u.device} · {u.loc}</div>
-                </div>
-                <div style={{ fontFamily: "var(--display)", fontSize: 22, color: levelColor(scores[i]) }}>{scores[i]}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ border: `1px solid ${levelColor(score)}30`, background: "var(--ink-2)", padding: 24, position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${levelColor(score)}, transparent)` }} />
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>Risk Profile</div>
-            <div style={{ fontSize: 13, marginBottom: 16 }}>{user.user}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-              <div style={{ fontFamily: "var(--display)", fontSize: 72, lineHeight: 1, color: levelColor(score), transition: "color .5s" }}>{score}</div>
-              <div>
-                <div style={{ display: "inline-flex", padding: "4px 10px", background: levelBg(score), color: levelColor(score), fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".1em", marginBottom: 6 }}>{levelLabel(score)} RISK</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)" }}>{user.ip} · {user.time}</div>
-              </div>
-            </div>
-            <div style={{ height: 4, background: "var(--line2)", marginBottom: 20, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${score}%`, background: `linear-gradient(90deg, var(--success), ${score > 60 ? "var(--warning)" : "var(--success)"}, ${score > 75 ? "var(--danger)" : "transparent"})`, transition: "width 1s cubic-bezier(.16,1,.3,1)" }} />
-            </div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>Risk Factors</div>
-            {user.reasons.map((r, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
-                <div style={{ width: 5, height: 5, borderRadius: "50%", background: levelColor(score), flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: "var(--muted)" }}>{r}</span>
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-              <BtnF onClick={() => toast(`Session killed for ${user.user}`, "danger")} style={{ padding: "8px 14px", fontSize: 9 }}>Kill Session</BtnF>
-              <BtnO onClick={() => toast(`${user.user} flagged for review`, "warning")} style={{ padding: "8px 14px", fontSize: 9 }}>Flag User</BtnO>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 44px" }}>
+        <div style={{ textAlign: "center", maxWidth: 480 }}>
+          {/* Animated icon */}
+          <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto 40px" }}>
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1px solid rgba(200,245,90,0.15)", animation: "rExpand 3.5s ease-out infinite" }} />
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1px solid rgba(200,245,90,0.1)", animation: "rExpand 3.5s ease-out infinite", animationDelay: "1.2s" }} />
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,245,90,0.12), transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 36 }}>🛡</span>
             </div>
           </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
-          {[
-            { label: "Geo-Velocity", val: "8,400 km/h", sub: "Impossible travel detected", c: "var(--danger)" },
-            { label: "Device Reputation", val: "Unknown", sub: "First-time device fingerprint", c: "var(--warning)" },
-            { label: "Behavioral Score", val: "42 / 100", sub: "Deviation from baseline", c: "var(--warning)" },
-          ].map((c, i) => (
-            <div key={i} style={{ background: "var(--ink-2)", padding: "22px 20px" }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 10 }}>{c.label}</div>
-              <div style={{ fontFamily: "var(--display)", fontSize: 28, color: c.c, letterSpacing: ".04em", marginBottom: 6 }}>{c.val}</div>
-              <div style={{ fontSize: 11, color: "var(--muted2)" }}>{c.sub}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 14, display: "flex", alignItems: "center", gap: 14 }}>
-          Suspicious Activity Feed <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        </div>
-        <div style={{ border: "1px solid var(--line)" }}>
-          {MOCK_RISK_FEED.map((f, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 18px", borderBottom: i < MOCK_RISK_FEED.length - 1 ? "1px solid var(--line)" : "none", background: "var(--ink-2)", transition: "background .15s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--ink-3)"} onMouseLeave={e => e.currentTarget.style.background = "var(--ink-2)"}>
-              <span style={{ fontSize: 16 }}>{f.ico}</span>
-              <span style={{ flex: 1, fontSize: 13 }}>{f.msg}</span>
-              <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted2)" }}>{f.time}</span>
-            </div>
-          ))}
+          {/* Label */}
+          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Coming Soon</div>
+          <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(36px,5vw,60px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 20 }}>
+            Risk<br />Intelligence
+          </h2>
+          <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.8, fontWeight: 300, marginBottom: 40 }}>
+            Behavioral anomaly detection, geo-velocity alerts, and real-time threat scoring are in active development. This module will surface suspicious patterns before they become incidents.
+          </p>
+          {/* Feature chips */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 40 }}>
+            {["Geo-velocity detection","TOR / VPN blocking","Behavioral baselines","Risk score per user","Step-up auth triggers","Threat feed integration"].map(f => (
+              <span key={f} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "6px 12px", border: "1px solid var(--line)", color: "var(--muted)" }}>{f}</span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <BtnF onClick={() => toast("We'll notify you when Risk Intel ships", "success")} style={{ fontSize: 9 }}>Notify Me →</BtnF>
+            <BtnO onClick={() => go("dashboard")} style={{ fontSize: 9 }}>← Dashboard</BtnO>
+          </div>
         </div>
       </div>
     </AppShell>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   SESSIONS
-═══════════════════════════════════════════════════════════════ */
-function Sessions({ go, toast, auth, onLogout }) {
+
+function Sessions({ go, toast }) {
   const [sessions, setSessions] = useState(MOCK_SESSIONS);
-  const kill = id => { setSessions(s => s.filter(x => x.id !== id)); toast("Session terminated immediately", "danger"); };
-  const killAll = () => { setSessions([]); toast("All sessions terminated — users signed out", "danger"); };
+
+  const kill = id => {
+    setSessions(s => s.filter(x => x.id !== id));
+    toast("Session terminated immediately", "danger");
+  };
+  const killAll = () => {
+    setSessions([]);
+    toast("All sessions terminated — users signed out", "danger");
+  };
+
   return (
-    <AppShell active="sessions" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="sessions" go={go}>
+      <div className="page-header" className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Sessions</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Active sessions · Real-time monitor</div></div>
-        <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All Sessions</button>
+        <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All</button>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
+      <div className="page-body" className="page-body" style={{ padding: "28px 44px 60px" }}>
+        <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
           {[
             { l: "Active Sessions", v: sessions.filter(s => s.active).length.toString(), c: "var(--success)" },
             { l: "Idle Sessions", v: sessions.filter(s => !s.active).length.toString(), c: "var(--warning)" },
@@ -1889,14 +3037,16 @@ function Sessions({ go, toast, auth, onLogout }) {
             </div>
           ))}
         </div>
+
         {sessions.length === 0 ? (
           <div style={{ border: "1px solid var(--line)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
             <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>All Clear</div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>All sessions have been terminated.</div>
           </div>
-        ) : (
-          <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+        ) : (<>
+          {/* Desktop table */}
+          <div className="sessions-table" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.2fr 1.2fr 1.2fr 0.8fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
               {["User","Device","Location","Started","Duration","Action"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
             </div>
@@ -1918,7 +3068,26 @@ function Sessions({ go, toast, auth, onLogout }) {
               </div>
             ))}
           </div>
-        )}
+          {/* Mobile cards */}
+          <div className="sessions-cards" style={{ display: "none", flexDirection: "column", gap: 10 }}>
+            {sessions.map(s => (
+              <div key={s.id} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${s.active ? "var(--success)" : "var(--warning)"}`, padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{s.user}</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginTop: 3 }}>{s.browser} · {s.device}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: s.active ? "var(--success)" : "var(--warning)" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: s.active ? "var(--success)" : "var(--warning)" }}>{s.duration}</span>
+                  </div>
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 12 }}>{s.loc} · {s.started}</div>
+                <button onClick={() => kill(s.id)} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--danger)", background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)", padding: "7px 14px", cursor: "pointer" }}>Kill Session</button>
+              </div>
+            ))}
+          </div>
+        </>)}
       </div>
     </AppShell>
   );
@@ -1935,21 +3104,26 @@ const ROLE_PERMS = {
   "Security Analyst": ["View audit logs", "View risk scores", "Flag users"],
   "Viewer": ["View dashboard", "View devices (read-only)"],
 };
-function RBAC({ go, toast, auth, onLogout }) {
+
+function RBAC({ go, toast }) {
   const [users, setUsers] = useState(MOCK_USERS);
   const [selectedUser, setSelectedUser] = useState(null);
+
   const changeRole = (id, newRole) => {
     setUsers(u => u.map(x => x.id === id ? { ...x, role: newRole } : x));
     toast(`Role updated to ${newRole}`, "success");
     setSelectedUser(null);
   };
+
   return (
-    <AppShell active="rbac" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="rbac" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Users & Roles</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Role-based access control · Least privilege</div></div>
         <BtnF onClick={() => toast("Invite flow — full implementation pending", "info")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Invite User</BtnF>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+
+        {/* Role assign modal */}
         {selectedUser && (
           <div onClick={() => setSelectedUser(null)} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div onClick={e => e.stopPropagation()} className="modal-anim" style={{ background: "var(--ink-2)", border: "1px solid var(--line2)", padding: 40, maxWidth: 420, width: "90%", position: "relative" }}>
@@ -1959,15 +3133,24 @@ function RBAC({ go, toast, auth, onLogout }) {
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 24 }}>{selectedUser.email}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {ROLES.map(r => (
-                  <button key={r} onClick={() => changeRole(selectedUser.id, r)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: selectedUser.role === r ? "rgba(200,245,90,.07)" : "var(--ink-3)", border: `1px solid ${selectedUser.role === r ? "var(--accent)" : "var(--line)"}`, cursor: "pointer", transition: "all .2s" }}>
+                  <button key={r} onClick={() => changeRole(selectedUser.id, r)} style={{
+                    padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between",
+                    background: selectedUser.role === r ? "rgba(200,245,90,.07)" : "var(--ink-3)",
+                    border: `1px solid ${selectedUser.role === r ? "var(--accent)" : "var(--line)"}`,
+                    cursor: "pointer", transition: "all .2s"
+                  }}>
                     <span style={{ fontSize: 13, color: "var(--paper)" }}>{r}</span>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: ROLE_COLORS[r] }}>{ROLE_PERMS[r].length} permissions {selectedUser.role === r ? "· current" : ""}</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: ROLE_COLORS[r] }}>
+                      {ROLE_PERMS[r].length} permissions {selectedUser.role === r ? "· current" : ""}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
           </div>
         )}
+
+        {/* Role reference */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
           {ROLES.map(r => (
             <div key={r} style={{ background: "var(--ink-2)", padding: "18px 16px" }}>
@@ -1976,7 +3159,9 @@ function RBAC({ go, toast, auth, onLogout }) {
             </div>
           ))}
         </div>
-        <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
+
+        {/* User table */}
+        <div className="rbac-grid" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 0.8fr 0.8fr", padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
             {["User","Role","Devices","Last Active","Action"].map(h => <span key={h} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted2)" }}>{h}</span>)}
           </div>
@@ -2002,27 +3187,32 @@ function RBAC({ go, toast, auth, onLogout }) {
 /* ═══════════════════════════════════════════════════════════════
    POLICY ENGINE
 ═══════════════════════════════════════════════════════════════ */
-function PolicyEngine({ go, toast, auth, onLogout }) {
+function PolicyEngine({ go, toast }) {
   const [policies, setPolicies] = useState(MOCK_POLICIES);
   const [threshold, setThreshold] = useState(70);
   const [trustDays, setTrustDays] = useState(30);
+
   const toggle = id => {
     setPolicies(p => p.map(x => x.id === id ? { ...x, active: !x.active } : x));
     const pol = policies.find(x => x.id === id);
     toast(`Policy "${pol.label}" ${pol.active ? "disabled" : "enabled"}`, pol.active ? "warning" : "success");
   };
+
   const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)" };
   const cats = [...new Set(policies.map(p => p.cat))];
+
   return (
-    <AppShell active="policy" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="policy" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Policy Engine</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Zero-trust rules · Adaptive enforcement</div></div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--success)", letterSpacing: ".06em", display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 8px var(--success)" }} />
           {policies.filter(p => p.active).length} / {policies.length} policies active
         </div>
       </div>
-      <div style={{ padding: "28px 44px 60px" }}>
+      <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+
+        {/* Threshold sliders */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
           {[
             { label: "Risk Score Threshold", val: threshold, set: setThreshold, unit: "", desc: "Step-up auth triggered above this score", min: 10, max: 95 },
@@ -2037,6 +3227,8 @@ function PolicyEngine({ go, toast, auth, onLogout }) {
             </div>
           ))}
         </div>
+
+        {/* Policy toggles grouped by category */}
         {cats.map(cat => (
           <div key={cat} style={{ marginBottom: 20 }}>
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: catColor[cat], marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -2046,6 +3238,7 @@ function PolicyEngine({ go, toast, auth, onLogout }) {
               {policies.filter(p => p.cat === cat).map((p, i, arr) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 18px", borderBottom: i < arr.length - 1 ? "1px solid var(--line)" : "none", background: "var(--ink-2)", transition: "background .15s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--ink-3)"} onMouseLeave={e => e.currentTarget.style.background = "var(--ink-2)"}>
+                  {/* Toggle */}
                   <div onClick={() => toggle(p.id)} style={{ width: 36, height: 20, borderRadius: 10, background: p.active ? "var(--accent)" : "var(--ink-3)", border: `1px solid ${p.active ? "var(--accent)" : "var(--line2)"}`, cursor: "pointer", position: "relative", flexShrink: 0, transition: "background .25s" }}>
                     <div style={{ position: "absolute", top: 2, left: p.active ? 17 : 2, width: 14, height: 14, borderRadius: "50%", background: p.active ? "var(--ink)" : "var(--muted)", transition: "left .25s" }} />
                   </div>
@@ -2067,7 +3260,7 @@ function PolicyEngine({ go, toast, auth, onLogout }) {
 /* ═══════════════════════════════════════════════════════════════
    ORG SETTINGS
 ═══════════════════════════════════════════════════════════════ */
-function OrgSettings({ go, toast, auth, onLogout }) {
+function OrgSettings({ go, toast }) {
   const [orgName, setOrgName] = useState(MOCK_ORG.orgName);
   const [domain, setDomain] = useState(MOCK_ORG.domain);
   const [mfa, setMfa] = useState(MOCK_ORG.mfaEnforced);
@@ -2075,16 +3268,20 @@ function OrgSettings({ go, toast, auth, onLogout }) {
   const [countries, setCountries] = useState(MOCK_ORG.allowedCountries);
   const [domainVerified, setDomainVerified] = useState(MOCK_ORG.domainVerified);
   const allCountries = ["US", "CA", "GB", "DE", "AU", "FR", "JP", "SG", "IN", "BR", "NL", "SE"];
+
   const toggleCountry = c => setCountries(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]);
   const save = () => toast("Organization settings saved", "success");
   const verifyDomain = () => { setDomainVerified(true); toast(`Domain ${domain} verified ✓`, "success"); };
+
   return (
-    <AppShell active="orgsettings" go={go} auth={auth} onLogout={onLogout}>
-      <div style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+    <AppShell active="orgsettings" go={go}>
+      <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div><div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Org Settings</div><div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Organization configuration · Multi-tenant</div></div>
         <BtnF onClick={save} style={{ padding: "8px 16px", fontSize: 9 }}>Save Changes</BtnF>
       </div>
       <div style={{ padding: "28px 44px 60px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 720 }}>
+
+        {/* Identity */}
         <div style={{ background: "var(--ink-2)", border: "1px solid var(--line)", padding: "24px 26px" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 20, paddingBottom: 14, borderBottom: "1px solid var(--line)" }}>Organization Identity</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -2101,6 +3298,8 @@ function OrgSettings({ go, toast, auth, onLogout }) {
             </div>
           </div>
         </div>
+
+        {/* Security Policies */}
         <div style={{ background: "var(--ink-2)", border: "1px solid var(--line)", padding: "24px 26px" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 20, paddingBottom: 14, borderBottom: "1px solid var(--line)" }}>Security Policies</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2118,7 +3317,8 @@ function OrgSettings({ go, toast, auth, onLogout }) {
                 <div style={{ fontSize: 13, fontWeight: 500 }}>Session Timeout</div>
                 <span style={{ fontFamily: "var(--display)", fontSize: 20, color: "var(--accent)" }}>{sessionTimeout}h</span>
               </div>
-              <input type="range" min={1} max={24} value={sessionTimeout} onChange={e => setSessionTimeout(Number(e.target.value))} style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }} />
+              <input type="range" min={1} max={24} value={sessionTimeout} onChange={e => { setSessionTimeout(Number(e.target.value)); }}
+                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }} />
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
                 <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>1h</span>
                 <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>24h</span>
@@ -2126,6 +3326,8 @@ function OrgSettings({ go, toast, auth, onLogout }) {
             </div>
           </div>
         </div>
+
+        {/* Allowed Countries */}
         <div style={{ background: "var(--ink-2)", border: "1px solid var(--line)", padding: "24px 26px" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8, paddingBottom: 14, borderBottom: "1px solid var(--line)" }}>Allowed Countries</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Auth attempts from countries not listed here will be automatically blocked.</div>
@@ -2142,33 +3344,48 @@ function OrgSettings({ go, toast, auth, onLogout }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ROOT
+   URL ROUTER
 ═══════════════════════════════════════════════════════════════ */
 const ROUTES = {
-  "/": "landing", "/landing": "landing", "/register": "register", "/login": "login",
-  "/dashboard": "dashboard", "/devices": "devices", "/audit-logs": "auditlogs",
-  "/risk": "risk", "/sessions": "sessions", "/users": "rbac", "/recovery": "recovery",
+  "/": "landing", "/register": "register", "/dashboard": "dashboard",
+  "/devices": "devices", "/audit-logs": "auditlogs", "/risk": "risk",
+  "/sessions": "sessions", "/users": "rbac", "/recovery": "recovery",
   "/policy": "policy", "/org": "orgsettings", "/admin": "admin",
 };
 const PAGE_TO_PATH = Object.fromEntries(Object.entries(ROUTES).map(([k, v]) => [v, k]));
-function getPageFromPath() { return ROUTES[window.location.pathname] || "landing"; }
+
+function getPageFromPath() {
+  return ROUTES[window.location.pathname] || "landing";
+}
 
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
-  const [auth, setAuthState] = useState(() => {
-    try {
-      const token = localStorage.getItem('crypton_token');
-      const username = localStorage.getItem('crypton_username');
-      return token ? { token, username } : null;
-    } catch { return null; }
-  });
+  const [simState, setSimState] = useState('closed');
+
+  const openSim = () => {
+    setSimState('opening');
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => requestAnimationFrame(() => setSimState('open')));
+  };
+  const closeSim = () => {
+    setSimState('closing');
+    setTimeout(() => { setSimState('closed'); document.body.style.overflow = ''; }, 420);
+  };
 
   const go = useCallback(id => {
     const path = PAGE_TO_PATH[id] || "/";
     window.history.pushState({ page: id }, "", path);
     setPage(id);
     window.scrollTo({ top: 0 });
+  }, []);
+
+  useEffect(() => {
+    /* Disable browser scroll restoration so reload always starts at top */
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
   useEffect(() => {
@@ -2179,46 +3396,28 @@ export default function App() {
 
   const toast = useCallback((msg, type = "info") => addToast(msg, type), [addToast]);
 
-  const setAuth = useCallback((a) => {
-    if (a?.token) localStorage.setItem('crypton_token', a.token);
-    if (a?.username) localStorage.setItem('crypton_username', a.username);
-    setAuthState(a);
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('crypton_token');
-    localStorage.removeItem('crypton_username');
-    setAuthState(null);
-    toast("Signed out", "info");
-    go("home");
-  }, [go, toast]);
-
   useEffect(() => {
     setTimeout(() => toast("CRYPTON — Zero passwords. Zero trust.", "info"), 800);
   }, []);
-
-  const shell = { go, toast, auth, onLogout: logout };
 
   return (
     <>
       <FontLink />
       <div className="grain" />
       <ToastStack toasts={toasts} />
-
-      {page === "home"        && <Home go={go} auth={auth} />}
-      {page === "landing"     && <Landing go={go} toast={toast} />}
-      {page === "register"    && <Register go={go} toast={toast} setAuth={setAuth} />}
-      {page === "login"       && <Login go={go} toast={toast} setAuth={setAuth} />}
-      {page === "dashboard"   && <Dashboard {...shell} />}
-      {page === "devices"     && <Devices {...shell} />}
-      {page === "recovery"    && <Recovery {...shell} />}
-      {page === "admin"       && <Admin {...shell} />}
-      {page === "auditlogs"   && <AuditLogs {...shell} />}
-      {page === "risk"        && <RiskIntel {...shell} />}
-      {page === "sessions"    && <Sessions {...shell} />}
-      {page === "rbac"        && <RBAC {...shell} />}
-      {page === "policy"      && <PolicyEngine {...shell} />}
-      {page === "orgsettings" && <OrgSettings {...shell} />}
+      {page === "landing"    && <Landing go={go} toast={toast} openSim={openSim} />}
+      {page === "register"   && <Register go={go} toast={toast} />}
+      {page === "dashboard"  && <Dashboard go={go} toast={toast} />}
+      {page === "devices"    && <Devices go={go} toast={toast} />}
+      {page === "recovery"   && <Recovery go={go} toast={toast} />}
+      {page === "admin"      && <Admin go={go} toast={toast} />}
+      {page === "auditlogs"  && <AuditLogs go={go} toast={toast} />}
+      {page === "risk"       && <RiskIntel go={go} toast={toast} />}
+      {page === "sessions"   && <Sessions go={go} toast={toast} />}
+      {page === "rbac"       && <RBAC go={go} toast={toast} />}
+      {page === "policy"     && <PolicyEngine go={go} toast={toast} />}
+      {page === "orgsettings"&& <OrgSettings go={go} toast={toast} />}
+      {simState !== 'closed' && <AttackSim animState={simState} onClose={closeSim} />}
     </>
   );
 }

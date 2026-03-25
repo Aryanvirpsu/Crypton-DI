@@ -6,8 +6,8 @@
 .DESCRIPTION
     Startup order:
       1. Docker infra (Postgres + Redis)
-      2. React CRA frontend :3000  (from REPO ROOT — the NEW UI with TrustAnimation,
-         AttackSim, BeforeAfter, PricingCard2 etc. NOT services/crypton-admin)
+      2. React CRA frontend :3000  (services\crypton-admin — new UI with TrustAnimation,
+         AttackSim, BeforeAfter, PricingCard2 etc.)
       3. cloudflared quick tunnel -> :3000
       4. Write identity .env with tunnel WebAuthn vars
       5. crypton-identity  :8080
@@ -109,13 +109,12 @@ Write-OK "Postgres :5432 and Redis :6379 are up"
 
 Write-Step 2 $totalSteps "React CRA frontend (new UI) — port 3000"
 
-# !! IMPORTANT: use REPO ROOT, NOT services/crypton-admin (that is old admin UI)
-$feDir    = $Root
+$feDir    = Join-Path $Root "services\crypton-admin"
 $feLog    = Join-Path $LogDir "frontend.log"
 $feErrLog = Join-Path $LogDir "frontend-err.log"
 
 if (-not (Test-Path (Join-Path $feDir "src\App.js"))) {
-    Write-Fail "src\App.js not found at repo root. Check that the react-app merge landed."
+    Write-Fail "src\App.js not found in services\crypton-admin"
 }
 if (-not (Test-Path (Join-Path $feDir "node_modules"))) {
     Write-Warn "node_modules missing — running npm install (~60s)..."
