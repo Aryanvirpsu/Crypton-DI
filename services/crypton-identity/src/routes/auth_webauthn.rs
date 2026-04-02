@@ -1,15 +1,15 @@
 use axum::{extract::State, routing::post, Json, Router};
-use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 use webauthn_rs::prelude::*;
 
 use crate::{
+    audit,
     error::AppError,
-    jwt::issue_jwt,
+    jwt::{issue_jwt, AuthUser},
     redis::challenges::{challenge_key, login_key},
-    state::AppState,
+    state::{AppState, AuthChallenge, RegChallenge, CHALLENGE_TTL_SECS},
 };
 
 pub fn router() -> Router<AppState> {
@@ -20,20 +20,44 @@ pub fn router() -> Router<AppState> {
         .route("/auth/login/finish", post(login_finish))
 }
 
-// ── Redis state payloads ──────────────────────────────────────────────────────
+// ── Challenge helpers ─────────────────────────────────────────────────────────
 
-#[derive(Serialize, Deserialize)]
-struct RegChallengeState {
-    user_id: Uuid,
-    username: String,
-    reg_state: PasskeyRegistration, // requires danger-allow-state-serialisation
+fn store_reg_challenge(state: &AppState, key: String, challenge: RegChallenge) {
+    let expiry = std::time::Instant::now()
+        + std::time::Duration::from_secs(CHALLENGE_TTL_SECS);
+    state
+        .reg_challenges
+        .lock()
+        .unwrap()
+        .insert(key, (challenge, expiry));
 }
 
-#[derive(Serialize, Deserialize)]
-struct AuthChallengeState {
-    user_id: Uuid,
-    username: String,
-    auth_state: PasskeyAuthentication, // requires danger-allow-state-serialisation
+fn take_reg_challenge(state: &AppState, key: &str) -> Option<RegChallenge> {
+    let entry = state.reg_challenges.lock().unwrap().remove(key)?;
+    let (challenge, expiry) = entry;
+    if std::time::Instant::now() >= expiry {
+        return None;
+    }
+    Some(challenge)
+}
+
+pub fn store_auth_challenge(state: &AppState, key: String, challenge: AuthChallenge) {
+    let expiry = std::time::Instant::now()
+        + std::time::Duration::from_secs(CHALLENGE_TTL_SECS);
+    state
+        .auth_challenges
+        .lock()
+        .unwrap()
+        .insert(key, (challenge, expiry));
+}
+
+pub fn take_auth_challenge(state: &AppState, key: &str) -> Option<AuthChallenge> {
+    let entry = state.auth_challenges.lock().unwrap().remove(key)?;
+    let (challenge, expiry) = entry;
+    if std::time::Instant::now() >= expiry {
+        return None;
+    }
+    Some(challenge)
 }
 
 // ── /register/start ──────────────────────────────────────────────────────────
@@ -68,15 +92,15 @@ async fn register_start(
     let challenge_id = Uuid::new_v4();
     let key = challenge_key(challenge_id);
 
-    let payload = serde_json::to_string(&RegChallengeState {
-        user_id,
-        username: req.username,
-        reg_state,
-    })
-    .map_err(|e| AppError::internal(e.to_string()))?;
-
-    let mut conn = state.redis_conn().await?;
-    let _: () = conn.set_ex(&key, payload, 300).await?;
+    store_reg_challenge(
+        &state,
+        key,
+        RegChallenge {
+            user_id,
+            username: req.username,
+            reg_state,
+        },
+    );
 
     Ok(Json(RegisterStartResp { challenge_id, ccr }))
 }
@@ -93,34 +117,35 @@ struct RegisterFinishReq {
 struct RegisterFinishResp {
     status: &'static str,
     user_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token: Option<String>,
 }
 
 async fn register_finish(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<RegisterFinishReq>,
 ) -> Result<Json<RegisterFinishResp>, AppError> {
+    // Extract user-agent for device metadata
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+
     tracing::info!(challenge_id = %req.challenge_id, "register_finish");
 
     let key = challenge_key(req.challenge_id);
-    let mut conn = state.redis_conn().await?;
+    let challenge = take_reg_challenge(&state, &key)
+        .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
 
-    // Fetch and consume the challenge state atomically
-    let raw: Option<String> = conn.get(&key).await?;
-    let raw = raw.ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
-    let _: () = conn.del(&key).await?;
-
-    let challenge: RegChallengeState = serde_json::from_str(&raw)
-        .map_err(|e| AppError::internal(format!("failed_to_parse_challenge: {e}")))?;
-
-    // Parse the attestation from the browser
     let rpk: RegisterPublicKeyCredential = serde_json::from_value(req.attestation)
-        .map_err(|e| AppError::bad_request(format!("invalid_attestation: {e}")))?;
+        .map_err(|_| AppError::bad_request("invalid_attestation"))?;
 
-    // Cryptographically verify the registration
     let passkey = state
         .webauthn
         .finish_passkey_registration(&rpk, &challenge.reg_state)
-        .map_err(|e| AppError::bad_request(format!("webauthn_error: {e}")))?;
+        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
 
     let db = state
         .db
@@ -131,7 +156,7 @@ async fn register_finish(
         .map_err(|e| AppError::internal(e.to_string()))?;
     let cred_id_bytes: Vec<u8> = passkey.cred_id().to_vec();
 
-    // Upsert user — handles re-registration (adding a new device) gracefully
+    // Upsert user
     sqlx::query(
         "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING",
     )
@@ -141,30 +166,57 @@ async fn register_finish(
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
 
-    // Resolve the canonical user_id (may differ from challenge if username already existed)
+    // Resolve canonical user_id
     let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE username = $1")
         .bind(&challenge.username)
         .fetch_one(db)
         .await
         .map_err(|e| AppError::internal(e.to_string()))?;
 
-    // Persist the credential. The `passkey` TEXT column is the source of truth —
-    // it holds the full serialised Passkey struct (including the public key).
-    // `public_key` is intentionally omitted here; it is now nullable (see
-    // migration 003) and should not be populated with placeholder bytes.
+    // Persist credential
     sqlx::query(
-        "INSERT INTO credentials (user_id, credential_id, sign_count, passkey) \
-         VALUES ($1, $2, 0, $3)",
+        "INSERT INTO credentials (user_id, credential_id, sign_count, passkey, user_agent) \
+         VALUES ($1, $2, 0, $3, $4)",
     )
     .bind(user_id)
     .bind(&cred_id_bytes)
     .bind(&passkey_json)
+    .bind(&user_agent)
     .execute(db)
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
 
+    // Fetch the new credential's DB UUID for JWT binding
+    let cred_uuid: Uuid = sqlx::query_scalar(
+        "SELECT id FROM credentials WHERE user_id = $1 AND credential_id = $2",
+    )
+    .bind(user_id)
+    .bind(&cred_id_bytes)
+    .fetch_one(db)
+    .await
+    .map_err(|e| AppError::internal(e.to_string()))?;
+
+    // Issue JWT for auto-login
+    let token = issue_jwt(user_id, &challenge.username, cred_uuid, &state.jwt_secret)?;
+
+    // Audit
+    audit::log_event(
+        db,
+        Some(user_id),
+        &challenge.username,
+        Some(cred_uuid),
+        "register",
+        serde_json::json!({}),
+        "success",
+    )
+    .await;
+
     tracing::info!(user_id = %user_id, username = %challenge.username, "registration complete");
-    Ok(Json(RegisterFinishResp { status: "ok", user_id }))
+    Ok(Json(RegisterFinishResp {
+        status: "ok",
+        user_id,
+        token: Some(token),
+    }))
 }
 
 // ── /login/start ─────────────────────────────────────────────────────────────
@@ -190,7 +242,7 @@ async fn login_start(
     let db = state
         .db
         .as_ref()
-        .ok_or_else(|| AppError::internal("database not configured"))?;
+        .ok_or_else(|| AppError::internal("database_not_configured"))?;
 
     let user_row = sqlx::query("SELECT id FROM users WHERE username = $1")
         .bind(&req.username)
@@ -235,15 +287,15 @@ async fn login_start(
     let challenge_id = Uuid::new_v4();
     let key = login_key(challenge_id);
 
-    let payload = serde_json::to_string(&AuthChallengeState {
-        user_id,
-        username: req.username,
-        auth_state,
-    })
-    .map_err(|e| AppError::internal(e.to_string()))?;
-
-    let mut conn = state.redis_conn().await?;
-    let _: () = conn.set_ex(&key, payload, 300).await?;
+    store_auth_challenge(
+        &state,
+        key,
+        AuthChallenge {
+            user_id,
+            username: req.username,
+            auth_state,
+        },
+    );
 
     Ok(Json(LoginStartResp { challenge_id, rcr }))
 }
@@ -269,25 +321,16 @@ async fn login_finish(
     tracing::info!(challenge_id = %req.challenge_id, "login_finish");
 
     let key = login_key(req.challenge_id);
-    let mut conn = state.redis_conn().await?;
+    let challenge = take_auth_challenge(&state, &key)
+        .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
 
-    // Fetch and consume the challenge state atomically
-    let raw: Option<String> = conn.get(&key).await?;
-    let raw = raw.ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
-    let _: () = conn.del(&key).await?;
-
-    let challenge: AuthChallengeState = serde_json::from_str(&raw)
-        .map_err(|e| AppError::internal(format!("failed_to_parse_challenge: {e}")))?;
-
-    // Parse the assertion from the browser
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
-        .map_err(|e| AppError::bad_request(format!("invalid_assertion: {e}")))?;
+        .map_err(|_| AppError::bad_request("invalid_assertion"))?;
 
-    // Cryptographically verify the authentication
     let auth_result = state
         .webauthn
         .finish_passkey_authentication(&auth_cred, &challenge.auth_state)
-        .map_err(|e| AppError::bad_request(format!("webauthn_error: {e}")))?;
+        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
 
     let db = state
         .db
@@ -297,12 +340,8 @@ async fn login_finish(
     let cred_id_bytes: Vec<u8> = auth_result.cred_id().to_vec();
     let new_counter = auth_result.counter() as i64;
 
-    // **new**: verify the credential is still active.  Although `login_start`
-    // only returned active credentials, a device could be revoked between the
-    // start and finish phases (e.g. via the web UI).  We look up the status by
-    // ID and reject if it isn't active.
-    let status: Option<String> = sqlx::query_scalar(
-        "SELECT status FROM credentials WHERE user_id = $1 AND credential_id = $2",
+    let cred_row = sqlx::query(
+        "SELECT id, status FROM credentials WHERE user_id = $1 AND credential_id = $2",
     )
     .bind(challenge.user_id)
     .bind(&cred_id_bytes)
@@ -310,11 +349,19 @@ async fn login_finish(
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
 
-    if status.as_deref() != Some("active") {
+    let (cred_uuid, status) = match cred_row {
+        None => return Err(AppError::bad_request("device_revoked")),
+        Some(r) => {
+            let id: Uuid = r.try_get("id").map_err(|e| AppError::internal(e.to_string()))?;
+            let s: String = r.try_get("status").map_err(|e| AppError::internal(e.to_string()))?;
+            (id, s)
+        }
+    };
+
+    if status != "active" {
         return Err(AppError::bad_request("device_revoked"));
     }
 
-    // Update counter and last_used_at for replay protection
     sqlx::query(
         "UPDATE credentials SET sign_count = $1, last_used_at = now() \
          WHERE user_id = $2 AND credential_id = $3",
@@ -326,7 +373,6 @@ async fn login_finish(
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
 
-    // Keep the stored Passkey JSON in sync (counter may have changed, backup state, etc.)
     if auth_result.needs_update() {
         let row = sqlx::query(
             "SELECT passkey FROM credentials WHERE user_id = $1 AND credential_id = $2",
@@ -362,8 +408,25 @@ async fn login_finish(
         }
     }
 
-    let token = issue_jwt(challenge.user_id, &challenge.username, &state.jwt_secret)?;
+    let token = issue_jwt(challenge.user_id, &challenge.username, cred_uuid, &state.jwt_secret)?;
 
-    tracing::info!(user_id = %challenge.user_id, username = %challenge.username, "login complete");
+    // Audit
+    audit::log_event(
+        db,
+        Some(challenge.user_id),
+        &challenge.username,
+        Some(cred_uuid),
+        "login",
+        serde_json::json!({}),
+        "success",
+    )
+    .await;
+
+    tracing::info!(
+        user_id = %challenge.user_id,
+        username = %challenge.username,
+        cred_id = %cred_uuid,
+        "login complete"
+    );
     Ok(Json(LoginFinishResp { status: "ok", token }))
 }

@@ -7,6 +7,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+use sqlx::{self, Row};
 
 use crate::{error::AppError, state::AppState};
 
@@ -14,13 +15,14 @@ use crate::{error::AppError, state::AppState};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,     // user_id
+    pub sub: String,      // user_id
     pub username: String,
+    pub cred_id: String,  // credential/device uuid
     pub iat: u64,
     pub exp: u64,
 }
 
-pub fn issue_jwt(user_id: Uuid, username: &str, secret: &str) -> Result<String, AppError> {
+pub fn issue_jwt(user_id: Uuid, username: &str, credential_id: Uuid, secret: &str) -> Result<String, AppError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| AppError::internal(e.to_string()))?
@@ -29,6 +31,7 @@ pub fn issue_jwt(user_id: Uuid, username: &str, secret: &str) -> Result<String, 
     let claims = Claims {
         sub: user_id.to_string(),
         username: username.to_owned(),
+        cred_id: credential_id.to_string(),
         iat: now,
         exp: now + 3600, // 1 hour
     };
@@ -48,6 +51,7 @@ pub fn issue_jwt(user_id: Uuid, username: &str, secret: &str) -> Result<String, 
 pub struct AuthUser {
     pub user_id: Uuid,
     pub username: String,
+    pub cred_id: Uuid,
 }
 
 #[async_trait]
@@ -78,9 +82,36 @@ impl FromRequestParts<AppState> for AuthUser {
         let user_id = Uuid::parse_str(&token_data.claims.sub)
             .map_err(|_| AppError::unauthorized("malformed_subject_claim"))?;
 
+        let cred_uuid = Uuid::parse_str(&token_data.claims.cred_id)
+            .map_err(|_| AppError::unauthorized("malformed_cred_id"))?;
+
+        // If a DB pool is available, verify the credential is still active.
+        // Revoked and not-found are both reported as the same 401 to avoid
+        // leaking whether a device was revoked vs never existed.
+        if let Some(ref pool) = state.db {
+            let row = sqlx::query(
+                "SELECT status FROM credentials WHERE id = $1 AND user_id = $2",
+            )
+            .bind(cred_uuid)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|_| AppError::unauthorized("device_not_active"))?;
+
+            let active = row
+                .and_then(|r| r.try_get::<String, _>("status").ok())
+                .map(|s| s == "active")
+                .unwrap_or(false);
+
+            if !active {
+                return Err(AppError::unauthorized("device_not_active"));
+            }
+        }
+
         Ok(AuthUser {
             user_id,
             username: token_data.claims.username,
+            cred_id: cred_uuid,
         })
     }
 }

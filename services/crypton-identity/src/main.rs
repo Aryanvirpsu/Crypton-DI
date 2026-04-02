@@ -1,4 +1,5 @@
 mod app;
+mod audit;
 mod config;
 mod error;
 mod jwt;
@@ -7,6 +8,7 @@ mod state;
 mod db;
 mod redis;
 
+use std::net::SocketAddr;
 use crate::{config::Config, state::AppState};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use axum_server::tls_rustls::RustlsConfig;
@@ -39,13 +41,13 @@ async fn main() -> anyhow::Result<()> {
         Ok(tls_config) => {
             tracing::info!("TLS enabled (crypton.local.pem found) — https://crypton.local:{}", cfg.app_port);
             axum_server::bind_rustls(socket_addr, tls_config)
-                .serve(app.into_make_service())
+                .serve(app.into_make_service_with_connect_info::<SocketAddr>())
                 .await?;
         }
         Err(e) => {
             tracing::warn!("TLS certs not found ({}). Running plain HTTP — for cloudflared tunnel use HTTP.", e);
             let listener = tokio::net::TcpListener::bind(&addr).await?;
-            axum::serve(listener, app.into_make_service()).await?;
+            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
         }
     }
 

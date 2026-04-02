@@ -7,7 +7,7 @@ use serde::Serialize;
 use sqlx::Row;
 use uuid::Uuid;
 
-use crate::{error::AppError, jwt::AuthUser, state::AppState};
+use crate::{audit, error::AppError, jwt::AuthUser, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -23,19 +23,25 @@ struct DeviceInfo {
     id: Uuid,
     nickname: Option<String>,
     status: String,
+    user_agent: Option<String>,
+    created_at: Option<String>,
+    last_used_at: Option<String>,
 }
 
 async fn list_devices(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DeviceInfo>>, AppError> {
-    let db = state
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::internal("database_not_configured"))?;
+    let db = match state.db.as_ref() {
+        Some(db) => db,
+        None => return Ok(Json(vec![])),
+    };
 
     let rows = sqlx::query(
-        "SELECT id, nickname, status \
+        "SELECT id, nickname, status, \
+                user_agent, \
+                created_at::text AS created_at, \
+                last_used_at::text AS last_used_at \
          FROM credentials \
          WHERE user_id = $1 \
          ORDER BY created_at",
@@ -52,6 +58,9 @@ async fn list_devices(
                 id: r.try_get("id").ok()?,
                 nickname: r.try_get("nickname").ok().flatten(),
                 status: r.try_get("status").ok()?,
+                user_agent: r.try_get("user_agent").ok().flatten(),
+                created_at: r.try_get("created_at").ok().flatten(),
+                last_used_at: r.try_get("last_used_at").ok().flatten(),
             })
         })
         .collect();
@@ -90,17 +99,22 @@ async fn revoke_device(
         return Err(AppError::not_found("credential_not_found"));
     }
 
-    tracing::info!(
-        user_id = %auth.user_id,
-        credential_id = %id,
-        "device revoked"
-    );
+    audit::log_event(
+        db,
+        Some(auth.user_id),
+        &auth.username,
+        Some(id),
+        "device_revoke",
+        serde_json::json!({}),
+        "success",
+    )
+    .await;
 
+    tracing::info!(user_id = %auth.user_id, credential_id = %id, "device revoked");
     Ok(Json(RevokeResp { status: "revoked" }))
 }
 
 // ── POST /devices/:id/revoke ──────────────────────────────────────────────────
-// Frontend calls this path+method. Same logic as DELETE /devices/:id.
 
 async fn revoke_device_post(
     auth: AuthUser,
@@ -125,6 +139,17 @@ async fn revoke_device_post(
     if result.rows_affected() == 0 {
         return Err(AppError::not_found("credential_not_found"));
     }
+
+    audit::log_event(
+        db,
+        Some(auth.user_id),
+        &auth.username,
+        Some(id),
+        "device_revoke",
+        serde_json::json!({}),
+        "success",
+    )
+    .await;
 
     tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked via POST");
     Ok(Json(RevokeResp { status: "revoked" }))

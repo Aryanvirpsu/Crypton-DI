@@ -11,3 +11,9 @@ pub fn challenge_key(challenge_id: Uuid) -> String {
 pub fn login_key(challenge_id: Uuid) -> String {
     format!("webauthn:login:challenge:{}", challenge_id)
 }
+
+/// Key for a protected-action challenge (separate namespace from login).
+/// Format: `webauthn:action:challenge:<uuid>`
+pub fn action_key(challenge_id: Uuid) -> String {
+    format!("webauthn:action:challenge:{}", challenge_id)
+}

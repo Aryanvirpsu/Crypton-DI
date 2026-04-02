@@ -8,16 +8,14 @@ use tower_governor::{
 
 use crate::state::AppState;
 
-mod auth_webauthn;
+pub mod auth_webauthn;
+mod actions;
 mod devices;
 mod health;
 mod secure;
 mod stubs;
 
 pub fn router() -> Router<AppState> {
-    // Rate-limit auth endpoints: 5 requests/second steady-state, burst of 20.
-    // Keyed by client IP (respects X-Forwarded-For via SmartIpKeyExtractor).
-    // Other routes (health, devices, secure) are not rate-limited here.
     let auth_governor = Arc::new(
         GovernorConfigBuilder::default()
             .per_second(5)
@@ -35,6 +33,7 @@ pub fn router() -> Router<AppState> {
         .merge(health::router())
         .merge(auth_router)
         .merge(devices::router())
+        .merge(actions::router())
         .merge(secure::router())
         .merge(stubs::router())
 }
