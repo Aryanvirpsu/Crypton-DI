@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypton WebAuthn Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .button-group button {
+            margin-bottom: 0;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .devices-list {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .device-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .device-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .device-info {
+            flex: 1;
+        }
+
+        .device-id {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .device-status {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .device-status.active {
+            color: #28a745;
+        }
+
+        .device-status.revoked {
+            color: #dc3545;
+            text-decoration: line-through;
+        }
+
+        .revoke-btn {
+            background: #dc3545;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .revoke-btn:hover {
+            background: #c82333;
+        }
+
+        .jwt-display {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Crypton WebAuthn</h1>
+        <p class="subtitle">Multi-device registration &amp; JWT testing</p>
+
+        <!-- Auth Section -->
+        <div class="section">
+            <h2 style="font-size: 18px; margin-bottom: 15px; color: #333;">Registration</h2>
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="e.g., user1, user2...">
+
+            <button onclick="registerStart()" id="registerBtn">1. Register (Start)</button>
+            <button onclick="registerFinish()" id="finishBtn" disabled>2. Register (Finish)</button>
+
+            <div id="registerStatus"></div>
+        </div>
+
+        <!-- JWT Section -->
+        <div class="section">
+            <h2 style="font-size: 18px; margin-bottom: 15px; color: #333;">JWT</h2>
+            <div id="jwtStatus"></div>
+            <div id="jwtDisplay" class="jwt-display" style="display: none;"></div>
+            <button onclick="loginStart()" style="margin-bottom: 10px;">Login (Get JWT)</button>
+            <button onclick="copyJWT()" id="copyJwtBtn" style="display: none; background: #28a745;">Copy JWT to Clipboard</button>
+            <button onclick="clearJWT()" style="background: #6c757d;">Clear JWT</button>
+        </div>
+
+        <!-- Devices Section -->
+        <div class="section">
+            <h2 style="font-size: 18px; margin-bottom: 15px; color: #333;">Devices</h2>
+            <button onclick="listDevices()">List My Devices</button>
+            <div id="devicesStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // API is served from the same origin as this page.
+        // Works with: https://crypton.local:8080 (local TLS),
+        //             http://localhost:8080 (plain HTTP dev),
+        //             https://abc123.trycloudflare.com (cloudflared tunnel).
+        const API_URL = window.location.origin;
+
+        let currentSessionId = null;
+
+        // ── Base64url helpers ─────────────────────────────────────────────────
+        // webauthn-rs uses base64url (RFC 4648 §5): uses - and _ instead of + and /,
+        // no padding. The standard browser atob() only handles base64, so we convert.
+
+        function base64urlToBytes(str) {
+            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+            const binary = atob(padded);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
+        }
+
+        function bytesToBase64url(buf) {
+            const bytes = new Uint8Array(buf);
+            let binary = '';
+            for (const b of bytes) binary += String.fromCharCode(b);
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        // ── Decode WebAuthn server options ────────────────────────────────────
+        // Converts every binary field the server sends as base64url strings into
+        // the Uint8Arrays that navigator.credentials.create / .get require.
+
+        function decodeOptions(opts) {
+            const o = { ...opts };
+
+            if (typeof o.challenge === 'string') {
+                o.challenge = base64urlToBytes(o.challenge);
+            }
+            // Registration: user.id
+            if (o.user && typeof o.user.id === 'string') {
+                o.user = { ...o.user, id: base64urlToBytes(o.user.id) };
+            }
+            // Registration: excludeCredentials[n].id
+            if (Array.isArray(o.excludeCredentials)) {
+                o.excludeCredentials = o.excludeCredentials.map(c => ({
+                    ...c,
+                    id: typeof c.id === 'string' ? base64urlToBytes(c.id) : c.id,
+                }));
+            }
+            // Authentication: allowCredentials[n].id
+            if (Array.isArray(o.allowCredentials)) {
+                o.allowCredentials = o.allowCredentials.map(c => ({
+                    ...c,
+                    id: typeof c.id === 'string' ? base64urlToBytes(c.id) : c.id,
+                }));
+            }
+
+            return o;
+        }
+
+        // ── Serialize a PublicKeyCredential for the server ────────────────────
+        // JSON.stringify on a PublicKeyCredential silently produces {} because
+        // ArrayBuffer fields are not enumerable. We must serialize manually.
+
+        function serializeCredential(cred) {
+            const r = cred.response;
+            const out = {
+                id:    cred.id,
+                rawId: bytesToBase64url(cred.rawId),
+                type:  cred.type,
+                response: {},
+            };
+            if (r.clientDataJSON)   out.response.clientDataJSON   = bytesToBase64url(r.clientDataJSON);
+            if (r.attestationObject) out.response.attestationObject = bytesToBase64url(r.attestationObject);
+            if (r.authenticatorData) out.response.authenticatorData = bytesToBase64url(r.authenticatorData);
+            if (r.signature)         out.response.signature         = bytesToBase64url(r.signature);
+            if (r.userHandle)        out.response.userHandle        = bytesToBase64url(r.userHandle);
+            return out;
+        }
+
+        // ── UI helpers ────────────────────────────────────────────────────────
+
+        function showStatus(id, msg, type = 'info') {
+            document.getElementById(id).innerHTML = `<div class="status ${type}">${msg}</div>`;
+        }
+
+        function getJWT()  { return localStorage.getItem('crypton_jwt'); }
+        function setJWT(t) { localStorage.setItem('crypton_jwt', t); updateJWTDisplay(); }
+
+        function clearJWT() {
+            localStorage.removeItem('crypton_jwt');
+            updateJWTDisplay();
+            showStatus('jwtStatus', 'JWT cleared', 'info');
+        }
+
+        function updateJWTDisplay() {
+            const jwt = getJWT();
+            const display  = document.getElementById('jwtDisplay');
+            const copyBtn  = document.getElementById('copyJwtBtn');
+            const jwtStatus = document.getElementById('jwtStatus');
+
+            if (jwt) {
+                display.textContent    = jwt;
+                display.style.display  = 'block';
+                copyBtn.style.display  = 'block';
+                jwtStatus.innerHTML    = '<div class="status success">JWT stored in localStorage</div>';
+            } else {
+                display.style.display  = 'none';
+                copyBtn.style.display  = 'none';
+                jwtStatus.innerHTML    = '<div class="status error">No JWT stored</div>';
+            }
+        }
+
+        function copyJWT() {
+            navigator.clipboard.writeText(getJWT()).then(() => alert('JWT copied to clipboard!'));
+        }
+
+        // ── Register (Start) ──────────────────────────────────────────────────
+
+        async function registerStart() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) { showStatus('registerStatus', 'Please enter a username', 'error'); return; }
+
+            const btn = document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Starting...';
+
+            try {
+                const resp = await fetch(`${API_URL}/auth/register/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username }),
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+                const data = await resp.json();
+                console.log('register/start response:', data);
+
+                currentSessionId = data.challenge_id;
+
+                // Decode the server's publicKey options (base64url -> Uint8Arrays)
+                const publicKeyOptions = decodeOptions(data.publicKey);
+
+                showStatus('registerStatus', 'Waiting for biometric / security key...', 'info');
+
+                const credential = await navigator.credentials.create({ publicKey: publicKeyOptions });
+                if (!credential) {
+                    showStatus('registerStatus', 'Registration cancelled', 'error');
+                    return;
+                }
+
+                console.log('Credential created:', credential);
+
+                // Serialize the credential properly (ArrayBuffers -> base64url strings)
+                localStorage.setItem('crypton_pending_cred', JSON.stringify(serializeCredential(credential)));
+
+                showStatus('registerStatus', 'Credential captured — click Register (Finish) to save', 'success');
+                document.getElementById('finishBtn').disabled = false;
+
+            } catch (err) {
+                showStatus('registerStatus', `Error: ${err.message}`, 'error');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '1. Register (Start)';
+            }
+        }
+
+        // ── Register (Finish) ─────────────────────────────────────────────────
+
+        async function registerFinish() {
+            const credJson = localStorage.getItem('crypton_pending_cred');
+            if (!credJson || !currentSessionId) {
+                showStatus('registerStatus', 'No pending credential — run Register (Start) first', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('finishBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Finishing...';
+
+            try {
+                const resp = await fetch(`${API_URL}/auth/register/finish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        challenge_id: currentSessionId,
+                        attestation: JSON.parse(credJson),
+                    }),
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+
+                showStatus('registerStatus', 'Device registered! Login to get a JWT', 'success');
+                localStorage.removeItem('crypton_pending_cred');
+
+            } catch (err) {
+                showStatus('registerStatus', `Finish error: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = true;
+                btn.innerHTML = '2. Register (Finish)';
+            }
+        }
+
+        // ── Login (Get JWT) ───────────────────────────────────────────────────
+
+        async function loginStart() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) { showStatus('jwtStatus', 'Please enter your username', 'error'); return; }
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Logging in...';
+
+            try {
+                const startResp = await fetch(`${API_URL}/auth/login/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username }),
+                });
+                if (!startResp.ok) throw new Error(`HTTP ${startResp.status}: ${await startResp.text()}`);
+                const data = await startResp.json();
+                console.log('login/start response:', data);
+
+                currentSessionId = data.challenge_id;
+
+                // Decode the server's publicKey options (base64url -> Uint8Arrays)
+                const publicKeyOptions = decodeOptions(data.publicKey);
+
+                showStatus('jwtStatus', 'Waiting for biometric / security key...', 'info');
+
+                const assertion = await navigator.credentials.get({ publicKey: publicKeyOptions });
+                if (!assertion) {
+                    showStatus('jwtStatus', 'Login cancelled', 'error');
+                    return;
+                }
+
+                const finishResp = await fetch(`${API_URL}/auth/login/finish`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        challenge_id: currentSessionId,
+                        assertion: serializeCredential(assertion),
+                    }),
+                });
+                if (!finishResp.ok) throw new Error(`HTTP ${finishResp.status}: ${await finishResp.text()}`);
+                const result = await finishResp.json();
+
+                setJWT(result.token);
+                showStatus('jwtStatus', 'Login successful! JWT obtained', 'success');
+
+            } catch (err) {
+                showStatus('jwtStatus', `Login error: ${err.message}`, 'error');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Login (Get JWT)';
+            }
+        }
+
+        // ── List Devices ──────────────────────────────────────────────────────
+
+        async function listDevices() {
+            const jwt = getJWT();
+            if (!jwt) { showStatus('devicesStatus', 'No JWT — login first', 'error'); return; }
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Loading...';
+
+            try {
+                const resp = await fetch(`${API_URL}/devices`, {
+                    headers: { 'Authorization': `Bearer ${jwt}` },
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const devices = await resp.json();
+
+                if (!devices || devices.length === 0) {
+                    showStatus('devicesStatus', 'No devices registered', 'info');
+                    return;
+                }
+
+                let html = '<div class="devices-list">';
+                devices.forEach(device => {
+                    html += `
+                        <div class="device-item">
+                            <div class="device-info">
+                                <div class="device-id">${device.id.substring(0, 8)}...</div>
+                                <div class="device-status ${device.status}">${device.status}</div>
+                            </div>
+                            ${device.status === 'active' ? `
+                                <button class="revoke-btn" onclick="revokeDevice('${device.id}')">Revoke</button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                document.getElementById('devicesStatus').innerHTML = html;
+
+            } catch (err) {
+                showStatus('devicesStatus', `Error: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'List My Devices';
+            }
+        }
+
+        // ── Revoke Device ─────────────────────────────────────────────────────
+
+        async function revokeDevice(deviceId) {
+            if (!confirm('Revoke this device?')) return;
+
+            const jwt = getJWT();
+            if (!jwt) { showStatus('devicesStatus', 'No JWT — login first', 'error'); return; }
+
+            try {
+                const resp = await fetch(`${API_URL}/devices/${deviceId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${jwt}` },
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                showStatus('devicesStatus', 'Device revoked', 'success');
+                setTimeout(listDevices, 1000);
+            } catch (err) {
+                showStatus('devicesStatus', `Revoke error: ${err.message}`, 'error');
+            }
+        }
+
+        // ── Init ──────────────────────────────────────────────────────────────
+
+        window.addEventListener('load', () => {
+            updateJWTDisplay();
+
+            const isSecure = window.isSecureContext;
+            const checks = [
+                navigator.credentials
+                    ? 'WebAuthn API available'
+                    : 'navigator.credentials missing (WebAuthn not supported)',
+                isSecure
+                    ? `Secure context (${window.location.protocol})`
+                    : 'NOT in secure context — WebAuthn requires HTTPS or localhost',
+                `API endpoint: ${API_URL}`,
+            ];
+
+            console.log('Crypton WebAuthn checks:\n' + checks.map(s => '  ' + s).join('\n'));
+
+            if (!isSecure) {
+                showStatus('registerStatus',
+                    'WebAuthn requires a secure context (HTTPS or localhost). ' +
+                    'Open this page via https:// or use the cloudflared tunnel.',
+                    'error');
+            }
+        });
+    </script>
+</body>
+</html>

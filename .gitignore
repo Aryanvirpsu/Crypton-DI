@@ -1,25 +1,40 @@
-@"
-# Rust
-/target
+# ── Rust ──────────────────────────────────────────────
+target/
 **/*.rs.bk
 
-# Env
-.env
-**/.env
-
-# Node
+# ── Node / React ──────────────────────────────────────
 node_modules/
-.next/
-dist/
+/node_modules
+/.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Docker
-*.pid
+# CRA build output
+/build
+/coverage
+services/crypton-admin/build/
 
-# OS / Editor
+# ── Environment / Secrets ─────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── TLS certs (local dev) ─────────────────────────────
+*.pem
+*.key
+*.crt
+
+# ── OS / Editor ───────────────────────────────────────
 .DS_Store
+Thumbs.db
 .vscode/
 .idea/
 
-# Logs
-*.log
-"@ | Out-File -Encoding utf8 .gitignore
+# ── Claude local ──────────────────────────────────────
+.claude/settings.local.json
+.claude/worktrees/
