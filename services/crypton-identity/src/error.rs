@@ -8,6 +8,7 @@ use serde::Serialize;
 #[derive(Debug)]
 pub struct AppError {
     status: StatusCode,
+    /// Internal detail — logged but NEVER sent to clients for 5xx errors.
     message: String,
 }
 
@@ -36,26 +37,27 @@ impl AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        (
-            self.status,
-            Json(ErrorBody {
-                error: self.message,
-            }),
-        )
-            .into_response()
+        // For server errors: log the detail internally, return a generic message externally.
+        let public_msg = if self.status.is_server_error() {
+            tracing::error!(detail = %self.message, status = %self.status, "internal error");
+            "internal_server_error".to_string()
+        } else {
+            // 4xx: message is safe to expose (it's a user-facing code, not a stack trace).
+            self.message
+        };
+
+        (self.status, Json(ErrorBody { error: public_msg })).into_response()
     }
 }
 
 impl From<anyhow::Error> for AppError {
     fn from(e: anyhow::Error) -> Self {
-        tracing::error!(error = %e, "internal error");
         Self::internal(e.to_string())
     }
 }
 
 impl From<redis::RedisError> for AppError {
     fn from(e: redis::RedisError) -> Self {
-        tracing::error!(error = %e, "redis error");
         Self::internal(e.to_string())
     }
 }
