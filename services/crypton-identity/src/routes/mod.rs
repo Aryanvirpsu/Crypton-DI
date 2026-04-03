@@ -12,6 +12,7 @@ pub mod auth_webauthn;
 mod actions;
 mod devices;
 mod health;
+mod oauth;
 mod secure;
 mod stubs;
 
@@ -36,4 +37,5 @@ pub fn router() -> Router<AppState> {
         .merge(actions::router())
         .merge(secure::router())
         .merge(stubs::router())
+        .merge(oauth::router())
 }
