@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crypton Demo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Mono', monospace, monospace;
+    background: #0a0a0a; color: #f4f1ec;
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+  }
+  .card {
+    background: #111; border: 1px solid rgba(255,255,255,.1);
+    padding: 60px 56px; max-width: 480px; width: 100%; text-align: center;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #c8f55a; margin: 0 auto 28px;
+  }
+  h1 { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; margin-bottom: 8px; }
+  .sub { font-size: 11px; color: #7a7570; margin-bottom: 44px; line-height: 1.7; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: #c8f55a; color: #0a0a0a;
+    padding: 14px 32px; font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; text-decoration: none; font-weight: 700;
+    transition: opacity .2s; font-family: inherit;
+  }
+  .btn:hover { opacity: .85; }
+  .divider {
+    margin: 36px 0 0; border-top: 1px solid rgba(255,255,255,.07);
+    padding-top: 24px; font-size: 9px; color: #5a5550; letter-spacing: .08em;
+  }
+  .err { color: #f87171; font-size: 11px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="dot"></div>
+  <h1>Demo App</h1>
+  <p class="sub">Passwordless login via Crypton.<br>No password. No secrets on the client.</p>
+
+  <a href="/login" class="btn">🔑&nbsp; Continue with Crypton</a>
+
+  <div class="divider">
+    OAuth 2.0 · Authorization Code · WebAuthn passkey
+  </div>
+
+  <div id="err" class="err" style="display:none"></div>
+</div>
+
+<script>
+  const e = new URLSearchParams(location.search).get('error');
+  if (e) {
+    const el = document.getElementById('err');
+    el.textContent = 'Error: ' + e;
+    el.style.display = 'block';
+  }
+</script>
+</body>
+</html>

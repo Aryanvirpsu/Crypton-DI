@@ -12,7 +12,20 @@ export default function Login({ go, toast }) {
     setEmailErr(false);
     setBusy(true);
     try {
-      await doLogin(email);
+      const result = await doLogin(email);
+      // OAuth mode: detected via ?oauth=<nonce> injected by /authorize redirect
+      const oauthNonce = new URLSearchParams(window.location.search).get('oauth');
+      if (oauthNonce) {
+        const resp = await fetch('/auth/oauth/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nonce: oauthNonce, token: result.token }),
+        });
+        if (!resp.ok) throw new Error('OAuth handshake failed');
+        const { redirect_url } = await resp.json();
+        window.location.href = redirect_url;
+        return;
+      }
       toast("Welcome back — authenticated ✓", "success");
       go("dashboard");
     } catch (err) {
