@@ -865,7 +865,7 @@ if (Test-Path $DemoDir) {
 
     # Set demo-site env vars
     $env:PORT           = "4000"
-    $env:CRYPTON_URL    = "http://localhost:8080"
+    $env:CRYPTON_URL    = "http://127.0.0.1:8080"  # 127.0.0.1 not localhost — Node fetch on Windows resolves localhost→::1
     $env:CLIENT_ID      = "demo-site"
     $env:CLIENT_SECRET  = "demo-secret-change-in-prod"
     $env:REDIRECT_URI   = "http://localhost:4000/callback"

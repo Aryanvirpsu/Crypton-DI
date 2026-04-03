@@ -14,7 +14,7 @@
  *
  * Config (env vars):
  *   PORT            default 4000
- *   CRYPTON_URL     default http://localhost:8080   (identity service, direct)
+ *   CRYPTON_URL     default http://127.0.0.1:8080   (identity service, direct — use 127.0.0.1 not localhost: Node.js 22 on Windows resolves localhost→::1 which fails when identity binds IPv4-only)
  *   CLIENT_ID       default demo-site
  *   CLIENT_SECRET   default demo-secret-change-in-prod
  *   REDIRECT_URI    default http://localhost:4000/callback
@@ -30,7 +30,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT         = process.env.PORT         || 4000;
-const CRYPTON_URL  = process.env.CRYPTON_URL  || 'http://localhost:8080';
+const CRYPTON_URL  = process.env.CRYPTON_URL  || 'http://127.0.0.1:8080'; // 127.0.0.1 not localhost — Node fetch on Windows resolves localhost→::1
 const CLIENT_ID    = process.env.CLIENT_ID    || 'demo-site';
 const CLIENT_SECRET = process.env.CLIENT_SECRET || 'demo-secret-change-in-prod';
 const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:4000/callback';
