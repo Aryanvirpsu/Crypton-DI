@@ -5,6 +5,14 @@ import { MOCK_USERS, ROLES, ROLE_COLORS, ROLE_PERMS } from './constants';
 import { BtnF } from './Buttons';
 import AppShell from './AppShell';
 
+const ROLE_MAP = {
+  super_admin: "Super Admin", superadmin: "Super Admin",
+  admin:       "Admin",
+  analyst:     "Security Analyst", security_analyst: "Security Analyst",
+  member:      "Viewer", viewer: "Viewer",
+};
+const normalizeRole = r => ROLE_MAP[r?.toLowerCase().replace(/\s+/g, "_")] || r || "Viewer";
+
 export default function RBAC({ go, toast }) {
   const [users, setUsers] = useState(MOCK_USERS);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -12,7 +20,13 @@ export default function RBAC({ go, toast }) {
   useEffect(() => {
     if (!getToken()) return;
     api.get("/users").then(data => {
-      if (Array.isArray(data) && data.length > 0) setUsers(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setUsers(data.map(u => ({
+          ...u,
+          name: u.name || u.email,
+          role: normalizeRole(u.role),
+        })));
+      }
     }).catch(() => {});
   }, []);
 
