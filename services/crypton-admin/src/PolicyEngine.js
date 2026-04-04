@@ -21,11 +21,11 @@ export default function PolicyEngine({ go, toast }) {
     const newActive = !pol.active;
     try { await api.patch(`/policies/${id}`, { active: newActive }); } catch {}
     setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
-    toast(`Policy "${pol.label}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
   };
 
-  const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)" };
-  const cats = [...new Set(policies.map(p => p.cat))];
+  const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)", other: "var(--muted)" };
+  const cats = [...new Set(policies.map(p => p.cat || "other"))];
 
   return (
     <AppShell active="policy" go={go}>
@@ -62,7 +62,7 @@ export default function PolicyEngine({ go, toast }) {
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: catColor[cat] }} />{cat.toUpperCase()} POLICIES
             </div>
             <div style={{ border: "1px solid var(--line)", overflow: "hidden" }}>
-              {policies.filter(p => p.cat === cat).map((p, i, arr) => (
+              {policies.filter(p => (p.cat || "other") === cat).map((p, i, arr) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 18px", borderBottom: i < arr.length - 1 ? "1px solid var(--line)" : "none", background: "var(--ink-2)", transition: "background .15s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--ink-3)"} onMouseLeave={e => e.currentTarget.style.background = "var(--ink-2)"}>
                   <div onClick={() => toggle(p.id)} style={{ width: 36, height: 20, borderRadius: 10, background: p.active ? "var(--accent)" : "var(--ink-3)", border: `1px solid ${p.active ? "var(--accent)" : "var(--line2)"}`, cursor: "pointer", position: "relative", flexShrink: 0, transition: "background .25s" }}>

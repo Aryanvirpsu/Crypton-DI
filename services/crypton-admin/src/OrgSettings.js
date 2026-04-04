@@ -25,6 +25,7 @@ export default function OrgSettings({ go, toast }) {
         if (data.sessionTimeoutHours !== undefined) setSessionTimeout(data.sessionTimeoutHours);
         if (data.session_timeout_hours !== undefined) setSessionTimeout(data.session_timeout_hours);
         if (Array.isArray(data.allowedCountries)) setCountries(data.allowedCountries);
+        else if (Array.isArray(data.allowed_countries)) setCountries(data.allowed_countries);
         if (data.domainVerified !== undefined) setDomainVerified(data.domainVerified);
       }
     }).catch(() => {});

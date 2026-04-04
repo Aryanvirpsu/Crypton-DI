@@ -10,7 +10,18 @@ export default function Sessions({ go, toast }) {
   useEffect(() => {
     if (!getToken()) return;
     api.get("/sessions").then(data => {
-      if (Array.isArray(data) && data.length > 0) setSessions(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setSessions(data.map(s => ({
+          id:       s.id,
+          user:     s.user,
+          device:   s.device || "Unknown",
+          browser:  s.browser || s.ip || "—",
+          loc:      s.loc || s.ip || "—",
+          started:  s.started || (s.created_at ? new Date(s.created_at).toLocaleString() : "—"),
+          duration: s.duration || (s.last_active ? new Date(s.last_active).toLocaleTimeString() : "—"),
+          active:   typeof s.active === 'boolean' ? s.active : s.status === "active",
+        })));
+      }
     }).catch(() => {});
   }, []);
 

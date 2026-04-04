@@ -14,6 +14,7 @@ pub fn router() -> Router<AppState> {
         .route("/devices", get(list_devices))
         .route("/devices/:id", delete(revoke_device))
         .route("/devices/:id/revoke", post(revoke_device_post))
+        .route("/devices/:id/mark-lost", post(mark_lost))
 }
 
 // ── GET /devices ──────────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ async fn list_devices(
                 created_at::text AS created_at, \
                 last_used_at::text AS last_used_at \
          FROM credentials \
-         WHERE user_id = $1 \
+         WHERE user_id = $1 AND status IN ('active', 'lost') \
          ORDER BY created_at",
     )
     .bind(auth.user_id)
@@ -153,4 +154,50 @@ async fn revoke_device_post(
 
     tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked via POST");
     Ok(Json(RevokeResp { status: "revoked" }))
+}
+
+// ── POST /devices/:id/mark-lost ───────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+struct MarkLostResp {
+    status: &'static str,
+}
+
+async fn mark_lost(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<MarkLostResp>, AppError> {
+    let db = state
+        .db
+        .as_ref()
+        .ok_or_else(|| AppError::internal("database_not_configured"))?;
+
+    let result = sqlx::query(
+        "UPDATE credentials SET status = 'lost' \
+         WHERE id = $1 AND user_id = $2 AND status = 'active'",
+    )
+    .bind(id)
+    .bind(auth.user_id)
+    .execute(db)
+    .await
+    .map_err(|e| AppError::internal(e.to_string()))?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::not_found("credential_not_found_or_not_active"));
+    }
+
+    audit::log_event(
+        db,
+        Some(auth.user_id),
+        &auth.username,
+        Some(id),
+        "device_mark_lost",
+        serde_json::json!({}),
+        "success",
+    )
+    .await;
+
+    tracing::info!(user_id = %auth.user_id, device_id = %id, "device marked lost");
+    Ok(Json(MarkLostResp { status: "lost" }))
 }
