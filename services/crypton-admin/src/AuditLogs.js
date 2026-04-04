@@ -13,20 +13,20 @@ export default function AuditLogs({ go, toast }) {
   useEffect(() => {
     if (!getToken()) { setLoading(false); return; }
     api.get("/audit-logs").then(data => {
-      if (Array.isArray(data)) setLogs(data);
+      if (data && Array.isArray(data.logs)) setLogs(data.logs);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const filters = ["ALL", "login", "register", "device_revoke", "action:rotate_api_key", "action:add_admin", "action:export_data"];
+  const filters = ["ALL", "login", "register", "device_revoke", "action_executed"];
   const filtered = logs.filter(r =>
-    (filter === "ALL" || r.action === filter) &&
-    (search === "" || (r.actor || "").toLowerCase().includes(search.toLowerCase()) || (r.action || "").toLowerCase().includes(search.toLowerCase()))
+    (filter === "ALL" || r.event_type === filter) &&
+    (search === "" || (r.event_type || "").toLowerCase().includes(search.toLowerCase()))
   );
 
   const typeColor = { success: "var(--success)", danger: "var(--danger)", warning: "var(--warning)", info: "var(--accent)" };
 
   const exportCSV = () => {
-    const rows = [["Actor","Action","Credential ID","Outcome","Time"], ...logs.map(r => [r.actor, r.action, r.credential_id || "", r.outcome, r.time || ""])];
+    const rows = [["actor","event_type","status","credential_id","created_at","metadata"], ...logs.map(r => [r.actor || "", r.event_type, r.status, r.credential_id || "", r.created_at || "", JSON.stringify(r.metadata || {})])];
     const csv = rows.map(r => r.join(",")).join("\n");
     const a = document.createElement("a"); a.href = "data:text/csv," + encodeURIComponent(csv); a.download = "crypton-audit.csv"; a.click();
     toast("Audit log exported as CSV", "success");
@@ -67,25 +67,25 @@ export default function AuditLogs({ go, toast }) {
               {filtered.map((r, i) => (
                 <div key={r.id || i} style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.5fr 1fr 1fr", padding: "13px 16px", borderBottom: i < filtered.length - 1 ? "1px solid var(--line)" : "none", background: i % 2 === 0 ? "var(--ink-2)" : "var(--ink)", alignItems: "center", transition: "background .15s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--ink-3)"} onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "var(--ink-2)" : "var(--ink)"}>
-                  <span style={{ fontSize: 12 }}>{r.actor}</span>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.type] || "var(--accent)", letterSpacing: ".05em" }}>{r.action}</span>
+                  <span style={{ fontSize: 12 }}>{r.actor || "—"}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.status] || "var(--accent)", letterSpacing: ".05em" }}>{r.event_type}</span>
                   <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted2)" }}>{r.credential_id ? r.credential_id.slice(0, 8) + "..." : "—"}</span>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: r.outcome === "success" ? "var(--success)" : "var(--danger)" }}>{r.outcome}</span>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted2)" }}>{r.time || "—"}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: r.status === "success" ? "var(--success)" : "var(--danger)" }}>{r.status}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted2)" }}>{r.created_at || "—"}</span>
                 </div>
               ))}
             </div>
             {/* Mobile cards */}
             <div className="audit-cards" style={{ display: "none", flexDirection: "column", gap: 8 }}>
               {filtered.map((r, i) => (
-                <div key={r.id || i} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${typeColor[r.type] || "var(--accent)"}`, padding: "14px 16px" }}>
+                <div key={r.id || i} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${typeColor[r.status] || "var(--accent)"}`, padding: "14px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.type] || "var(--accent)", letterSpacing: ".05em" }}>{r.action}</span>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>{r.time || "—"}</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: typeColor[r.status] || "var(--accent)", letterSpacing: ".05em" }}>{r.event_type}</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)" }}>{r.created_at || "—"}</span>
                   </div>
-                  <div style={{ fontSize: 12, marginBottom: 4 }}>{r.actor}</div>
+                  <div style={{ fontSize: 12, marginBottom: 4 }}>{r.actor || r.event_type}</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <span>{r.outcome}</span>
+                    <span>{r.status}</span>
                   </div>
                 </div>
               ))}

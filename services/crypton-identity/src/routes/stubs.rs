@@ -39,7 +39,6 @@ pub fn router() -> Router<AppState> {
         // Org
         .route("/org", get(get_org).patch(patch_org))
         // Audit
-        .route("/audit-logs",        get(audit_logs))
         .route("/export/audit-logs", get(export_audit_logs))
 }
 
@@ -225,49 +224,6 @@ async fn patch_org(
 }
 
 // ── Audit ─────────────────────────────────────────────────────────────────────
-
-async fn audit_logs(_auth: AuthUser, State(state): State<AppState>) -> Json<serde_json::Value> {
-    if let Some(db) = state.db.as_ref() {
-        let rows = sqlx::query(
-            "SELECT id, actor, credential_id, action, detail, outcome, \
-                    created_at::text AS created_at \
-             FROM audit_logs ORDER BY created_at DESC LIMIT 50",
-        )
-        .fetch_all(db)
-        .await;
-
-        if let Ok(rows) = rows {
-            let logs: Vec<serde_json::Value> = rows
-                .iter()
-                .filter_map(|r| {
-                    let id: uuid::Uuid = r.try_get("id").ok()?;
-                    let actor: String = r.try_get("actor").ok()?;
-                    let credential_id: Option<uuid::Uuid> =
-                        r.try_get("credential_id").ok().flatten();
-                    let action: String = r.try_get("action").ok()?;
-                    let detail: serde_json::Value =
-                        r.try_get("detail").ok().unwrap_or(serde_json::json!({}));
-                    let outcome: String = r.try_get("outcome").ok()?;
-                    let created_at: Option<String> = r.try_get("created_at").ok().flatten();
-                    Some(serde_json::json!({
-                        "id": id,
-                        "actor": actor,
-                        "credential_id": credential_id,
-                        "action": action,
-                        "detail": detail,
-                        "outcome": outcome,
-                        "time": created_at,
-                        "type": if outcome == "success" { "success" } else { "danger" }
-                    }))
-                })
-                .collect();
-            return Json(serde_json::json!(logs));
-        }
-    }
-
-    // Fallback if no DB
-    Json(serde_json::json!([]))
-}
 
 async fn export_audit_logs(_auth: AuthUser, State(state): State<AppState>) -> impl IntoResponse {
     let mut csv = String::from("id,actor,credential_id,action,outcome,time\n");

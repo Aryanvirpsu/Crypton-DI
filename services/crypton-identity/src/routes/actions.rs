@@ -13,7 +13,7 @@ use crate::{
     state::{AppState, AuthChallenge},
 };
 
-const ALLOWED_ACTIONS: &[&str] = &["add_admin", "rotate_api_key", "export_data"];
+const ALLOWED_ACTIONS: &[&str] = &["add_admin", "rotate_api_key", "export_data", "delete_resource"];
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -101,6 +101,7 @@ struct ActionExecuteReq {
     challenge_id: Uuid,
     action: String,
     assertion: serde_json::Value,
+    resource_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -118,9 +119,19 @@ async fn action_execute(
         return Err(AppError::bad_request("invalid_action"));
     }
 
+    // delete_resource requires resource_id before consuming the challenge
+    if req.action == "delete_resource" && req.resource_id.as_deref().unwrap_or("").is_empty() {
+        return Err(AppError::bad_request("resource_id_required"));
+    }
+
     let key = action_key(req.challenge_id);
     let challenge = take_auth_challenge(&state, &key)
         .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
+
+    // Ownership guard: challenge must belong to the authenticated user
+    if challenge.user_id != auth.user_id {
+        return Err(AppError::bad_request("challenge_user_mismatch"));
+    }
 
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
         .map_err(|_| AppError::bad_request("invalid_assertion"))?;
@@ -166,17 +177,36 @@ async fn action_execute(
             "message": "Export ready",
             "download_url": "/export/audit-logs"
         }),
+        "delete_resource" => {
+            let rid = req.resource_id.as_deref().unwrap_or("");
+            serde_json::json!({
+                "message": "Resource deleted",
+                "resource_id": rid
+            })
+        }
         _ => serde_json::json!({ "message": "unknown_action" }),
     };
 
-    // Audit
+    // Audit — delete_resource uses action_executed with resource_id in metadata
+    let (audit_action, audit_detail) = if req.action == "delete_resource" {
+        (
+            "action_executed".to_string(),
+            serde_json::json!({
+                "action": "delete_resource",
+                "resource_id": req.resource_id.as_deref().unwrap_or("")
+            }),
+        )
+    } else {
+        (format!("action:{}", req.action), result.clone())
+    };
+
     audit::log_event(
         db,
         Some(auth.user_id),
         &auth.username,
         cred_uuid,
-        &format!("action:{}", req.action),
-        result.clone(),
+        &audit_action,
+        audit_detail,
         "success",
     )
     .await;

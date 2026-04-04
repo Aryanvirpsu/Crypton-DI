@@ -98,6 +98,16 @@ export default function Devices({ go, toast }) {
     fetchDevices(); // refetch
   };
 
+  const doMarkLost = async (id, name) => {
+    try {
+      await api.post(`/devices/${id}/mark-lost`, {});
+      toast(`${name} marked as lost`, "warning");
+    } catch {
+      toast("Mark lost failed", "danger");
+    }
+    fetchDevices();
+  };
+
   return (
     <AppShell active="devices" go={go}>
       {showRevoke && (
@@ -141,7 +151,7 @@ export default function Devices({ go, toast }) {
           </div>
         ) : (
           <div className="pg-in" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
-            {devices.map(d => <DeviceCard key={d.id || d.name} {...d} onRevoke={() => openRevoke(d.name, d.id)} toast={toast} />)}
+            {devices.map(d => <DeviceCard key={d.id || d.name} {...d} onRevoke={() => openRevoke(d.name, d.id)} onMarkLost={() => doMarkLost(d.id, d.name)} toast={toast} />)}
           </div>
         )}
       </div>
@@ -149,10 +159,10 @@ export default function Devices({ go, toast }) {
   );
 }
 
-function DeviceCard({ ico, name, type: dtype, status, enrolled, last, fp, onRevoke, toast }) {
+function DeviceCard({ ico, name, type: dtype, status, enrolled, last, fp, onRevoke, onMarkLost, toast }) {
   const [hov, setHov] = useState(false);
-  const ringC = status === "active" ? "var(--success)" : status === "revoked" ? "var(--danger)" : "var(--muted2)";
-  const statusC = status === "active" ? { background: "var(--s-success)", color: "var(--success)" } : status === "revoked" ? { background: "var(--s-danger)", color: "var(--danger)" } : { background: "rgba(90,85,80,.15)", color: "var(--muted)" };
+  const ringC = status === "active" ? "var(--success)" : status === "revoked" ? "var(--danger)" : status === "lost" ? "var(--warning)" : "var(--muted2)";
+  const statusC = status === "active" ? { background: "var(--s-success)", color: "var(--success)" } : status === "revoked" ? { background: "var(--s-danger)", color: "var(--danger)" } : status === "lost" ? { background: "var(--s-warning)", color: "var(--warning)" } : { background: "rgba(90,85,80,.15)", color: "var(--muted)" };
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: hov ? "var(--ink-3)" : "var(--ink-2)", padding: 28, transition: "background .25s", position: "relative", overflow: "hidden", opacity: status === "inactive" ? .75 : 1 }}>
@@ -177,6 +187,9 @@ function DeviceCard({ ico, name, type: dtype, status, enrolled, last, fp, onRevo
         ))}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {status === "active" && (
+          <button onClick={onMarkLost} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--warning)", background: "var(--s-warning)", padding: "8px 16px", border: "1px solid rgba(251,191,36,.25)", cursor: "pointer", transition: "all .25s" }}>Mark Lost</button>
+        )}
         <button onClick={onRevoke} style={{ display: "inline-flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer", transition: "all .25s" }}>Revoke</button>
       </div>
     </div>

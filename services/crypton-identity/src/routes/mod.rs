@@ -10,9 +10,11 @@ use crate::state::AppState;
 
 pub mod auth_webauthn;
 mod actions;
+mod audit_logs;
 mod devices;
 mod health;
 mod oauth;
+mod recovery;
 mod secure;
 mod stubs;
 
@@ -33,7 +35,9 @@ pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .merge(health::router())
         .merge(auth_router)
+        .merge(audit_logs::router())
         .merge(devices::router())
+        .merge(recovery::router())
         .merge(actions::router())
         .merge(secure::router())
         .merge(stubs::router())
