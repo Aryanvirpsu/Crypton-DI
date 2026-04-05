@@ -39,7 +39,6 @@ export default function AuditLogs({ go, toast }) {
         <BtnF onClick={exportCSV} style={{ padding: "8px 16px", fontSize: 9 }}>↓ Export CSV</BtnF>
       </div>
       <div className="page-body" style={{ padding: "28px 44px 60px" }}>
-        {/* Search + Filter */}
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search actor, action..."
             style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "var(--ink-3)", border: "1px solid var(--line2)", color: "var(--paper)", fontFamily: "var(--body)", fontSize: 13, outline: "none" }} />
@@ -75,7 +74,6 @@ export default function AuditLogs({ go, toast }) {
                 </div>
               ))}
             </div>
-            {/* Mobile cards */}
             <div className="audit-cards" style={{ display: "none", flexDirection: "column", gap: 8 }}>
               {filtered.map((r, i) => (
                 <div key={r.id || i} style={{ background: "var(--ink-2)", border: "1px solid var(--line)", borderLeft: `3px solid ${typeColor[r.status] || "var(--accent)"}`, padding: "14px 16px" }}>
