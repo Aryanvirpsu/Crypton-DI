@@ -74,8 +74,6 @@ async fn main() -> anyhow::Result<()> {
     .allow_origin(Any)
     .allow_methods(Any)
     .allow_headers(Any);
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
     let app = Router::new()
         // Gateway's own health endpoint — does NOT proxy to identity
