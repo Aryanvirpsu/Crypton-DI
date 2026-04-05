@@ -23,11 +23,9 @@ export default function ProtectedActions({ go, toast }) {
     setModal(m => ({ ...m, phase: "signing" }));
 
     try {
-      // 1. Get challenge
       const start = await api.post("/actions/challenge", { action: action.id });
       const pk = start.publicKey;
 
-      // 2. WebAuthn assertion
       const getOpts = {
         ...pk,
         challenge: fromB64url(pk.challenge),
@@ -35,7 +33,6 @@ export default function ProtectedActions({ go, toast }) {
       };
       const assertion = await navigator.credentials.get({ publicKey: getOpts });
 
-      // 3. Execute
       const result = await api.post("/actions/execute", {
         challenge_id: start.challenge_id,
         action: action.id,
@@ -66,7 +63,6 @@ export default function ProtectedActions({ go, toast }) {
   };
 
   const handleDownload = () => {
-    // Trigger CSV download for export_data
     const tok = getToken();
     fetch("/export/audit-logs", { headers: { Authorization: `Bearer ${tok}` } })
       .then(r => r.blob())
@@ -82,7 +78,6 @@ export default function ProtectedActions({ go, toast }) {
 
   return (
     <AppShell active="actions" go={go}>
-      {/* Modal */}
       {modal && (
         <div onClick={e => { if (e.target === e.currentTarget && modal.phase !== "signing") setModal(null); }} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.88)", backdropFilter: "blur(14px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="modal-anim" style={{ background: "var(--ink-2)", border: "1px solid var(--line2)", padding: 48, maxWidth: 480, width: "90%", position: "relative" }}>
@@ -122,7 +117,6 @@ export default function ProtectedActions({ go, toast }) {
                   <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 8 }}>Action Complete</div>
                   <div style={{ fontSize: 13, color: "var(--success)", fontWeight: 500 }}>{modal.result?.message || "Success"}</div>
                 </div>
-                {/* Action-specific result display */}
                 {modal.action.id === "rotate_api_key" && modal.result?.api_key && (
                   <div style={{ background: "var(--ink-3)", border: "1px solid var(--line)", padding: 16, marginBottom: 20 }}>
                     <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 8, letterSpacing: ".08em", textTransform: "uppercase" }}>New API Key</div>
