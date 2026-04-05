@@ -18,20 +18,17 @@ function formatRelativeTime(isoString) {
   return `${days}d ago`;
 }
 
-/** Parse user-agent string to extract OS and browser name */
 function parseUserAgent(ua) {
   if (!ua || ua === 'unknown') return { os: 'Device', browser: '' };
   const ua_lower = ua.toLowerCase();
   
-  // Detect OS
   let os = 'Device';
   if (ua_lower.includes('mac')) os = ua_lower.includes('iphone') ? 'iPhone' : ua_lower.includes('ipad') ? 'iPad' : 'macOS';
   else if (ua_lower.includes('win')) os = 'Windows';
   else if (ua_lower.includes('linux')) os = ua_lower.includes('android') ? 'Android' : 'Linux';
   else if (ua_lower.includes('iphone')) os = 'iPhone';
   else if (ua_lower.includes('ipad')) os = 'iPad';
-  
-  // Detect browser
+
   let browser = '';
   if (ua_lower.includes('safari') && !ua_lower.includes('chrome')) browser = 'Safari';
   else if (ua_lower.includes('chrome')) browser = 'Chrome';
@@ -95,7 +92,7 @@ export default function Devices({ go, toast }) {
     } catch {
       toast("Revoke failed", "danger");
     }
-    fetchDevices(); // refetch
+    fetchDevices(); 
   };
 
   const doMarkLost = async (id, name) => {
@@ -114,7 +111,7 @@ export default function Devices({ go, toast }) {
         <div onClick={e => { if (e.target === e.currentTarget) closeRevoke(); }} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.88)", backdropFilter: "blur(14px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="modal-anim" style={{ background: "var(--ink-2)", border: "1px solid var(--line2)", padding: 48, maxWidth: 440, width: "90%", position: "relative" }}>
             <button onClick={closeRevoke} style={{ position: "absolute", top: 18, right: 18, background: "none", border: "none", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 16, cursor: "pointer" }}>×</button>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Destructive Action</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>
             <h3 style={{ fontFamily: "var(--display)", fontSize: 44, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 14 }}>Revoke<br />Device?</h3>
             <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, marginBottom: 24, fontWeight: 300 }}>This device will lose all access immediately. Cannot be undone without re-enrollment.</p>
             <div style={{ background: "var(--s-danger)", border: "1px solid rgba(248,113,113,.2)", padding: 14, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".06em", color: "var(--danger)", marginBottom: 24 }}>⚠ DEVICE BLOCKED WITHIN 500MS OF CONFIRMATION</div>
