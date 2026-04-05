@@ -10,17 +10,25 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use crate::{routes, state::AppState};
 
 pub fn app(state: AppState) -> Router {
-    let cors_origin: HeaderValue = state
-        .cors_origin
-        .parse()
-        .expect("WEBAUTHN_ORIGIN is not a valid HTTP header value");
+    let allowed_origins = [
+        "https://crypton-di-s2ay.vercel.app",
+        "https://crypton-di.vercel.app",
+        "https://app.cryptonid.tech",
+        "https://cryptonid.tech",
+        "https://auth.cryptonid.tech",
+    ];
+
+    let origins: Vec<HeaderValue> = allowed_origins
+        .iter()
+        .map(|o| o.parse().expect("invalid CORS origin"))
+        .collect();
 
     let cors = CorsLayer::new()
-        .allow_origin(cors_origin)
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
+        .allow_origin(origins)
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH, Method::OPTIONS])
         .allow_headers([CONTENT_TYPE, AUTHORIZATION]);
 
-    Router::<AppState>::new()
+    Router::new()
         .merge(routes::router())
         .with_state(state)
         .layer(cors)
