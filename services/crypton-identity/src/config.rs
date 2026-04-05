@@ -6,12 +6,15 @@ pub struct Config {
     pub database_url: Option<String>,
     pub redis_url: Option<String>,
 
-    // WebAuthn – required for Week 3+
+    // WebAuthn
     pub webauthn_rp_id: String,
     pub webauthn_origin: String,
     pub webauthn_rp_name: String,
 
-    // JWT – required for Week 3+
+    // Frontend / CORS
+    pub cors_origin: String,
+
+    // JWT
     pub jwt_secret: String,
 }
 
@@ -33,6 +36,9 @@ impl Config {
         let webauthn_rp_name = env::var("WEBAUTHN_RP_NAME")
             .map_err(|_| anyhow::anyhow!("WEBAUTHN_RP_NAME is required"))?;
 
+        let cors_origin = env::var("CORS_ORIGIN")
+            .map_err(|_| anyhow::anyhow!("CORS_ORIGIN is required"))?;
+
         let jwt_secret = env::var("JWT_SECRET")
             .map_err(|_| anyhow::anyhow!("JWT_SECRET is required"))?;
 
@@ -43,6 +49,7 @@ impl Config {
             webauthn_rp_id,
             webauthn_origin,
             webauthn_rp_name,
+            cors_origin,
             jwt_secret,
         })
     }
