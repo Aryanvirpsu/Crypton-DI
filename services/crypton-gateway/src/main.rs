@@ -18,14 +18,14 @@
 use axum::{
     body::Body,
     extract::State,
-    http::{Request, Response, StatusCode},
+    http::{header, Method, Request, Response, StatusCode},
     routing::get,
     Router,
 };
 use bytes::Bytes;
 use reqwest::Client;
 use std::sync::Arc;
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -63,12 +63,22 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let state = Arc::new(GatewayState {
-    client: Client::builder()
-        .no_proxy()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?,
-    identity_base,
-});
+        client: Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?,
+        identity_base,
+    });
+
+    let cors = CorsLayer::new()
+        .allow_origin([
+            "https://crypton-di-s2ay.vercel.app".parse().unwrap(),
+            "https://crypton-di.vercel.app".parse().unwrap(),
+            "https://app.cryptonid.tech".parse().unwrap(),
+            "https://cryptonid.tech".parse().unwrap(),
+        ])
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
     let app = Router::new()
         // Gateway's own health endpoint — does NOT proxy to identity
@@ -76,6 +86,7 @@ async fn main() -> anyhow::Result<()> {
         // Everything else is forwarded transparently
         .fallback(proxy_handler)
         .with_state(state)
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
