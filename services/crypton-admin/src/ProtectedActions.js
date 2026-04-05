@@ -85,7 +85,7 @@ export default function ProtectedActions({ go, toast }) {
 
             {modal.phase === "confirm" && (
               <>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}></div>
                 <h3 style={{ fontFamily: "var(--display)", fontSize: 36, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 14 }}>{modal.action.label}</h3>
                 <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, marginBottom: 24, fontWeight: 300 }}>This action requires cryptographic verification with your trusted device.</p>
                 <div style={{ background: "var(--accent-dim)", border: "1px solid rgba(200,245,90,.2)", padding: 16, marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
@@ -167,7 +167,7 @@ export default function ProtectedActions({ go, toast }) {
       </div>
 
       <div className="page-body" style={{ padding: "36px 44px 60px" }}>
-        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 20, letterSpacing: ".06em" }}>// Each action requires cryptographic verification with your enrolled device</div>
+        <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 20, letterSpacing: ".06em" }}>Each action requires cryptographic verification with your enrolled device</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
           {ACTIONS.map(a => (
             <ActionCard key={a.id} action={a} onClick={() => startAction(a)} />
