@@ -25,7 +25,7 @@ use axum::{
 use bytes::Bytes;
 use reqwest::Client;
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{cors::{Any, CorsLayer}, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -70,13 +70,10 @@ async fn main() -> anyhow::Result<()> {
         identity_base,
     });
 
-    let cors = CorsLayer::new()
-        .allow_origin([
-            "https://crypton-di-s2ay.vercel.app".parse().unwrap(),
-            "https://crypton-di.vercel.app".parse().unwrap(),
-            "https://app.cryptonid.tech".parse().unwrap(),
-            "https://cryptonid.tech".parse().unwrap(),
-        ])
+   let cors = CorsLayer::new()
+    .allow_origin(Any)
+    .allow_methods(Any)
+    .allow_headers(Any);
         .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
