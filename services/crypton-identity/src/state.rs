@@ -69,7 +69,7 @@ impl AppState {
             redis,
             webauthn,
             jwt_secret: cfg.jwt_secret.clone(),
-            cors_origin: cfg.webauthn_origin.clone(),
+            cors_origin: cfg.cors_origin.clone(),
             reg_challenges: Arc::new(Mutex::new(HashMap::new())),
             auth_challenges: Arc::new(Mutex::new(HashMap::new())),
         })
