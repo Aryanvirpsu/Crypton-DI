@@ -665,7 +665,13 @@ function useSphereIntro() {
 
   return { canvasRef, introRef, heroRef, navRef };
 }
+const AUTH_UI_ORIGIN = "https://app.cryptonid.tech";
 
+function redirectToAuthUi(page) {
+  const path = PAGE_TO_PATH[page] || "/";
+  const url = `${AUTH_UI_ORIGIN}${path}${window.location.search || ""}`;
+  window.location.assign(url);
+}
 
 function Landing({ go, toast, openSim }) {
   useReveal([]);
@@ -2078,18 +2084,22 @@ export default function App() {
   };
 
   const go = useCallback(id => {
-    if (PROTECTED_PAGES.has(id) && !getToken()) {
-      const path = PAGE_TO_PATH["login"] || "/login";
-      window.history.pushState({ page: "login" }, "", path);
-      setPage("login");
-      return;
-    }
-    const path = PAGE_TO_PATH[id] || "/";
-    window.history.pushState({ page: id }, "", path);
-    setPage(id);
-    window.scrollTo({ top: 0 });
-  }, []);
+  if (id === "login" || id === "register") {
+    redirectToAuthUi(id);
+    return;
+  }
 
+  if (PROTECTED_PAGES.has(id) && !getToken()) {
+    redirectToAuthUi("login");
+    return;
+  }
+
+  const path = PAGE_TO_PATH[id] || "/";
+  window.history.pushState({ page: id }, "", path);
+  setPage(id);
+  window.scrollTo({ top: 0 });
+}, []);
+   
   useEffect(() => {
     /* Disable browser scroll restoration so reload always starts at top */
     if ("scrollRestoration" in window.history) {
@@ -2109,11 +2119,16 @@ export default function App() {
     }
     // Guard on initial load
     const initialPage = getPageFromPath();
-    if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
-      const path = PAGE_TO_PATH["login"] || "/login";
-      window.history.replaceState({ page: "login" }, "", path);
-      setPage("login");
-    }
+
+if ((initialPage === "login" || initialPage === "register") && window.location.hostname !== "app.cryptonid.tech") {
+  redirectToAuthUi(initialPage);
+  return;
+}
+
+if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
+  redirectToAuthUi("login");
+  return;
+}
     setAuthReady(true);
   }, []);
 
