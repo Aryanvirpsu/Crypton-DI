@@ -6,15 +6,15 @@ pub struct Config {
     pub database_url: Option<String>,
     pub redis_url: Option<String>,
 
-    // WebAuthn
+    // WebAuthn – required for Week 3+
     pub webauthn_rp_id: String,
     pub webauthn_origin: String,
     pub webauthn_rp_name: String,
 
-    // Frontend / CORS
+    // Frontend CORS origin
     pub cors_origin: String,
 
-    // JWT
+    // JWT – required for Week 3+
     pub jwt_secret: String,
 }
 
