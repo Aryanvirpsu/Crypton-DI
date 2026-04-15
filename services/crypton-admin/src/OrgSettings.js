@@ -42,8 +42,10 @@ export default function OrgSettings({ go, toast }) {
         sessionTimeoutHours: sessionTimeout,
         allowedCountries: countries,
       });
-    } catch {}
-    toast("Organization settings saved", "success");
+      toast("Organization settings saved", "success");
+    } catch (err) {
+      toast(err?.message || "Failed to save settings", "danger");
+    }
   };
 
   const verifyDomain = () => { setDomainVerified(true); toast(`Domain ${domain} verified ✓`, "success"); };

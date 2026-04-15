@@ -26,15 +26,23 @@ export default function Sessions({ go, toast }) {
   }, []);
 
   const kill = async id => {
-    try { await api.del(`/sessions/${id}`); } catch {}
-    setSessions(s => s.filter(x => x.id !== id));
-    toast("Session terminated immediately", "danger");
+    try {
+      await api.del(`/sessions/${id}`);
+      setSessions(s => s.filter(x => x.id !== id));
+      toast("Session terminated immediately", "danger");
+    } catch (err) {
+      toast(err?.message || "Failed to terminate session", "danger");
+    }
   };
 
   const killAll = async () => {
-    try { await api.del("/sessions"); } catch {}
-    setSessions([]);
-    toast("All sessions terminated — users signed out", "danger");
+    try {
+      await api.del("/sessions");
+      setSessions([]);
+      toast("All sessions terminated — users signed out", "danger");
+    } catch (err) {
+      toast(err?.message || "Failed to terminate all sessions", "danger");
+    }
   };
 
   return (

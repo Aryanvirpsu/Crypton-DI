@@ -91,8 +91,8 @@ export default function Devices({ go, toast }) {
     try {
       if (revTargetId) await crypton.devices.revoke(revTargetId);
       toast("Device revoked — access blocked", "danger");
-    } catch {
-      toast("Revoke failed", "danger");
+    } catch (err) {
+      toast(err?.message || "Revoke failed", "danger");
     }
     fetchDevices(); // refetch
   };
@@ -101,8 +101,8 @@ export default function Devices({ go, toast }) {
     try {
       await crypton.devices.markLost(id);
       toast(`${name} marked as lost`, "warning");
-    } catch {
-      toast("Mark lost failed", "danger");
+    } catch (err) {
+      toast(err?.message || "Mark lost failed", "danger");
     }
     fetchDevices();
   };

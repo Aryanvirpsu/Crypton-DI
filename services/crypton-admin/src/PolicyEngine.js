@@ -19,9 +19,13 @@ export default function PolicyEngine({ go, toast }) {
   const toggle = async id => {
     const pol = policies.find(x => x.id === id);
     const newActive = !pol.active;
-    try { await api.patch(`/policies/${id}`, { active: newActive }); } catch {}
-    setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
-    toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    try {
+      await api.patch(`/policies/${id}`, { active: newActive });
+      setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
+      toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    } catch (err) {
+      toast(err?.message || "Failed to update policy", "danger");
+    }
   };
 
   const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)", other: "var(--muted)" };

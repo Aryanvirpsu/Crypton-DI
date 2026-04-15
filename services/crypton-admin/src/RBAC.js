@@ -31,10 +31,14 @@ export default function RBAC({ go, toast }) {
   }, []);
 
   const changeRole = async (id, newRole) => {
-    try { await api.patch(`/users/${id}/role`, { role: newRole }); } catch {}
-    setUsers(u => u.map(x => x.id === id ? { ...x, role: newRole } : x));
-    toast(`Role updated to ${newRole}`, "success");
-    setSelectedUser(null);
+    try {
+      await api.patch(`/users/${id}/role`, { role: newRole });
+      setUsers(u => u.map(x => x.id === id ? { ...x, role: newRole } : x));
+      toast(`Role updated to ${newRole}`, "success");
+      setSelectedUser(null);
+    } catch (err) {
+      toast(err?.message || "Failed to update role", "danger");
+    }
   };
 
   return (
