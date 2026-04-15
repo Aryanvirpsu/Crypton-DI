@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { AuthContext } from './AuthContext';
 import Devices from "./Devices";
 import AuditLogs from "./AuditLogs";
-import { getToken, setToken, clearToken, parseJwt, PROTECTED_PAGES, _authRef } from './auth';
+import { getToken, setToken, clearToken, parseJwt, getValidToken, PROTECTED_PAGES, _authRef } from './auth';
 import { api } from './api';
 import { PAGE_TO_PATH, getPageFromPath } from './routes';
 import { PAGE_LABELS } from './constants';
@@ -63,11 +63,11 @@ function ToastStack({ toasts }) {
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
-  const [authUser, setAuthUser] = useState(() => { const t = getToken(); return t ? parseJwt(t) : null; });
+  const [authUser, setAuthUser] = useState(() => { const t = getValidToken(); return t ? parseJwt(t) : null; });
   const [authReady, setAuthReady] = useState(false);
 
   const go = useCallback(id => {
-    if (PROTECTED_PAGES.has(id) && !getToken()) {
+    if (PROTECTED_PAGES.has(id) && !getValidToken()) {
       const path = PAGE_TO_PATH["login"] || "/login";
       window.history.pushState({ page: "login" }, "", path);
       setPage("login");
@@ -81,18 +81,10 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    const tok = getToken();
-    if (tok) {
-      const parsed = parseJwt(tok);
-      if (parsed && parsed.exp && parsed.exp * 1000 > Date.now()) {
-        setAuthUser(parsed);
-      } else {
-        clearToken();
-        setAuthUser(null);
-      }
-    }
+    const valid = getValidToken(); // null if missing or expired; also auto-clears stale token
+    setAuthUser(valid ? parseJwt(valid) : null);
     const initialPage = getPageFromPath();
-    if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
+    if (PROTECTED_PAGES.has(initialPage) && !valid) {
       const path = PAGE_TO_PATH["login"] || "/login";
       window.history.replaceState({ page: "login" }, "", path);
       setPage("login");
@@ -101,7 +93,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onPop = () => setPage(getPageFromPath());
+    const onPop = () => {
+      const nextPage = getPageFromPath();
+      if (PROTECTED_PAGES.has(nextPage) && !getValidToken()) {
+        const path = PAGE_TO_PATH["login"] || "/login";
+        window.history.replaceState({ page: "login" }, "", path);
+        setPage("login");
+        return;
+      }
+      setPage(nextPage);
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
