@@ -87,7 +87,7 @@ export const MOCK_POLICIES = [
 ];
 
 export const PAGE_LABELS = {
-  dashboard: "Dashboard", devices: "Devices", actions: "Protected Actions",
+  dashboard: "Dashboard", devices: "Devices",
   auditlogs: "Audit Logs", rbac: "Users & Roles", recovery: "Recovery",
   risk: "Risk Intelligence", sessions: "Sessions", admin: "Admin",
   policy: "Policy Engine", orgsettings: "Org Settings",
