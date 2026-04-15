@@ -10,6 +10,7 @@ import AppShell from './AppShell';
 import { BtnF, BtnO } from './Buttons';
 import { useToasts } from './hooks';
 import Login from './Login';
+import Register from './Register';
 import Recovery from './Recovery';
 import Admin from './Admin';
 import RiskIntel from './RiskIntel';
@@ -63,7 +64,10 @@ function ToastStack({ toasts }) {
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
-  const [authUser, setAuthUser] = useState(() => { const t = getToken(); return t ? parseJwt(t) : null; });
+  const [authUser, setAuthUser] = useState(() => {
+    const t = getToken();
+    return t ? parseJwt(t) : null;
+  });
   const [authReady, setAuthReady] = useState(false);
 
   const go = useCallback(id => {
@@ -112,7 +116,7 @@ export default function App() {
     import('./sdk').then(({ crypton }) => crypton.auth.logout()).catch(() => {});
     clearToken();
     setAuthUser(null);
-    window.location.href = MAIN_URL; // Redirect to marketing site on logout
+    window.location.href = MAIN_URL;
   }, []);
 
   _authRef.logout = logout;
@@ -120,7 +124,7 @@ export default function App() {
 
   useEffect(() => {
     setTimeout(() => toast("CRYPTON ADMIN — Systems operational.", "info"), 800);
-  }, []);
+  }, [toast]);
 
   const authCtx = useMemo(() => ({ authUser, authReady, logout }), [authUser, authReady, logout]);
 
@@ -129,18 +133,21 @@ export default function App() {
       <FontLink />
       <div className="grain" />
       <ToastStack toasts={toasts} />
+
       {page === "login"      && <Login go={go} toast={toast} />}
+      {page === "register"   && <Register go={go} toast={toast} />}
+
       {authReady && (
         <>
-          {page === "admin"      && <Admin go={go} toast={toast} />}
-          {page === "auditlogs"  && <AuditLogs go={go} toast={toast} />}
-          {page === "devices"    && <Devices go={go} toast={toast} />}
-          {page === "sessions"   && <Sessions go={go} toast={toast} />}
-          {page === "recovery"   && <Recovery go={go} toast={toast} />}
-          {page === "rbac"       && <RBAC go={go} toast={toast} />}
-          {page === "policy"     && <PolicyEngine go={go} toast={toast} />}
-          {page === "risk"       && <RiskIntel go={go} toast={toast} />}
-          {page === "orgsettings"&& <OrgSettings go={go} toast={toast} />}
+          {page === "admin"       && <Admin go={go} toast={toast} />}
+          {page === "auditlogs"   && <AuditLogs go={go} toast={toast} />}
+          {page === "devices"     && <Devices go={go} toast={toast} />}
+          {page === "sessions"    && <Sessions go={go} toast={toast} />}
+          {page === "recovery"    && <Recovery go={go} toast={toast} />}
+          {page === "rbac"        && <RBAC go={go} toast={toast} />}
+          {page === "policy"      && <PolicyEngine go={go} toast={toast} />}
+          {page === "risk"        && <RiskIntel go={go} toast={toast} />}
+          {page === "orgsettings" && <OrgSettings go={go} toast={toast} />}
         </>
       )}
     </AuthContext.Provider>
