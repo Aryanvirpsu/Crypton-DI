@@ -1,10 +1,11 @@
 import { PAGE_LABELS } from './constants';
 import { useAuth } from './AuthContext';
+import { MAIN_URL, DEMO_URL } from './config';
 
 function Breadcrumb({ page, go }) {
   return (
     <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted2)", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-      <button onClick={() => go("landing")} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", padding: 0, transition: "color .2s" }}
+      <button onClick={() => window.location.href = MAIN_URL} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", color: "var(--muted)", padding: 0, transition: "color .2s" }}
         onMouseEnter={e => e.target.style.color = "var(--accent)"} onMouseLeave={e => e.target.style.color = "var(--muted)"}>CRYPTON</button>
       <span>/</span>
       <span style={{ color: "var(--paper)" }}>{PAGE_LABELS[page] || page}</span>
@@ -15,20 +16,19 @@ function Breadcrumb({ page, go }) {
 function Sidebar({ active, go }) {
   const { authUser, logout } = useAuth();
 
+  // crypton-admin nav — operator/security surfaces ONLY
   const navItems = [
-    { id: "dashboard", ico: "◈", label: "Dashboard" },
-    { id: "devices",   ico: "📱", label: "Devices" },
-    { id: "actions",   ico: "⚡", label: "Protected Actions" },
-    { id: "auditlogs", ico: "📋", label: "Audit Logs" },
-    { id: "rbac",      ico: "👥", label: "Users & Roles" },
+    { id: "admin",       ico: "⚙",  label: "Admin Overview" },
+    { id: "devices",     ico: "📱", label: "Devices" },
+    { id: "auditlogs",   ico: "📋", label: "Audit Logs" },
+    { id: "rbac",        ico: "👥", label: "Users & Roles" },
   ];
   const secItems = [
-    { id: "recovery", ico: "🔒", label: "Recovery" },
-    { id: "risk",     ico: "🛡", label: "Risk Intel" },
-    { id: "sessions", ico: "👁", label: "Sessions" },
+    { id: "recovery",    ico: "🔒", label: "Recovery" },
+    { id: "risk",        ico: "🛡", label: "Risk Intel" },
+    { id: "sessions",    ico: "👁", label: "Sessions" },
   ];
-  const adminItems = [
-    { id: "admin",       ico: "⚙",  label: "Admin" },
+  const configItems = [
     { id: "policy",      ico: "📜", label: "Policy Engine" },
     { id: "orgsettings", ico: "🏢", label: "Org Settings" },
   ];
@@ -55,25 +55,34 @@ function Sidebar({ active, go }) {
   return (
     <aside style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", overflowX: "hidden" }}>
       <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: "pointer" }} onClick={() => go("landing")}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: "pointer" }} onClick={() => window.location.href = MAIN_URL}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
           <span className="sb-mark" style={{ fontFamily: "var(--display)", fontSize: 16, letterSpacing: ".12em" }}>CRYPTON</span>
         </div>
-        <button onClick={() => go("landing")} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "rgba(255,255,255,.03)", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, background .2s" }}
+        <a href={MAIN_URL} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "rgba(255,255,255,.03)", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, background .2s", textDecoration: "none" }}
           onMouseEnter={e => { e.currentTarget.style.color = "var(--paper)"; e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "rgba(255,255,255,.03)"; }}>
           <span style={{ fontSize: 10 }}>←</span>
-          <span className="si-label">Back to Home</span>
-        </button>
+          <span className="si-label">Marketing Site</span>
+        </a>
       </div>
 
       <nav style={{ padding: "16px 12px", flex: 1 }}>
-        {sectionLabel("Main")}
+        {sectionLabel("Overview")}
         {navItems.map(navBtn)}
         {sectionLabel("Security", { marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 })}
         {secItems.map(navBtn)}
-        {sectionLabel("Admin", { marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 })}
-        {adminItems.map(navBtn)}
+        {sectionLabel("Config", { marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 })}
+        {configItems.map(navBtn)}
+        {/* Cross-link to demo app */}
+        <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          {sectionLabel("Demo")}
+          <a href={DEMO_URL} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", textDecoration: "none", fontFamily: "var(--body)" }}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>
+            <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>⚡</span>
+            <span className="si-label">Demo App →</span>
+          </a>
+        </div>
       </nav>
 
       <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
@@ -97,11 +106,11 @@ function Sidebar({ active, go }) {
 
 function BottomTabBar({ active, go }) {
   const tabs = [
-    { id: "dashboard", ico: "◈", label: "Home" },
+    { id: "admin",     ico: "⚙",  label: "Admin" },
     { id: "devices",   ico: "📱", label: "Devices" },
     { id: "auditlogs", ico: "📋", label: "Logs" },
+    { id: "sessions",  ico: "👁", label: "Sessions" },
     { id: "risk",      ico: "🛡", label: "Risk" },
-    { id: "admin",     ico: "⚙",  label: "Admin" },
   ];
   return (
     <div className="bottom-tabs">

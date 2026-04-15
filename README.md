@@ -1,70 +1,61 @@
-# Getting Started with Create React App
+# Crypton Monorepo
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Zero-trust hardware device identity and authentication infrastructure.
 
-## Available Scripts
+## System Architecture
 
-In the project directory, you can run:
+The monorepo is divided into specialized product surfaces to ensure clear ownership and separation of concerns.
 
-### `npm start`
+### Services (`/services`)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. **`crypton-id`** (formerly `crypton-identity`)
+   - **Role**: Backend Trust Engine.
+   - **Stack**: Rust (Axum), Redis, PostgreSQL.
+   - **Key Logic**: Nonce generation, cryptographic signature verification, JWT issuance, session management.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+2. **`crypton-main`**
+   - **Role**: Public Marketing Surface.
+   - **Key Logic**: Product orientation, sphere engine visualization, attack simulator, lead generation.
+   - **CTAs**: Routes users to the Demo app for enrollment or the Admin panel for operators.
 
-### `npm test`
+3. **`crypton-demo`** (formerly `demo-site`)
+   - **Role**: Third-party SaaS Demo.
+   - **Key Logic**: "Vault" SaaS application logic, integration with Crypton SDK for device enrollment and passkey flows.
+   - **User Story**: A developer or customer uses this app to experience how Crypton feels in a real product.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+4. **`crypton-admin`**
+   - **Role**: Internal Operator Panel.
+   - **Key Logic**: Audit logs, security policy configuration, session revocation, risk intelligence.
+   - **User Story**: A security engineer or admin uses this to manage the Crypton infrastructure.
 
-### `npm run build`
+5. **`crypton-gateway`**
+   - **Role**: API Gateway / Proxy.
+   - **Port**: `8090` (Default).
+   - **Key Logic**: Handles CORS, request forwarding, and high-level routing.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Development Setup
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Ports (Standard Config)
+- `crypton-main`: `3000`
+- `crypton-demo`: `3001`
+- `crypton-admin`: `3002`
+- `crypton-gateway`: `8090`
+- `crypton-id`: `8080`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Quick Start (Recommended)
+Use the unified scripts in the root directory:
+```powershell
+# Start everything (Local Auth/WebAuthn)
+.\start-all.ps1 -LocalOnly
 
-### `npm run eject`
+# Check system health
+.\status.ps1
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# Stop all services
+.\stop-all.ps1
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+For more details on the architecture and manual startup, see [DEV_STATUS.md](./DEV_STATUS.md).
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Design Philosophy
+Crypton follows an **SDK-First** approach. The identity infrastructure (`crypton-id`) is decoupled from the product UI. The demo app is the gold-standard implementation of the SDK.

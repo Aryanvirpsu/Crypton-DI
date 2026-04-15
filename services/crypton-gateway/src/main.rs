@@ -51,9 +51,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let port: u16 = std::env::var("APP_PORT")
+        .or_else(|_| std::env::var("PORT"))
         .unwrap_or_else(|_| "8090".to_string())
         .parse()
-        .map_err(|_| anyhow::anyhow!("APP_PORT must be a valid port number"))?;
+        .map_err(|_| anyhow::anyhow!("APP_PORT (or PORT) must be a valid port number"))?;
 
     let identity_base = std::env::var("IDENTITY_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());

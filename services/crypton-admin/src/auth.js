@@ -1,15 +1,21 @@
-export const TOKEN_KEY = "crypton_token";
-export const getToken  = () => localStorage.getItem(TOKEN_KEY);
-export const setToken  = (t) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+import {
+  getSessionToken,
+  setSessionToken,
+  clearSessionToken,
+  parseJwt,
+  TOKEN_KEY as SESSION_TOKEN_KEY
+} from './sdk/session';
 
-export function parseJwt(token) {
-  try { return JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); } catch { return null; }
-}
+export const getToken = getSessionToken;
+export const setToken = setSessionToken;
+export const clearToken = clearSessionToken;
+export { parseJwt };
+export const TOKEN_KEY = SESSION_TOKEN_KEY;
 
+// Admin protected surfaces — only operator panel routes
 export const PROTECTED_PAGES = new Set([
-  "dashboard","devices","auditlogs","rbac","recovery","risk",
-  "sessions","admin","policy","orgsettings","actions",
+  "admin","devices","auditlogs","rbac","recovery","risk",
+  "sessions","policy","orgsettings",
 ]);
 
 // Module-level auth ref — lets api/webauthn update App auth state without prop-drilling

@@ -14,7 +14,7 @@ yarn-error.log*
 # CRA build output
 /build
 /coverage
-services/crypton-admin/build/
+services/*/build/
 
 # ── Environment / Secrets ─────────────────────────────
 .env
@@ -38,3 +38,19 @@ Thumbs.db
 # ── Claude local ──────────────────────────────────────
 .claude/settings.local.json
 .claude/worktrees/
+.claude/launch.json
+.agents/
+.run/
+skills-lock.json
+
+# ── Dev credentials ───────────────────────────────────
+dev.env
+
+# ── Binary docs ───────────────────────────────────────
+*.docx
+
+# ── Build logs ────────────────────────────────────────
+services/*/build*.log
+
+# ── Demo internal ─────────────────────────────────────
+.demo/
