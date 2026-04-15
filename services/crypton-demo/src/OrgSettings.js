@@ -1,34 +1,38 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from './api';
 import { getAdminToken } from './auth';
-import { MOCK_ORG } from './constants';
 import { BtnF } from './Buttons';
 import AppShell from './AppShell';
 
 export default function OrgSettings({ go, toast }) {
-  const [orgName, setOrgName] = useState(MOCK_ORG.orgName);
-  const [domain, setDomain] = useState(MOCK_ORG.domain);
-  const [mfa, setMfa] = useState(MOCK_ORG.mfaEnforced);
-  const [sessionTimeout, setSessionTimeout] = useState(MOCK_ORG.sessionTimeoutHours);
-  const [countries, setCountries] = useState(MOCK_ORG.allowedCountries);
-  const [domainVerified, setDomainVerified] = useState(MOCK_ORG.domainVerified);
+  const [orgName, setOrgName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [mfa, setMfa] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState(8);
+  const [countries, setCountries] = useState([]);
+  const [domainVerified, setDomainVerified] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const allCountries = ["US", "CA", "GB", "DE", "AU", "FR", "JP", "SG", "IN", "BR", "NL", "SE"];
 
   useEffect(() => {
-    if (!getAdminToken()) return;
-    adminApi.get("/org").then(data => {
-      if (data && typeof data === 'object') {
-        if (data.orgName || data.name) setOrgName(data.orgName || data.name);
-        if (data.domain) setDomain(data.domain);
-        if (data.mfa_required !== undefined) setMfa(data.mfa_required);
-        if (data.mfaEnforced !== undefined) setMfa(data.mfaEnforced);
-        if (data.sessionTimeoutHours !== undefined) setSessionTimeout(data.sessionTimeoutHours);
-        if (data.session_timeout_hours !== undefined) setSessionTimeout(data.session_timeout_hours);
-        if (Array.isArray(data.allowedCountries)) setCountries(data.allowedCountries);
-        else if (Array.isArray(data.allowed_countries)) setCountries(data.allowed_countries);
-        if (data.domainVerified !== undefined) setDomainVerified(data.domainVerified);
-      }
-    }).catch(() => {});
+    if (!getAdminToken()) { setLoading(false); return; }
+    adminApi.get("/org")
+      .then(data => {
+        if (data && typeof data === 'object') {
+          if (data.orgName || data.name) setOrgName(data.orgName || data.name);
+          if (data.domain) setDomain(data.domain);
+          if (data.mfa_required !== undefined) setMfa(data.mfa_required);
+          if (data.mfaEnforced !== undefined) setMfa(data.mfaEnforced);
+          if (data.sessionTimeoutHours !== undefined) setSessionTimeout(data.sessionTimeoutHours);
+          if (data.session_timeout_hours !== undefined) setSessionTimeout(data.session_timeout_hours);
+          if (Array.isArray(data.allowedCountries)) setCountries(data.allowedCountries);
+          else if (Array.isArray(data.allowed_countries)) setCountries(data.allowed_countries);
+          if (data.domainVerified !== undefined) setDomainVerified(data.domainVerified);
+        }
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const toggleCountry = c => setCountries(cs => cs.includes(c) ? cs.filter(x => x !== c) : [...cs, c]);
@@ -42,8 +46,10 @@ export default function OrgSettings({ go, toast }) {
         sessionTimeoutHours: sessionTimeout,
         allowedCountries: countries,
       });
-    } catch {}
-    toast("Organization settings saved", "success");
+      toast("Organization settings saved", "success");
+    } catch {
+      toast("Failed to save settings — try again", "danger");
+    }
   };
 
   const verifyDomain = () => { setDomainVerified(true); toast(`Domain ${domain} verified ✓`, "success"); };
@@ -55,6 +61,17 @@ export default function OrgSettings({ go, toast }) {
         <BtnF onClick={save} style={{ padding: "8px 16px", fontSize: 9 }}>Save Changes</BtnF>
       </div>
       <div style={{ padding: "28px 44px 60px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 720 }}>
+        {loading && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>Loading settings...</div>
+        )}
+        {error && (
+          <div style={{ border: "1px solid rgba(248,113,113,.2)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>Failed to Load</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Could not reach the org settings API. Check your connection and refresh.</div>
+          </div>
+        )}
+        {!loading && !error && <>
 
         {/* Identity */}
         <div style={{ background: "var(--ink-2)", border: "1px solid var(--line)", padding: "24px 26px" }}>
@@ -113,6 +130,7 @@ export default function OrgSettings({ go, toast }) {
           </div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted2)", marginTop: 14 }}>{countries.length} countries allowed · {allCountries.length - countries.length} blocked</div>
         </div>
+        </>}
       </div>
     </AppShell>
   );

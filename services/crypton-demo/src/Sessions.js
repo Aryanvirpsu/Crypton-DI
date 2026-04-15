@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from './api';
 import { getAdminToken } from './auth';
-import { MOCK_SESSIONS } from './constants';
 import AppShell from './AppShell';
 
 export default function Sessions({ go, toast }) {
-  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [sessions, setSessions] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!getAdminToken()) return;
-    adminApi.get("/sessions").then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        setSessions(data.map(s => ({
+    if (!getAdminToken()) { setLoading(false); return; }
+    adminApi.get("/sessions")
+      .then(data => {
+        setSessions(Array.isArray(data) ? data.map(s => ({
           id:       s.id,
           user:     s.user,
           device:   s.device || "Unknown",
@@ -20,21 +21,30 @@ export default function Sessions({ go, toast }) {
           started:  s.started || (s.created_at ? new Date(s.created_at).toLocaleString() : "—"),
           duration: s.duration || (s.last_active ? new Date(s.last_active).toLocaleTimeString() : "—"),
           active:   typeof s.active === 'boolean' ? s.active : s.status === "active",
-        })));
-      }
-    }).catch(() => {});
+        })) : []);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const kill = async id => {
-    try { await adminApi.del(`/sessions/${id}`); } catch {}
-    setSessions(s => s.filter(x => x.id !== id));
-    toast("Session terminated immediately", "danger");
+    try {
+      await adminApi.del(`/sessions/${id}`);
+      setSessions(s => s.filter(x => x.id !== id));
+      toast("Session terminated", "danger");
+    } catch {
+      toast("Failed to terminate session — try again", "danger");
+    }
   };
 
   const killAll = async () => {
-    try { await adminApi.del("/sessions"); } catch {}
-    setSessions([]);
-    toast("All sessions terminated — users signed out", "danger");
+    try {
+      await adminApi.del("/sessions");
+      setSessions([]);
+      toast("All sessions terminated — users signed out", "danger");
+    } catch {
+      toast("Failed to terminate all sessions — try again", "danger");
+    }
   };
 
   return (
@@ -47,6 +57,17 @@ export default function Sessions({ go, toast }) {
         <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All</button>
       </div>
       <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+        {loading && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>Loading sessions...</div>
+        )}
+        {error && (
+          <div style={{ border: "1px solid rgba(248,113,113,.2)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>Failed to Load</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Could not reach the sessions API. Check your connection and refresh.</div>
+          </div>
+        )}
+        {!loading && !error && sessions !== null && <>
         <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", marginBottom: 24 }}>
           {[
             { l: "Active Sessions",   v: sessions.filter(s => s.active).length.toString(), c: "var(--success)" },
@@ -108,6 +129,7 @@ export default function Sessions({ go, toast }) {
             ))}
           </div>
         </>)}
+        </>}
       </div>
     </AppShell>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { AuthContext } from './AuthContext';
 import { getToken, clearToken, getAdminToken, clearAdminToken, parseJwt, PROTECTED_PAGES, ADMIN_PAGES, _authRef, _adminAuthRef } from './auth';
-import { api } from './api';
+import { api, API_BASE } from './api';
 import { PAGE_TO_PATH, getPageFromPath } from './routes';
 import { PAGE_LABELS } from './constants';
 import AppShell from './AppShell';
@@ -156,7 +156,7 @@ export default function App() {
   const adminLogout = useCallback(() => {
     const tok = getAdminToken();
     if (tok) {
-      fetch('/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${tok}` } }).catch(() => {});
+      fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` } }).catch(() => {});
     }
     clearAdminToken();
     setAdminUser(null);

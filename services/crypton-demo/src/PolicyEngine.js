@@ -1,27 +1,33 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from './api';
 import { getAdminToken } from './auth';
-import { MOCK_POLICIES } from './constants';
 import AppShell from './AppShell';
 
 export default function PolicyEngine({ go, toast }) {
-  const [policies, setPolicies] = useState(MOCK_POLICIES);
+  const [policies, setPolicies] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [threshold, setThreshold] = useState(70);
   const [trustDays, setTrustDays] = useState(30);
 
   useEffect(() => {
-    if (!getAdminToken()) return;
-    adminApi.get("/policies").then(data => {
-      if (Array.isArray(data) && data.length > 0) setPolicies(data);
-    }).catch(() => {});
+    if (!getAdminToken()) { setLoading(false); return; }
+    adminApi.get("/policies")
+      .then(data => { setPolicies(Array.isArray(data) ? data : []); })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const toggle = async id => {
     const pol = policies.find(x => x.id === id);
     const newActive = !pol.active;
-    try { await adminApi.patch(`/policies/${id}`, { active: newActive }); } catch {}
-    setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
-    toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    try {
+      await adminApi.patch(`/policies/${id}`, { active: newActive });
+      setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
+      toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    } catch {
+      toast("Failed to update policy — try again", "danger");
+    }
   };
 
   const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)", other: "var(--muted)" };
@@ -34,12 +40,25 @@ export default function PolicyEngine({ go, toast }) {
           <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Policy Engine</div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Zero-trust rules · Adaptive enforcement</div>
         </div>
-        <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--success)", letterSpacing: ".06em", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 8px var(--success)" }} />
-          {policies.filter(p => p.active).length} / {policies.length} policies active
-        </div>
+        {policies !== null && (
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--success)", letterSpacing: ".06em", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", boxShadow: "0 0 8px var(--success)" }} />
+            {policies.filter(p => p.active).length} / {policies.length} policies active
+          </div>
+        )}
       </div>
       <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+        {loading && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>Loading policies...</div>
+        )}
+        {error && (
+          <div style={{ border: "1px solid rgba(248,113,113,.2)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>Failed to Load</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Could not reach the policies API. Check your connection and refresh.</div>
+          </div>
+        )}
+        {!loading && !error && policies !== null && <>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
           {[
             { label: "Risk Score Threshold", val: threshold, set: setThreshold, unit: "",      desc: "Step-up auth triggered above this score", min: 10, max: 95 },
@@ -78,6 +97,7 @@ export default function PolicyEngine({ go, toast }) {
             </div>
           </div>
         ))}
+        </>}
       </div>
     </AppShell>
   );

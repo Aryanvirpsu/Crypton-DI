@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from './api';
 import { getAdminToken } from './auth';
-import { MOCK_USERS, ROLES, ROLE_COLORS, ROLE_PERMS } from './constants';
+import { ROLES, ROLE_COLORS, ROLE_PERMS } from './constants';
 import { BtnF } from './Buttons';
 import AppShell from './AppShell';
 
@@ -14,27 +14,34 @@ const ROLE_MAP = {
 const normalizeRole = r => ROLE_MAP[r?.toLowerCase().replace(/\s+/g, "_")] || r || "Viewer";
 
 export default function RBAC({ go, toast }) {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
-    if (!getAdminToken()) return;
-    adminApi.get("/users").then(data => {
-      if (Array.isArray(data) && data.length > 0) {
-        setUsers(data.map(u => ({
+    if (!getAdminToken()) { setLoading(false); return; }
+    adminApi.get("/users")
+      .then(data => {
+        setUsers(Array.isArray(data) ? data.map(u => ({
           ...u,
           name: u.name || u.email,
           role: normalizeRole(u.role),
-        })));
-      }
-    }).catch(() => {});
+        })) : []);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   const changeRole = async (id, newRole) => {
-    try { await adminApi.patch(`/users/${id}/role`, { role: newRole }); } catch {}
-    setUsers(u => u.map(x => x.id === id ? { ...x, role: newRole } : x));
-    toast(`Role updated to ${newRole}`, "success");
-    setSelectedUser(null);
+    try {
+      await adminApi.patch(`/users/${id}/role`, { role: newRole });
+      setUsers(u => u.map(x => x.id === id ? { ...x, role: newRole } : x));
+      toast(`Role updated to ${newRole}`, "success");
+      setSelectedUser(null);
+    } catch {
+      toast("Failed to update role — try again", "danger");
+    }
   };
 
   return (
@@ -47,6 +54,17 @@ export default function RBAC({ go, toast }) {
         <BtnF onClick={() => toast("Invite flow — full implementation pending", "info")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Invite User</BtnF>
       </div>
       <div className="page-body" style={{ padding: "28px 44px 60px" }}>
+        {loading && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 11 }}>Loading users...</div>
+        )}
+        {error && (
+          <div style={{ border: "1px solid rgba(248,113,113,.2)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>Failed to Load</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>Could not reach the users API. Check your connection and refresh.</div>
+          </div>
+        )}
+        {!loading && !error && users !== null && <>
 
         {selectedUser && (
           <div onClick={() => setSelectedUser(null)} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -104,6 +122,7 @@ export default function RBAC({ go, toast }) {
             </div>
           ))}
         </div>
+        </>}
       </div>
     </AppShell>
   );

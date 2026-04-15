@@ -1,5 +1,5 @@
 import { crypton } from './sdk';
-import { _authRef, getAdminToken } from './auth';
+import { _authRef, _adminAuthRef, getAdminToken, clearAdminToken } from './auth';
 
 export const API_BASE = process.env.REACT_APP_API_BASE || "";
 
@@ -38,9 +38,21 @@ async function _adminFetch(method, path, body) {
   return json.data;
 }
 
+async function _adminWrap(promise) {
+  try {
+    return await promise;
+  } catch (err) {
+    if (err.message === "session_expired") {
+      clearAdminToken();
+      if (_adminAuthRef.logout) _adminAuthRef.logout();
+    }
+    throw err;
+  }
+}
+
 export const adminApi = {
-  get:   (path)       => _adminFetch('GET',    path),
-  post:  (path, body) => _adminFetch('POST',   path, body),
-  del:   (path)       => _adminFetch('DELETE', path),
-  patch: (path, body) => _adminFetch('PATCH',  path, body),
+  get:   (path)       => _adminWrap(_adminFetch('GET',    path)),
+  post:  (path, body) => _adminWrap(_adminFetch('POST',   path, body)),
+  del:   (path)       => _adminWrap(_adminFetch('DELETE', path)),
+  patch: (path, body) => _adminWrap(_adminFetch('PATCH',  path, body)),
 };
