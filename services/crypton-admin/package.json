@@ -4,6 +4,7 @@
   "private": true,
   "proxy": "http://127.0.0.1:8090",
   "dependencies": {
+    "@crypton/sdk": "*",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -14,6 +15,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "prestart": "npm run build:sdk",
+    "prebuild": "npm run build:sdk",
+    "build:sdk": "tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module CommonJS --moduleResolution node --outDir ../../libs/crypton-sdk/dist/cjs && tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module ESNext --moduleResolution bundler --outDir ../../libs/crypton-sdk/dist/esm",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
