@@ -18,14 +18,17 @@
 use axum::{
     body::Body,
     extract::State,
-    http::{Request, Response, StatusCode},
+    http::{Method, Request, Response, StatusCode},
     routing::get,
     Router,
 };
 use bytes::Bytes;
 use reqwest::Client;
 use std::sync::Arc;
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -50,11 +53,12 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let port: u16 = std::env::var("APP_PORT")
-        .or_else(|_| std::env::var("PORT"))
+    // Prefer Railway's PORT first
+    let port: u16 = std::env::var("PORT")
+        .or_else(|_| std::env::var("APP_PORT"))
         .unwrap_or_else(|_| "8090".to_string())
         .parse()
-        .map_err(|_| anyhow::anyhow!("APP_PORT (or PORT) must be a valid port number"))?;
+        .map_err(|_| anyhow::anyhow!("PORT (or APP_PORT) must be a valid port number"))?;
 
     let identity_base = std::env::var("IDENTITY_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
@@ -70,12 +74,31 @@ async fn main() -> anyhow::Result<()> {
             .build()?,
         identity_base,
     });
+
+    let cors = CorsLayer::new()
+        .allow_origin([
+            "https://app.cryptonid.tech".parse().unwrap(),
+            "https://demo.cryptonid.tech".parse().unwrap(),
+            "http://localhost:3000".parse().unwrap(),
+            "http://127.0.0.1:3000".parse().unwrap(),
+        ])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers(Any);
+
     let app = Router::new()
         // Gateway's own health endpoint — does NOT proxy to identity
         .route("/health", get(gateway_health))
         // Everything else is forwarded transparently
         .fallback(proxy_handler)
         .with_state(state)
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
