@@ -19,7 +19,7 @@ tracing             = "0.1"
 tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
 
 # Middleware
-tower-http  = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.6.8", features = ["trace", "cors"] }
 
 # Utilities
 anyhow      = "1"
