@@ -200,7 +200,9 @@ async fn proxy_handler(
     }
 
     resp_builder.body(Body::from(resp_body)).map_err(|e| {
+        
         tracing::error!("failed to build downstream response: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })
 }
+//
