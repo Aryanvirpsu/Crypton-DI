@@ -17,7 +17,7 @@
   "scripts": {
     "prestart": "npm run build:sdk",
     "prebuild": "npm run build:sdk",
-    "build:sdk": "tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module CommonJS --moduleResolution node --outDir ../../libs/crypton-sdk/dist/cjs && tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module ESNext --moduleResolution bundler --outDir ../../libs/crypton-sdk/dist/esm",
+    "build:sdk": "npm --prefix ../../libs/crypton-sdk install && npm --prefix ../../libs/crypton-sdk run build",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
