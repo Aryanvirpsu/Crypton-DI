@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken } from './auth';
 import { api } from './api';
-import { MOCK_DASHBOARD_STATS, MOCK_ACTIVITY } from './constants';
 import { useReveal } from './hooks';
 import { BtnF } from './Buttons';
 import AppShell from './AppShell';
@@ -47,20 +46,44 @@ function ActivityItem({ ico, t, title, meta, time, go, link }) {
 export default function Dashboard({ go, toast }) {
   const [orbIdx, setOrbIdx] = useState(0);
   const orb = ORB_DATA[orbIdx];
-  const [stats, setStats] = useState(MOCK_DASHBOARD_STATS);
-  const [activity, setActivity] = useState(MOCK_ACTIVITY);
+  // null = loading, object = loaded (may be empty)
+  const [stats, setStats] = useState(null);
+  const [activity, setActivity] = useState(null);
+  const [pageError, setPageError] = useState(null);
 
   useReveal([orbIdx]);
 
   useEffect(() => {
     if (!getToken()) return;
-    api.get("/dashboard/stats").then(data => {
-      if (data && typeof data === 'object' && 'activeDevices' in data) setStats(data);
-    }).catch(err => console.warn("Dashboard stats fetch failed, using mock:", err));
-    api.get("/dashboard/activity").then(data => {
-      if (Array.isArray(data) && data.length > 0) setActivity(data);
-    }).catch(err => console.warn("Dashboard activity fetch failed, using mock:", err));
+    api.get("/admin/dashboard/stats").then(data => {
+      if (data && typeof data === 'object') setStats(data);
+    }).catch(err => {
+      setStats({});
+      setPageError(p => p || (err?.code === "access_denied" ? "access_denied" : "load_failed"));
+    });
+    api.get("/admin/dashboard/activity").then(data => {
+      setActivity(Array.isArray(data) ? data : []);
+    }).catch(err => {
+      setActivity([]);
+      setPageError(p => p || (err?.code === "access_denied" ? "access_denied" : "load_failed"));
+    });
   }, []);
+
+  if (pageError) {
+    return (
+      <AppShell active="dashboard" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const setOrb = i => {
     setOrbIdx(i);
@@ -85,11 +108,17 @@ export default function Dashboard({ go, toast }) {
       </div>
       <div style={{ padding: "36px 44px 60px", flex: 1 }} className="page-body">
         <div className="pg-in stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, background: "var(--line)", marginBottom: 28, border: "1px solid var(--line)" }}>
-          {[
-            { l: "Active Devices",    v: String(stats.activeDevices  ?? MOCK_DASHBOARD_STATS.activeDevices),  d: "↑ 1 this week",  i: "📱", link: "devices" },
-            { l: "Auth Events (24h)", v: String(stats.authEvents24h  ?? MOCK_DASHBOARD_STATS.authEvents24h),  d: "All verified",   i: "⚡", link: "auditlogs" },
-            { l: "Security Score",    v: `${stats.securityScore ?? MOCK_DASHBOARD_STATS.securityScore}%`,     d: "No issues found",i: "🛡", vc: "var(--success)", link: "risk" },
-          ].map((s, i) => <StatCard key={i} {...s} go={go} />)}
+          {(() => {
+            const loading = stats === null;
+            const activeCreds   = stats?.activeCredentials ?? 0;
+            const authEvents    = stats?.authEvents24h     ?? 0;
+            const totalUsers    = stats?.totalUsers        ?? 0;
+            return [
+              { l: "Active Credentials", v: loading ? "—" : String(activeCreds), d: "Org-wide active",  i: "📱", link: "devices" },
+              { l: "Auth Events (24h)",  v: loading ? "—" : String(authEvents),  d: "Organisation-wide",i: "⚡", link: "auditlogs" },
+              { l: "Total Users",        v: loading ? "—" : String(totalUsers),  d: "Enrolled accounts",i: "👥", vc: "var(--accent)", link: "rbac" },
+            ];
+          })().map((s, i) => <StatCard key={i} {...s} go={go} />)}
         </div>
 
         <div className="pg-in orb-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", border: "1px solid var(--line)", marginBottom: 28, background: "var(--ink-2)" }}>
@@ -120,7 +149,13 @@ export default function Dashboard({ go, toast }) {
           <button onClick={() => go("auditlogs")} style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", letterSpacing: ".08em" }}>View All →</button>
         </div>
         <div className="pg-in" style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)" }}>
-          {activity.map((a) => <ActivityItem key={a.id} {...a} t={a.type || a.status} go={go} />)}
+          {activity === null ? (
+            <div style={{ padding: "24px 20px", fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", letterSpacing: ".06em" }}>Loading…</div>
+          ) : activity.length === 0 ? (
+            <div style={{ padding: "24px 20px", fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", letterSpacing: ".06em" }}>No activity recorded yet.</div>
+          ) : (
+            activity.map((a) => <ActivityItem key={a.id} {...a} t={a.type || a.status} go={go} />)
+          )}
         </div>
       </div>
     </AppShell>

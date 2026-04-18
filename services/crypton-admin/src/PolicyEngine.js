@@ -8,13 +8,32 @@ export default function PolicyEngine({ go, toast }) {
   const [policies, setPolicies] = useState(MOCK_POLICIES);
   const [threshold, setThreshold] = useState(70);
   const [trustDays, setTrustDays] = useState(30);
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (!getToken()) return;
     api.get("/policies").then(data => {
       if (Array.isArray(data) && data.length > 0) setPolicies(data);
-    }).catch(() => {});
+    }).catch(err => {
+      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+    });
   }, []);
+
+  if (pageError) {
+    return (
+      <AppShell active="policy" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const toggle = async id => {
     const pol = policies.find(x => x.id === id);

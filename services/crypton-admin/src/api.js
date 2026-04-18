@@ -16,6 +16,10 @@ async function _request(path, options) {
     throw new CryptonError("session_expired", "Session Expired");
   }
 
+  if (res.status === 403) {
+    throw new CryptonError("access_denied", "Access Denied");
+  }
+
   let json;
   try {
     json = await res.json();

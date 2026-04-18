@@ -16,6 +16,7 @@ const normalizeRole = r => ROLE_MAP[r?.toLowerCase().replace(/\s+/g, "_")] || r 
 export default function RBAC({ go, toast }) {
   const [users, setUsers] = useState(MOCK_USERS);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -27,8 +28,26 @@ export default function RBAC({ go, toast }) {
           role: normalizeRole(u.role),
         })));
       }
-    }).catch(() => {});
+    }).catch(err => {
+      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+    });
   }, []);
+
+  if (pageError) {
+    return (
+      <AppShell active="rbac" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const changeRole = async (id, newRole) => {
     try {

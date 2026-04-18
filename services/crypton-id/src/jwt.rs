@@ -76,6 +76,13 @@ pub struct AuthUser {
     pub cred_id: Uuid,
 }
 
+pub struct AdminUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub cred_id: Uuid,
+    pub role: String,
+}
+
 #[async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
@@ -129,6 +136,43 @@ impl FromRequestParts<AppState> for AuthUser {
             user_id,
             username: token_data.claims.username,
             cred_id: cred_uuid,
+        })
+    }
+}
+
+#[async_trait]
+impl FromRequestParts<AppState> for AdminUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, AppError> {
+        let auth = AuthUser::from_request_parts(parts, state).await?;
+
+        let db = state
+            .db
+            .as_ref()
+            .ok_or_else(|| AppError::unauthorized("admin_authorization_required"))?;
+
+        let role: Option<String> = sqlx::query_scalar(
+            "SELECT role FROM users WHERE id = $1",
+        )
+        .bind(auth.user_id)
+        .fetch_optional(db)
+        .await
+        .map_err(|_| AppError::unauthorized("admin_authorization_required"))?;
+
+        let role = role.ok_or_else(|| AppError::forbidden("admin_authorization_required"))?;
+        if role != "admin" && role != "super_admin" {
+            return Err(AppError::forbidden("admin_authorization_required"));
+        }
+
+        Ok(AdminUser {
+            user_id: auth.user_id,
+            username: auth.username,
+            cred_id: auth.cred_id,
+            role,
         })
     }
 }

@@ -9,13 +9,32 @@ export default function AuditLogs({ go, toast }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (!getToken()) { setLoading(false); return; }
     api.get("/audit-logs").then(data => {
       if (data && Array.isArray(data.logs)) setLogs(data.logs);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(err => {
+      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+    }).finally(() => setLoading(false));
   }, []);
+
+  if (pageError) {
+    return (
+      <AppShell active="auditlogs" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const filters = ["ALL", "login", "register", "device_revoke", "action_executed"];
   const filtered = logs.filter(r =>
