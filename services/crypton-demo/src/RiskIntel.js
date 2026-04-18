@@ -19,7 +19,7 @@ export default function RiskIntel({ go, toast }) {
               <span style={{ fontSize: 36 }}>🛡</span>
             </div>
           </div>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Coming Soon</div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>{'// Coming Soon'}</div>
           <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(36px,5vw,60px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 20 }}>
             Risk<br />Intelligence
           </h2>

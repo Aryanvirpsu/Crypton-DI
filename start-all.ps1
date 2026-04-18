@@ -301,16 +301,32 @@ if (-not (Wait-Http "http://127.0.0.1:8090/health" "crypton-gateway :8090" 30)) 
 Banner "Step 4/4 -- Frontends"
 $env:BROWSER = "none"
 
+# Ensure SDK is built once before services start
+INFO "Building @crypton/sdk..."
+$sdkOut = Join-Path $LogDir "sdk-build.out"
+$sdkErr = Join-Path $LogDir "sdk-build.err"
+$np     = Start-Process "cmd.exe" -ArgumentList @("/c", "npm run build:sdk") `
+          -WorkingDirectory $Root `
+          -RedirectStandardOutput $sdkOut `
+          -RedirectStandardError  $sdkErr `
+          -WindowStyle Hidden -PassThru -Wait
+if ($np.ExitCode -ne 0) {
+    Get-Content $sdkErr -Tail 30 -EA SilentlyContinue | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    FAIL "@crypton/sdk build failed - see $sdkErr"
+}
+OK "@crypton/sdk built successfully"
+
 function Start-Frontend { param($Label, $Dir, $Port, $NpmScript = "start")
     if (-not (Test-Path (Join-Path $Dir "node_modules"))) {
         WARN "node_modules missing in $Label - running npm install..."
-        $ilog = Join-Path $LogDir "$Label-install.log"
+        $iout = Join-Path $LogDir "$Label-install.out"
+        $ierr = Join-Path $LogDir "$Label-install.err"
         $np   = Start-Process "cmd.exe" -ArgumentList @("/c", "npm install") `
                 -WorkingDirectory $Dir `
-                -RedirectStandardOutput $ilog `
-                -RedirectStandardError  $ilog `
+                -RedirectStandardOutput $iout `
+                -RedirectStandardError  $ierr `
                 -WindowStyle Hidden -PassThru -Wait
-        if ($np.ExitCode -ne 0) { FAIL "$Label npm install failed - see $ilog" }
+        if ($np.ExitCode -ne 0) { FAIL "$Label npm install failed - see $ierr" }
         OK "$Label npm install done"
     }
     $env:PORT = "$Port"

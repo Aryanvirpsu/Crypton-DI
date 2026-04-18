@@ -3,14 +3,14 @@ import {
   setSessionToken,
   clearSessionToken,
   parseJwt,
-  TOKEN_KEY as SESSION_TOKEN_KEY
-} from './sdk/session';
+  TOKEN_KEY
+} from '@crypton/sdk';
 
 export const getToken = getSessionToken;
 export const setToken = setSessionToken;
 export const clearToken = clearSessionToken;
 export { parseJwt };
-export const TOKEN_KEY = SESSION_TOKEN_KEY;
+export { TOKEN_KEY };
 
 // Admin protected surfaces — only operator panel routes
 export const PROTECTED_PAGES = new Set([

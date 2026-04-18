@@ -66,7 +66,10 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(GatewayState {
         // no_proxy() prevents reqwest from routing gateway→identity traffic
         // through any system HTTP_PROXY env var that might be set
-        client: Client::builder().no_proxy().build()?,
+        client: Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?,
         identity_base,
     });
 

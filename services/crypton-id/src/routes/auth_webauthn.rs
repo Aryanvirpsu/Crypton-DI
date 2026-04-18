@@ -1,4 +1,4 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, http::header::AUTHORIZATION, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
@@ -7,8 +7,8 @@ use webauthn_rs::prelude::*;
 use crate::{
     audit,
     error::{AppError, AppJson, ApiResponse},
-    jwt::issue_jwt,
-    redis::challenges::{challenge_key, login_key},
+    jwt::{issue_jwt, verify_device_active, Claims},
+    redis::challenges::{challenge_key, login_key, recovery_enrollment_key},
     state::{AppState, AuthChallenge, RegChallenge, CHALLENGE_TTL_SECS},
 };
 
@@ -97,6 +97,7 @@ pub async fn take_auth_challenge(state: &AppState, key: &str) -> Result<Option<A
 struct RegisterStartReq {
     username: String,
     display_name: Option<String>,
+    enrollment_token: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -106,13 +107,150 @@ struct RegisterStartResp {
     ccr: CreationChallengeResponse,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RecoveryEnrollmentGrant {
+    pub user_id: Uuid,
+    pub username: String,
+    pub request_id: Uuid,
+}
+
+async fn get_recovery_enrollment_grant(
+    state: &AppState,
+    token: &str,
+) -> Result<Option<RecoveryEnrollmentGrant>, AppError> {
+    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(recovery_enrollment_key(token))
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    Ok(raw.and_then(|s| serde_json::from_str(&s).ok()))
+}
+
+async fn consume_recovery_enrollment_grant(
+    state: &AppState,
+    token: &str,
+    expected_user_id: Uuid,
+    expected_username: &str,
+) -> Result<(), AppError> {
+    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+    let key = recovery_enrollment_key(token);
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    let grant: RecoveryEnrollmentGrant = raw
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .ok_or_else(|| AppError::unauthorized("invalid_recovery_enrollment_token"))?;
+
+    if grant.user_id != expected_user_id || grant.username != expected_username {
+        return Err(AppError::unauthorized("invalid_recovery_enrollment_token"));
+    }
+
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    Ok(())
+}
+
+async fn authenticated_user_id_from_headers(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+) -> Result<Option<Uuid>, AppError> {
+    let token = headers
+        .get(AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "));
+
+    let Some(token) = token else {
+        return Ok(None);
+    };
+
+    let claims = jsonwebtoken::decode::<Claims>(
+        token,
+        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &jsonwebtoken::Validation::default(),
+    )
+    .ok()
+    .map(|d| d.claims);
+
+    let Some(claims) = claims else {
+        return Ok(None);
+    };
+
+    if let Ok(mut conn) = state.redis_conn().await {
+        if let Ok(true) = crate::redis::sessions::is_denied(
+            &mut conn,
+            &claims.sub,
+            claims.iat,
+        ).await {
+            return Ok(None);
+        }
+    }
+
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => return Ok(None),
+    };
+    let cred_id = match Uuid::parse_str(&claims.cred_id) {
+        Ok(id) => id,
+        Err(_) => return Ok(None),
+    };
+
+    if let Some(ref pool) = state.db {
+        if verify_device_active(pool, cred_id, user_id).await.is_err() {
+            return Ok(None);
+        }
+    }
+
+    Ok(Some(user_id))
+}
+
 async fn register_start(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     AppJson(req): AppJson<RegisterStartReq>,
 ) -> Result<Json<ApiResponse<RegisterStartResp>>, AppError> {
     tracing::info!(username = %req.username, "register_start");
 
-    let user_id = Uuid::new_v4();
+    let db = state
+        .db
+        .as_ref()
+        .ok_or_else(|| AppError::internal("database_not_configured"))?;
+
+    let existing_user_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE username = $1")
+        .bind(&req.username)
+        .fetch_optional(db)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    let mut existing_user = false;
+    let mut enrollment_token = None;
+    let user_id = if let Some(existing) = existing_user_id {
+        existing_user = true;
+        if authenticated_user_id_from_headers(&state, &headers).await? == Some(existing) {
+            existing
+        } else if let Some(token) = req.enrollment_token.as_deref() {
+            let grant = get_recovery_enrollment_grant(&state, token).await?
+                .ok_or_else(|| AppError::unauthorized("invalid_recovery_enrollment_token"))?;
+            if grant.user_id != existing || grant.username != req.username {
+                return Err(AppError::unauthorized("invalid_recovery_enrollment_token"));
+            }
+            enrollment_token = Some(token.to_string());
+            existing
+        } else {
+            return Err(AppError::unauthorized("existing_account_requires_authorized_enrollment"));
+        }
+    } else {
+        Uuid::new_v4()
+    };
+
     let display_name = req.display_name.as_deref().unwrap_or(&req.username);
 
     let (ccr, reg_state) = state
@@ -130,6 +268,8 @@ async fn register_start(
             user_id,
             username: req.username,
             reg_state,
+            existing_user,
+            enrollment_token,
         },
     ).await?;
 
@@ -187,22 +327,22 @@ async fn register_finish(
         .map_err(|e| AppError::internal(e.to_string()))?;
     let cred_id_bytes: Vec<u8> = passkey.cred_id().to_vec();
 
-    // Upsert user
-    sqlx::query(
-        "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING",
-    )
-    .bind(challenge.user_id)
-    .bind(&challenge.username)
-    .execute(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    if let Some(token) = challenge.enrollment_token.as_deref() {
+        consume_recovery_enrollment_grant(&state, token, challenge.user_id, &challenge.username).await?;
+    }
 
-    // Resolve canonical user_id
-    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE username = $1")
+    if !challenge.existing_user {
+        sqlx::query(
+            "INSERT INTO users (id, username) VALUES ($1, $2)",
+        )
+        .bind(challenge.user_id)
         .bind(&challenge.username)
-        .fetch_one(db)
+        .execute(db)
         .await
         .map_err(|e| AppError::internal(e.to_string()))?;
+    }
+
+    let user_id = challenge.user_id;
 
     // Persist credential
     sqlx::query(

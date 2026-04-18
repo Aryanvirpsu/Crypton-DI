@@ -59,7 +59,7 @@ function ToastStack({ toasts }) {
           borderLeft: `2px solid ${t.type === "danger" ? "var(--danger)" : t.type === "success" ? "var(--success)" : "var(--accent)"}`,
           padding: "11px 16px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em",
           color: "var(--paper)", minWidth: 220
-        }}>// {t.msg}</div>
+        }}>{`// ${t.msg}`}</div>
       ))}
     </div>
   );

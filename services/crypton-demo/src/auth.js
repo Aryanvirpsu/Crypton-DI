@@ -3,14 +3,14 @@ import {
   setSessionToken,
   clearSessionToken,
   parseJwt,
-  TOKEN_KEY as SESSION_TOKEN_KEY
-} from './sdk/session';
+  TOKEN_KEY
+} from '@crypton/sdk';
 
 export const getToken = getSessionToken;
 export const setToken = setSessionToken;
 export const clearToken = clearSessionToken;
 export { parseJwt };
-export const TOKEN_KEY = SESSION_TOKEN_KEY;
+export { TOKEN_KEY };
 
 export const ADMIN_TOKEN_KEY = "crypton_admin_token";
 export const getAdminToken = () => localStorage.getItem(ADMIN_TOKEN_KEY);
