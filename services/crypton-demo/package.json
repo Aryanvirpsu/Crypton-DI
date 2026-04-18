@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "client:start": "react-scripts start",
-    "client:build": "react-scripts build"
+    "build:sdk": "npm --prefix ../../libs/crypton-sdk install && npm --prefix ../../libs/crypton-sdk run build",
+    "client:build": "npm run build:sdk && react-scripts build"
   },
   "dependencies": {
     "@crypton/sdk": "file:../../libs/crypton-sdk",
