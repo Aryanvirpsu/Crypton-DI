@@ -12,6 +12,10 @@ pub struct RegChallenge {
     pub user_id: Uuid,
     pub username: String,
     pub reg_state: PasskeyRegistration,
+    #[serde(default)]
+    pub existing_user: bool,
+    #[serde(default)]
+    pub enrollment_token: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]

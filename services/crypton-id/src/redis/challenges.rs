@@ -17,3 +17,9 @@ pub fn login_key(challenge_id: Uuid) -> String {
 pub fn action_key(challenge_id: Uuid) -> String {
     format!("webauthn:action:challenge:{}", challenge_id)
 }
+
+/// Key for a recovery-authorized device enrollment grant.
+/// Format: `webauthn:recovery:enroll:<token>`
+pub fn recovery_enrollment_key(token: &str) -> String {
+    format!("webauthn:recovery:enroll:{}", token)
+}

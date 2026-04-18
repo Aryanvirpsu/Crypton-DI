@@ -70,7 +70,7 @@ export default function RBAC({ go, toast }) {
           <div onClick={() => setSelectedUser(null)} style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div onClick={e => e.stopPropagation()} className="modal-anim" style={{ background: "var(--ink-2)", border: "1px solid var(--line2)", padding: 40, maxWidth: 420, width: "90%", position: "relative" }}>
               <button onClick={() => setSelectedUser(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: "var(--muted)", fontSize: 16, cursor: "pointer", fontFamily: "var(--mono)" }}>×</button>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14 }}>// Assign Role</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14 }}>{'// Assign Role'}</div>
               <div style={{ fontFamily: "var(--display)", fontSize: 32, letterSpacing: ".04em", textTransform: "uppercase", lineHeight: .95, marginBottom: 20 }}>{selectedUser.name}</div>
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 24 }}>{selectedUser.email}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

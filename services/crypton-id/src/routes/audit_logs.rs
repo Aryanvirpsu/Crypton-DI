@@ -3,7 +3,7 @@ use serde::Serialize;
 use sqlx::{postgres::PgRow, Row};
 use uuid::Uuid;
 
-use crate::{error::{AppError, ApiResponse}, jwt::AuthUser, state::AppState};
+use crate::{error::{AppError, ApiResponse}, jwt::AdminUser, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/audit-logs", get(list_audit_logs))
@@ -30,7 +30,7 @@ struct AuditLogsResp {
 // ── GET /audit-logs ───────────────────────────────────────────────────────────
 
 async fn list_audit_logs(
-    auth: AuthUser,
+    _admin: AdminUser,
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<AuditLogsResp>>, AppError> {
     let db = state
@@ -45,11 +45,9 @@ async fn list_audit_logs(
                 detail  AS metadata, \
                 created_at::text AS created_at \
          FROM audit_logs \
-         WHERE user_id = $1 \
          ORDER BY created_at DESC \
          LIMIT 50",
     )
-    .bind(auth.user_id)
     .fetch_all(db)
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;

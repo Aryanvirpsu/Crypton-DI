@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
-import { crypton, parseJwt, CryptonError } from './sdk';
+import { crypton, parseJwt, CryptonError, getSessionToken } from './sdk';
 import { _adminAuthRef } from './auth';
 import { BtnF } from './Buttons';
 import { MAIN_URL } from './config';
+
+// Minimal authenticated fetch for non-JSON endpoints
+async function _authFetch(path, options = {}) {
+  const token = getSessionToken();
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${MAIN_URL}${path}`, { ...options, headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res;
+}
 
 export default function AdminLogin({ go, toast }) {
   const [email, setEmail] = useState("");
@@ -52,7 +63,7 @@ export default function AdminLogin({ go, toast }) {
       // OAuth mode: detected via ?oauth=<nonce> injected by /authorize redirect
       const oauthNonce = new URLSearchParams(window.location.search).get('oauth');
       if (oauthNonce) {
-        const resp = await crypton['transport'].rawFetch('/auth/oauth/complete', {
+        const resp = await _authFetch('/auth/oauth/complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nonce: oauthNonce, token: result.token }),

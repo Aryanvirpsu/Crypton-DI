@@ -14,9 +14,20 @@
  *   4. Real audit event written: demo:<action_id>
  */
 import { useState } from "react";
-import { crypton } from '../sdk';
+import { crypton, getSessionToken } from '../sdk';
 import { BtnF, BtnO } from '../Buttons';
 import AppShell from '../AppShell';
+
+// Minimal authenticated fetch for non-JSON endpoints
+async function _authFetch(path, options = {}) {
+  const token = getSessionToken();
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${process.env.REACT_APP_API_BASE || ""}${path}`, { ...options, headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res;
+}
 
 // ── Demo action catalogue ─────────────────────────────────────────────────────
 // Each id must match a string in ALLOWED_ACTIONS in actions.rs
@@ -74,8 +85,8 @@ export default function DemoActions({ go, toast }) {
   };
 
   const handleDownload = () => {
-    // rawFetch is the transport-level authenticated fetch for non-JSON responses
-    crypton.transport.rawFetch("/export/audit-logs")
+    // Download audit logs as CSV using authenticated fetch
+    _authFetch("/export/audit-logs")
       .then(r => r.blob())
       .then(blob => {
         const a = document.createElement("a");
@@ -108,7 +119,7 @@ export default function DemoActions({ go, toast }) {
 
             {modal.phase === "confirm" && (
               <>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>// Demo — Protected Action</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>{'// Demo — Protected Action'}</div>
                 <h3 style={{ fontFamily: "var(--display)", fontSize: 36, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 14 }}>{modal.action.label}</h3>
                 <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, marginBottom: 24, fontWeight: 300 }}>
                   This action requires cryptographic verification with your enrolled trusted device.
@@ -207,7 +218,7 @@ export default function DemoActions({ go, toast }) {
       {/* Body */}
       <div className="page-body" style={{ padding: "36px 44px 60px" }}>
         <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", marginBottom: 20, letterSpacing: ".06em" }}>
-          // Each action triggers an actual cryptographic challenge. Signing with a lost or revoked device fails.
+          {'// Each action triggers an actual cryptographic challenge. Signing with a lost or revoked device fails.'}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
           {DEMO_ACTIONS.map(a => (

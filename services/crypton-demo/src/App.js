@@ -1,71 +1,33 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AuthContext } from "./AuthContext";
-import {
-  getToken,
-  clearToken,
-  getAdminToken,
-  clearAdminToken,
-  parseJwt,
-  PROTECTED_PAGES,
-  ADMIN_PAGES,
-  _authRef,
-  _adminAuthRef,
-} from "./auth";
-import { api, API_BASE } from "./api";
-import { PAGE_TO_PATH, getPageFromPath } from "./routes";
-import { PAGE_LABELS } from "./constants";
-import AppShell from "./AppShell";
-import { BtnF, BtnO } from "./Buttons";
-import { useToasts } from "./hooks";
+import { AuthContext } from './AuthContext';
+import { getToken, clearToken, getAdminToken, clearAdminToken, parseJwt, PROTECTED_PAGES, ADMIN_PAGES, _authRef, _adminAuthRef } from './auth';
+import { api, API_BASE } from './api';
+import { PAGE_TO_PATH, getPageFromPath } from './routes';
+import { PAGE_LABELS } from './constants';
+import AppShell from './AppShell';
+import { BtnF, BtnO } from './Buttons';
+import { useToasts } from './hooks';
 
-import Landing from "./Landing";
-import Login from "./Login";
-import AdminLogin from "./AdminLogin";
-import Register from "./Register";
-import Dashboard from "./Dashboard";
+import Landing from './Landing';
+import Login from './Login';
+import AdminLogin from './AdminLogin';
+import Register from './Register';
+import Dashboard from './Dashboard';
 import Devices from "./Devices";
 import DemoActions from "./demo-app/DemoActions";
 
-import Admin from "./Admin";
-import AuditLogs from "./AuditLogs";
-import Sessions from "./Sessions";
-import Recovery from "./Recovery";
-import RBAC from "./RBAC";
-import PolicyEngine from "./PolicyEngine";
-import RiskIntel from "./RiskIntel";
-import OrgSettings from "./OrgSettings";
+import Admin from './Admin';
+import AuditLogs from './AuditLogs';
+import Sessions from './Sessions';
+import Recovery from './Recovery';
+import RBAC from './RBAC';
+import PolicyEngine from './PolicyEngine';
+import RiskIntel from './RiskIntel';
+import OrgSettings from './OrgSettings';
 
 /* ─────────────────────────────────────────────────────────────
    CRYPTON DEMO — SaaS app + Operator Panel
    ───────────────────────────────────────────────────────────── */
-
-const AUTH_UI_BASE = "https://app.cryptonid.tech";
-const AUTH_UI_HOST = "app.cryptonid.tech";
-const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
-
-const AUTH_UI_PATHS = {
-  login: "/login",
-  register: "/register",
-  admin_login: "/admin/login",
-};
-
-function canRenderLocalAuthUi() {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
-  return host === AUTH_UI_HOST || LOCAL_DEV_HOSTS.has(host);
-}
-
-function redirectToAuthUi(page = "login") {
-  if (typeof window === "undefined") return;
-
-  const qs = window.location.search || "";
-  const path = AUTH_UI_PATHS[page] || "/login";
-  const target = `${AUTH_UI_BASE}${path}${qs}`;
-
-  if (window.location.href !== target) {
-    window.location.replace(target);
-  }
-}
 
 const FontLink = () => (
   <style>{`
@@ -90,40 +52,14 @@ const FontLink = () => (
 
 function ToastStack({ toasts }) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 24,
-        right: 24,
-        zIndex: 8000,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          style={{
-            background: "var(--ink-2)",
-            border: "1px solid var(--line)",
-            borderLeft: `2px solid ${
-              t.type === "danger"
-                ? "var(--danger)"
-                : t.type === "success"
-                ? "var(--success)"
-                : "var(--accent)"
-            }`,
-            padding: "11px 16px",
-            fontFamily: "var(--mono)",
-            fontSize: 9,
-            letterSpacing: ".08em",
-            color: "var(--paper)",
-            minWidth: 220,
-          }}
-        >
-          // {t.msg}
-        </div>
+    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 8000, display: "flex", flexDirection: "column", gap: 6 }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          background: "var(--ink-2)", border: "1px solid var(--line)",
+          borderLeft: `2px solid ${t.type === "danger" ? "var(--danger)" : t.type === "success" ? "var(--success)" : "var(--accent)"}`,
+          padding: "11px 16px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em",
+          color: "var(--paper)", minWidth: 220
+        }}>{`// ${t.msg}`}</div>
       ))}
     </div>
   );
@@ -134,54 +70,25 @@ export default function App() {
   const [toasts, addToast] = useToasts();
 
   // User Auth
-  const [authUser, setAuthUser] = useState(() => {
-    const t = getToken();
-    return t ? parseJwt(t) : null;
-  });
-
+  const [authUser, setAuthUser] = useState(() => { const t = getToken(); return t ? parseJwt(t) : null; });
   // Admin Auth
-  const [adminUser, setAdminUser] = useState(() => {
-    const t = getAdminToken();
-    return t ? parseJwt(t) : null;
-  });
+  const [adminUser, setAdminUser] = useState(() => { const t = getAdminToken(); return t ? parseJwt(t) : null; });
 
   const [authReady, setAuthReady] = useState(false);
 
-  const go = useCallback((id) => {
-    const localAuthUi = canRenderLocalAuthUi();
-
-    if ((id === "login" || id === "register") && !localAuthUi) {
-      redirectToAuthUi(id);
-      return;
-    }
-
-    if (id === "admin_login" && !localAuthUi) {
-      redirectToAuthUi("admin_login");
-      return;
-    }
-
+  const go = useCallback(id => {
     if (PROTECTED_PAGES.has(id) && !getToken()) {
-      if (localAuthUi) {
-        const path = PAGE_TO_PATH["login"] || "/login";
-        window.history.pushState({ page: "login" }, "", path);
-        setPage("login");
-      } else {
-        redirectToAuthUi("login");
-      }
+      const path = PAGE_TO_PATH["login"] || "/login";
+      window.history.pushState({ page: "login" }, "", path);
+      setPage("login");
       return;
     }
-
     if (ADMIN_PAGES.has(id) && !getAdminToken()) {
-      if (localAuthUi) {
-        const path = PAGE_TO_PATH["admin_login"] || "/admin/login";
-        window.history.pushState({ page: "admin_login" }, "", path);
-        setPage("admin_login");
-      } else {
-        redirectToAuthUi("admin_login");
-      }
+      const path = PAGE_TO_PATH["admin_login"] || "/admin/login";
+      window.history.pushState({ page: "admin_login" }, "", path);
+      setPage("admin_login");
       return;
     }
-
     const path = PAGE_TO_PATH[id] || "/";
     window.history.pushState({ page: id }, "", path);
     setPage(id);
@@ -195,104 +102,44 @@ export default function App() {
     const tok = getToken();
     if (tok) {
       const parsed = parseJwt(tok);
-      if (parsed && parsed.exp && parsed.exp * 1000 > Date.now()) {
-        setAuthUser(parsed);
-      } else {
-        clearToken();
-        setAuthUser(null);
-      }
+      if (parsed && parsed.exp && parsed.exp * 1000 > Date.now()) setAuthUser(parsed);
+      else { clearToken(); setAuthUser(null); }
     }
 
     // Check Admin Token
     const admtok = getAdminToken();
     if (admtok) {
       const parsedA = parseJwt(admtok);
-      if (parsedA && parsedA.exp && parsedA.exp * 1000 > Date.now()) {
-        setAdminUser(parsedA);
-      } else {
-        clearAdminToken();
-        setAdminUser(null);
-      }
+      if (parsedA && parsedA.exp && parsedA.exp * 1000 > Date.now()) setAdminUser(parsedA);
+      else { clearAdminToken(); setAdminUser(null); }
     }
 
     const initialPage = getPageFromPath();
-    const localAuthUi = canRenderLocalAuthUi();
-
-    if ((initialPage === "login" || initialPage === "register") && !localAuthUi) {
-      redirectToAuthUi(initialPage);
-      return;
-    }
-
-    if (initialPage === "admin_login" && !localAuthUi) {
-      redirectToAuthUi("admin_login");
-      return;
-    }
-
     if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
-      if (localAuthUi) {
-        const path = PAGE_TO_PATH["login"] || "/login";
-        window.history.replaceState({ page: "login" }, "", path);
-        setPage("login");
-      } else {
-        redirectToAuthUi("login");
-        return;
-      }
+      const path = PAGE_TO_PATH["login"];
+      window.history.replaceState({ page: "login" }, "", path);
+      setPage("login");
     } else if (ADMIN_PAGES.has(initialPage) && !getAdminToken()) {
-      if (localAuthUi) {
-        const path = PAGE_TO_PATH["admin_login"] || "/admin/login";
-        window.history.replaceState({ page: "admin_login" }, "", path);
-        setPage("admin_login");
-      } else {
-        redirectToAuthUi("admin_login");
-        return;
-      }
+      const path = PAGE_TO_PATH["admin_login"];
+      window.history.replaceState({ page: "admin_login" }, "", path);
+      setPage("admin_login");
     }
-
     setAuthReady(true);
   }, []);
 
   useEffect(() => {
     const onPop = () => {
       const p = getPageFromPath();
-      const localAuthUi = canRenderLocalAuthUi();
-
-      if ((p === "login" || p === "register") && !localAuthUi) {
-        redirectToAuthUi(p);
-        return;
-      }
-
-      if (p === "admin_login" && !localAuthUi) {
-        redirectToAuthUi("admin_login");
-        return;
-      }
-
       if (ADMIN_PAGES.has(p) && !getAdminToken()) {
-        if (localAuthUi) {
-          window.history.replaceState(
-            { page: "admin_login" },
-            "",
-            PAGE_TO_PATH["admin_login"]
-          );
-          setPage("admin_login");
-        } else {
-          redirectToAuthUi("admin_login");
-        }
+        window.history.replaceState({ page: "admin_login" }, "", PAGE_TO_PATH["admin_login"]);
+        setPage("admin_login");
       } else if (PROTECTED_PAGES.has(p) && !getToken()) {
-        if (localAuthUi) {
-          window.history.replaceState(
-            { page: "login" },
-            "",
-            PAGE_TO_PATH["login"]
-          );
-          setPage("login");
-        } else {
-          redirectToAuthUi("login");
-        }
+        window.history.replaceState({ page: "login" }, "", PAGE_TO_PATH["login"]);
+        setPage("login");
       } else {
         setPage(p);
       }
     };
-
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -300,9 +147,7 @@ export default function App() {
   const toast = useCallback((msg, type = "info") => addToast(msg, type), [addToast]);
 
   const logout = useCallback(() => {
-    import("./sdk")
-      .then(({ crypton }) => crypton.auth.logout())
-      .catch(() => {});
+    import('./sdk').then(({ crypton }) => crypton.auth.logout()).catch(() => {});
     clearToken();
     setAuthUser(null);
     go("login");
@@ -311,10 +156,7 @@ export default function App() {
   const adminLogout = useCallback(() => {
     const tok = getAdminToken();
     if (tok) {
-      fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${tok}` },
-      }).catch(() => {});
+      fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` } }).catch(() => {});
     }
     clearAdminToken();
     setAdminUser(null);
@@ -326,51 +168,40 @@ export default function App() {
   _adminAuthRef.logout = adminLogout;
   _adminAuthRef.setUser = setAdminUser;
 
+  // We provide the active user based on whether we are in an admin page or not.
+  // Wait, if an admin page uses AuthContext, it needs the adminUser.
+  // We can dynamically swap out the provided context value.
   const isAdminPage = ADMIN_PAGES.has(page) || page === "admin_login";
-
-  const authCtx = useMemo(
-    () => ({
-      authUser: isAdminPage ? adminUser : authUser,
-      authReady,
-      logout: isAdminPage ? adminLogout : logout,
-    }),
-    [authUser, adminUser, authReady, logout, adminLogout, isAdminPage]
-  );
-
-  const localAuthUi = canRenderLocalAuthUi();
+  const authCtx = useMemo(() => ({
+    authUser: isAdminPage ? adminUser : authUser,
+    authReady,
+    logout: isAdminPage ? adminLogout : logout
+  }), [authUser, adminUser, authReady, logout, adminLogout, isAdminPage]);
 
   return (
     <AuthContext.Provider value={authCtx}>
       <FontLink />
       <div className="grain" />
       <ToastStack toasts={toasts} />
-
-      {page === "landing" && <Landing go={go} toast={toast} />}
-
-      {localAuthUi && page === "login" && <Login go={go} toast={toast} />}
-      {localAuthUi && page === "admin_login" && (
-        <AdminLogin go={go} toast={toast} />
-      )}
-      {localAuthUi && page === "register" && (
-        <Register go={go} toast={toast} />
-      )}
+      {page === "landing"    && <Landing go={go} toast={toast} />}
+      {page === "login"      && <Login go={go} toast={toast} />}
+      {page === "admin_login"&& <AdminLogin go={go} toast={toast} />}
+      {page === "register"   && <Register go={go} toast={toast} />}
 
       {authReady && (
         <>
-          {page === "dashboard" && <Dashboard go={go} toast={toast} />}
-          {page === "demo" && <DemoActions go={go} toast={toast} />}
-          {page === "devices" && <Devices go={go} toast={toast} />}
+          {page === "dashboard"  && <Dashboard go={go} toast={toast} />}
+          {page === "demo"       && <DemoActions go={go} toast={toast} />}
+          {page === "devices"    && <Devices go={go} toast={toast} />}
 
-          {page === "admin" && <Admin go={go} toast={toast} />}
-          {page === "auditlogs" && <AuditLogs go={go} toast={toast} />}
-          {page === "sessions" && <Sessions go={go} toast={toast} />}
-          {page === "recovery" && <Recovery go={go} toast={toast} />}
-          {page === "rbac" && <RBAC go={go} toast={toast} />}
-          {page === "policy" && <PolicyEngine go={go} toast={toast} />}
-          {page === "risk" && <RiskIntel go={go} toast={toast} />}
-          {page === "orgsettings" && (
-            <OrgSettings go={go} toast={toast} />
-          )}
+          {page === "admin"      && <Admin go={go} toast={toast} />}
+          {page === "auditlogs"  && <AuditLogs go={go} toast={toast} />}
+          {page === "sessions"   && <Sessions go={go} toast={toast} />}
+          {page === "recovery"   && <Recovery go={go} toast={toast} />}
+          {page === "rbac"       && <RBAC go={go} toast={toast} />}
+          {page === "policy"     && <PolicyEngine go={go} toast={toast} />}
+          {page === "risk"       && <RiskIntel go={go} toast={toast} />}
+          {page === "orgsettings"&& <OrgSettings go={go} toast={toast} />}
         </>
       )}
     </AuthContext.Provider>

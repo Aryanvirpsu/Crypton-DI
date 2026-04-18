@@ -6,7 +6,7 @@ import { ActionsModule } from './modules/actions';
 
 export { CryptonError, ERROR_CODES } from './errors';
 export type { ErrorCode } from './errors';
-export { parseJwt, getSessionToken, setSessionToken, clearSessionToken } from './session';
+export { parseJwt, getSessionToken, setSessionToken, clearSessionToken, TOKEN_KEY } from './session';
 export type { JwtPayload } from './session';
 export type { DeviceInfo } from './modules/devices';
 export type { RecoveryRequest } from './modules/recovery';
