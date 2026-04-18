@@ -1,9 +1,21 @@
 import { CryptonTransport } from '../client';
+import { CryptonError } from '../errors';
 import { fromB64url, b64url } from '../utils/base64';
 
 export interface ActionResult {
   status: string;
   result: Record<string, unknown>;
+}
+
+function wrapWebAuthnError(err: unknown): never {
+  if (err instanceof DOMException) {
+    const code =
+      err.name === 'NotAllowedError' ? 'webauthn_cancelled' :
+      err.name === 'InvalidStateError' ? 'webauthn_already_registered' :
+      'webauthn_security_error';
+    throw new CryptonError(code, err.message);
+  }
+  throw err;
 }
 
 /**
@@ -14,8 +26,8 @@ export interface ActionResult {
  *   2. user signs with registered device (navigator.credentials.get)
  *   3. execute(challengeId, action, assertion) → backend verifies + runs action
  *
- * sign(action) is a convenience wrapper for callers that manage their own
- * loading state and want the full flow in one await.
+ * sign(action) is the recommended one-shot wrapper for most callers.
+ * challenge() and execute() are available as escape hatches for custom UI.
  */
 export class ActionsModule {
   constructor(private client: CryptonTransport) {}
@@ -52,7 +64,7 @@ export class ActionsModule {
   /**
    * Full one-shot flow: challenge → WebAuthn prompt → execute.
    * Set UI to "signing" state before calling; awaiting this resolves to
-   * the action result or throws (including NotAllowedError on cancel).
+   * the action result or throws CryptonError (including on user cancel).
    */
   async sign(action: string): Promise<ActionResult> {
     const start = await this.challenge(action);
@@ -67,7 +79,13 @@ export class ActionsModule {
       })),
     };
 
-    const assertion = await navigator.credentials.get({ publicKey: getOpts }) as PublicKeyCredential;
+    let assertion: PublicKeyCredential;
+    try {
+      assertion = await navigator.credentials.get({ publicKey: getOpts }) as PublicKeyCredential;
+    } catch (err) {
+      wrapWebAuthnError(err);
+    }
+
     return this.execute(start.challenge_id, action, assertion);
   }
 }

@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
 import { getToken } from './auth';
-import { MOCK_SESSIONS } from './constants';
 import AppShell from './AppShell';
 
 export default function Sessions({ go, toast }) {
-  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  // Start empty — always show backend response, never fake rows
+  const [sessions, setSessions] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (!getToken()) return;
     api.get("/sessions").then(data => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setSessions(data.map(s => ({
           id:       s.id,
           user:     s.user,
@@ -22,26 +24,55 @@ export default function Sessions({ go, toast }) {
           active:   typeof s.active === 'boolean' ? s.active : s.status === "active",
         })));
       }
-    }).catch(() => {});
+    }).catch(err => {
+      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+    }).finally(() => setLoaded(true));
   }, []);
 
+  if (pageError) {
+    return (
+      <AppShell active="sessions" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   const kill = async id => {
-    try { await api.del(`/sessions/${id}`); } catch {}
-    setSessions(s => s.filter(x => x.id !== id));
-    toast("Session terminated immediately", "danger");
+    try {
+      await api.del(`/sessions/${id}`);
+      setSessions(s => s.filter(x => x.id !== id));
+      toast("Session terminated immediately", "danger");
+    } catch (err) {
+      toast(err?.message || "Failed to terminate session", "danger");
+    }
   };
 
   const killAll = async () => {
-    try { await api.del("/sessions"); } catch {}
-    setSessions([]);
-    toast("All sessions terminated — users signed out", "danger");
+    try {
+      await api.del("/sessions");
+      setSessions([]);
+      toast("All sessions terminated — users signed out", "danger");
+    } catch (err) {
+      toast(err?.message || "Failed to terminate all sessions", "danger");
+    }
   };
 
   return (
     <AppShell active="sessions" go={go}>
       <div className="page-header" style={{ padding: "36px 44px 28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
         <div>
-          <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Sessions</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".06em", textTransform: "uppercase" }}>Sessions</span>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 8, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--warning)", background: "var(--s-warning)", border: "1px solid rgba(251,191,36,.3)", padding: "3px 7px" }}>DEMO</span>
+          </div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 6 }}>Active sessions · Real-time monitor</div>
         </div>
         <button onClick={killAll} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--danger)", background: "var(--s-danger)", padding: "8px 16px", border: "1px solid rgba(248,113,113,.25)", cursor: "pointer" }}>⚡ Kill All</button>
@@ -60,11 +91,15 @@ export default function Sessions({ go, toast }) {
           ))}
         </div>
 
-        {sessions.length === 0 ? (
+        {!loaded ? (
+          <div style={{ border: "1px solid var(--line)", padding: "40px", textAlign: "center", background: "var(--ink-2)" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", letterSpacing: ".06em" }}>Loading…</div>
+          </div>
+        ) : sessions.length === 0 ? (
           <div style={{ border: "1px solid var(--line)", padding: "60px", textAlign: "center", background: "var(--ink-2)" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
             <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>All Clear</div>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>All sessions have been terminated.</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>No active sessions.</div>
           </div>
         ) : (<>
           <div className="sessions-table" style={{ border: "1px solid var(--line)", overflow: "hidden" }}>

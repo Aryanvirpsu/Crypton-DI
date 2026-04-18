@@ -31,17 +31,19 @@ export class CryptonTransport {
     }
 
     if (!json.success) {
-      const err = json as { success: false; error: { code: string; message: string } };
-      throw new CryptonError(err.error.code, err.error.message);
+      throw new CryptonError(
+        json.error?.code ?? "unknown_error",
+        json.error?.message ?? "An error occurred",
+      );
     }
 
-    return (json as { success: true; data: T }).data;
+    return json.data;
   }
 
   get = <T>(path: string) => this.request<T>(path, { method: 'GET' });
-  post = <T>(path: string, body?: any) => this.request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+  post = <T>(path: string, body?: unknown) => this.request<T>(path, { method: 'POST', body: JSON.stringify(body) });
   del = <T>(path: string) => this.request<T>(path, { method: 'DELETE' });
-  patch = <T>(path: string, body?: any) => this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+  patch = <T>(path: string, body?: unknown) => this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 
   /** Raw fetch with auth headers — for non-JSON responses (e.g. blob downloads). */
   public async rawFetch(path: string, options?: RequestInit): Promise<Response> {

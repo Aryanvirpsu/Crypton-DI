@@ -8,20 +8,43 @@ export default function PolicyEngine({ go, toast }) {
   const [policies, setPolicies] = useState(MOCK_POLICIES);
   const [threshold, setThreshold] = useState(70);
   const [trustDays, setTrustDays] = useState(30);
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (!getToken()) return;
     api.get("/policies").then(data => {
       if (Array.isArray(data) && data.length > 0) setPolicies(data);
-    }).catch(() => {});
+    }).catch(err => {
+      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+    });
   }, []);
+
+  if (pageError) {
+    return (
+      <AppShell active="policy" go={go}>
+        <div style={{ padding: "60px 44px", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>{pageError === "access_denied" ? "🔒" : "⚠"}</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: 28, letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 8 }}>
+            {pageError === "access_denied" ? "Access Denied" : "Load Failed"}
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            {pageError === "access_denied" ? "You do not have permission to view this page." : "Failed to load data."}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   const toggle = async id => {
     const pol = policies.find(x => x.id === id);
     const newActive = !pol.active;
-    try { await api.patch(`/policies/${id}`, { active: newActive }); } catch {}
-    setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
-    toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    try {
+      await api.patch(`/policies/${id}`, { active: newActive });
+      setPolicies(p => p.map(x => x.id === id ? { ...x, active: newActive } : x));
+      toast(`Policy "${pol.label || pol.name}" ${newActive ? "enabled" : "disabled"}`, newActive ? "success" : "warning");
+    } catch (err) {
+      toast(err?.message || "Failed to update policy", "danger");
+    }
   };
 
   const catColor = { geo: "var(--accent)", risk: "var(--danger)", network: "var(--warning)", device: "#7EC8E3", auth: "var(--success)", other: "var(--muted)" };

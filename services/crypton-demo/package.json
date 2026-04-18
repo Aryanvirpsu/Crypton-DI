@@ -4,11 +4,16 @@
   "private": true,
   "description": "Minimal demo showing Login with Crypton (OAuth 2.0 authorization code flow)",
   "scripts": {
+    "prebuild:sdk": "",
+    "build:sdk": "tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module CommonJS --moduleResolution node --outDir ../../libs/crypton-sdk/dist/cjs && tsc --project ../../libs/crypton-sdk/tsconfig.build.json --module ESNext --moduleResolution bundler --outDir ../../libs/crypton-sdk/dist/esm",
+    "preclient:start": "npm run build:sdk",
+    "preclient:build": "npm run build:sdk",
     "start": "node server.js",
     "client:start": "react-scripts start",
     "client:build": "react-scripts build"
   },
   "dependencies": {
+    "@crypton/sdk": "*",
     "cookie-parser": "^1.4.6",
     "express": "^4.18.2",
     "@testing-library/dom": "^10.4.1",

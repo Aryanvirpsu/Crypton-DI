@@ -18,5 +18,16 @@ export const PROTECTED_PAGES = new Set([
   "sessions","policy","orgsettings",
 ]);
 
+// Returns the raw token if it exists and is not expired; otherwise clears it and returns null.
+// Use this instead of getToken() wherever auth-gating decisions are made.
+export function getValidToken() {
+  const tok = getToken();
+  if (!tok) return null;
+  const parsed = parseJwt(tok);
+  if (parsed && parsed.exp && parsed.exp * 1000 > Date.now()) return tok;
+  clearToken();
+  return null;
+}
+
 // Module-level auth ref — lets api/webauthn update App auth state without prop-drilling
 export let _authRef = { user: null, logout: null, setUser: null };

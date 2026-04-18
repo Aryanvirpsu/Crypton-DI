@@ -2,6 +2,7 @@
   "name": "crypton",
   "version": "0.1.0",
   "private": true,
+  "workspaces": ["libs/*", "services/*"],
   "dependencies": {
     "@fal-ai/client": "^1.9.5",
     "@remotion/cli": "^4.0.438",
