@@ -29,6 +29,34 @@ import OrgSettings from './OrgSettings';
    CRYPTON DEMO — SaaS app + Operator Panel
    ───────────────────────────────────────────────────────────── */
 
+const AUTH_UI_BASE = "https://app.cryptonid.tech";
+const AUTH_UI_HOST = "app.cryptonid.tech";
+const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+const AUTH_UI_PATHS = {
+  login: "/login",
+  register: "/register",
+  admin_login: "/admin/login",
+};
+
+function canRenderLocalAuthUi() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === AUTH_UI_HOST || LOCAL_DEV_HOSTS.has(host);
+}
+
+function redirectToAuthUi(page = "login") {
+  if (typeof window === "undefined") return;
+
+  const qs = window.location.search || "";
+  const path = AUTH_UI_PATHS[page] || "/login";
+  const target = `${AUTH_UI_BASE}${path}${qs}`;
+
+  if (window.location.href !== target) {
+    window.location.replace(target);
+  }
+}
+
 const FontLink = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Geist:wght@300;400;500&display=swap');
@@ -54,12 +82,28 @@ function ToastStack({ toasts }) {
   return (
     <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 8000, display: "flex", flexDirection: "column", gap: 6 }}>
       {toasts.map(t => (
-        <div key={t.id} style={{
-          background: "var(--ink-2)", border: "1px solid var(--line)",
-          borderLeft: `2px solid ${t.type === "danger" ? "var(--danger)" : t.type === "success" ? "var(--success)" : "var(--accent)"}`,
-          padding: "11px 16px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em",
-          color: "var(--paper)", minWidth: 220
-        }}>{`// ${t.msg}`}</div>
+        <div
+          key={t.id}
+          style={{
+            background: "var(--ink-2)",
+            border: "1px solid var(--line)",
+            borderLeft: `2px solid ${
+              t.type === "danger"
+                ? "var(--danger)"
+                : t.type === "success"
+                ? "var(--success)"
+                : "var(--accent)"
+            }`,
+            padding: "11px 16px",
+            fontFamily: "var(--mono)",
+            fontSize: 9,
+            letterSpacing: ".08em",
+            color: "var(--paper)",
+            minWidth: 220
+          }}
+        >
+          {`// ${t.msg}`}
+        </div>
       ))}
     </div>
   );
@@ -69,26 +113,53 @@ export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
 
-  // User Auth
-  const [authUser, setAuthUser] = useState(() => { const t = getToken(); return t ? parseJwt(t) : null; });
-  // Admin Auth
-  const [adminUser, setAdminUser] = useState(() => { const t = getAdminToken(); return t ? parseJwt(t) : null; });
+  const [authUser, setAuthUser] = useState(() => {
+    const t = getToken();
+    return t ? parseJwt(t) : null;
+  });
+
+  const [adminUser, setAdminUser] = useState(() => {
+    const t = getAdminToken();
+    return t ? parseJwt(t) : null;
+  });
 
   const [authReady, setAuthReady] = useState(false);
 
   const go = useCallback(id => {
+    const localAuthUi = canRenderLocalAuthUi();
+
+    if ((id === "login" || id === "register") && !localAuthUi) {
+      redirectToAuthUi(id);
+      return;
+    }
+
+    if (id === "admin_login" && !localAuthUi) {
+      redirectToAuthUi("admin_login");
+      return;
+    }
+
     if (PROTECTED_PAGES.has(id) && !getToken()) {
-      const path = PAGE_TO_PATH["login"] || "/login";
-      window.history.pushState({ page: "login" }, "", path);
-      setPage("login");
+      if (localAuthUi) {
+        const path = PAGE_TO_PATH["login"] || "/login";
+        window.history.pushState({ page: "login" }, "", path);
+        setPage("login");
+      } else {
+        redirectToAuthUi("login");
+      }
       return;
     }
+
     if (ADMIN_PAGES.has(id) && !getAdminToken()) {
-      const path = PAGE_TO_PATH["admin_login"] || "/admin/login";
-      window.history.pushState({ page: "admin_login" }, "", path);
-      setPage("admin_login");
+      if (localAuthUi) {
+        const path = PAGE_TO_PATH["admin_login"] || "/admin/login";
+        window.history.pushState({ page: "admin_login" }, "", path);
+        setPage("admin_login");
+      } else {
+        redirectToAuthUi("admin_login");
+      }
       return;
     }
+
     const path = PAGE_TO_PATH[id] || "/";
     window.history.pushState({ page: id }, "", path);
     setPage(id);
@@ -98,7 +169,6 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
 
-    // Check User Token
     const tok = getToken();
     if (tok) {
       const parsed = parseJwt(tok);
@@ -106,7 +176,6 @@ export default function App() {
       else { clearToken(); setAuthUser(null); }
     }
 
-    // Check Admin Token
     const admtok = getAdminToken();
     if (admtok) {
       const parsedA = parseJwt(admtok);
@@ -115,31 +184,75 @@ export default function App() {
     }
 
     const initialPage = getPageFromPath();
-    if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
-      const path = PAGE_TO_PATH["login"];
-      window.history.replaceState({ page: "login" }, "", path);
-      setPage("login");
-    } else if (ADMIN_PAGES.has(initialPage) && !getAdminToken()) {
-      const path = PAGE_TO_PATH["admin_login"];
-      window.history.replaceState({ page: "admin_login" }, "", path);
-      setPage("admin_login");
+    const localAuthUi = canRenderLocalAuthUi();
+
+    if ((initialPage === "login" || initialPage === "register") && !localAuthUi) {
+      redirectToAuthUi(initialPage);
+      return;
     }
+
+    if (initialPage === "admin_login" && !localAuthUi) {
+      redirectToAuthUi("admin_login");
+      return;
+    }
+
+    if (PROTECTED_PAGES.has(initialPage) && !getToken()) {
+      if (localAuthUi) {
+        const path = PAGE_TO_PATH["login"];
+        window.history.replaceState({ page: "login" }, "", path);
+        setPage("login");
+      } else {
+        redirectToAuthUi("login");
+        return;
+      }
+    } else if (ADMIN_PAGES.has(initialPage) && !getAdminToken()) {
+      if (localAuthUi) {
+        const path = PAGE_TO_PATH["admin_login"];
+        window.history.replaceState({ page: "admin_login" }, "", path);
+        setPage("admin_login");
+      } else {
+        redirectToAuthUi("admin_login");
+        return;
+      }
+    }
+
     setAuthReady(true);
   }, []);
 
   useEffect(() => {
     const onPop = () => {
       const p = getPageFromPath();
+      const localAuthUi = canRenderLocalAuthUi();
+
+      if ((p === "login" || p === "register") && !localAuthUi) {
+        redirectToAuthUi(p);
+        return;
+      }
+
+      if (p === "admin_login" && !localAuthUi) {
+        redirectToAuthUi("admin_login");
+        return;
+      }
+
       if (ADMIN_PAGES.has(p) && !getAdminToken()) {
-        window.history.replaceState({ page: "admin_login" }, "", PAGE_TO_PATH["admin_login"]);
-        setPage("admin_login");
+        if (localAuthUi) {
+          window.history.replaceState({ page: "admin_login" }, "", PAGE_TO_PATH["admin_login"]);
+          setPage("admin_login");
+        } else {
+          redirectToAuthUi("admin_login");
+        }
       } else if (PROTECTED_PAGES.has(p) && !getToken()) {
-        window.history.replaceState({ page: "login" }, "", PAGE_TO_PATH["login"]);
-        setPage("login");
+        if (localAuthUi) {
+          window.history.replaceState({ page: "login" }, "", PAGE_TO_PATH["login"]);
+          setPage("login");
+        } else {
+          redirectToAuthUi("login");
+        }
       } else {
         setPage(p);
       }
     };
+
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -168,9 +281,6 @@ export default function App() {
   _adminAuthRef.logout = adminLogout;
   _adminAuthRef.setUser = setAdminUser;
 
-  // We provide the active user based on whether we are in an admin page or not.
-  // Wait, if an admin page uses AuthContext, it needs the adminUser.
-  // We can dynamically swap out the provided context value.
   const isAdminPage = ADMIN_PAGES.has(page) || page === "admin_login";
   const authCtx = useMemo(() => ({
     authUser: isAdminPage ? adminUser : authUser,
@@ -178,30 +288,34 @@ export default function App() {
     logout: isAdminPage ? adminLogout : logout
   }), [authUser, adminUser, authReady, logout, adminLogout, isAdminPage]);
 
+  const localAuthUi = canRenderLocalAuthUi();
+
   return (
     <AuthContext.Provider value={authCtx}>
       <FontLink />
       <div className="grain" />
       <ToastStack toasts={toasts} />
-      {page === "landing"    && <Landing go={go} toast={toast} />}
-      {page === "login"      && <Login go={go} toast={toast} />}
-      {page === "admin_login"&& <AdminLogin go={go} toast={toast} />}
-      {page === "register"   && <Register go={go} toast={toast} />}
+
+      {page === "landing" && <Landing go={go} toast={toast} />}
+
+      {localAuthUi && page === "login" && <Login go={go} toast={toast} />}
+      {localAuthUi && page === "admin_login" && <AdminLogin go={go} toast={toast} />}
+      {localAuthUi && page === "register" && <Register go={go} toast={toast} />}
 
       {authReady && (
         <>
-          {page === "dashboard"  && <Dashboard go={go} toast={toast} />}
-          {page === "demo"       && <DemoActions go={go} toast={toast} />}
-          {page === "devices"    && <Devices go={go} toast={toast} />}
+          {page === "dashboard" && <Dashboard go={go} toast={toast} />}
+          {page === "demo" && <DemoActions go={go} toast={toast} />}
+          {page === "devices" && <Devices go={go} toast={toast} />}
 
-          {page === "admin"      && <Admin go={go} toast={toast} />}
-          {page === "auditlogs"  && <AuditLogs go={go} toast={toast} />}
-          {page === "sessions"   && <Sessions go={go} toast={toast} />}
-          {page === "recovery"   && <Recovery go={go} toast={toast} />}
-          {page === "rbac"       && <RBAC go={go} toast={toast} />}
-          {page === "policy"     && <PolicyEngine go={go} toast={toast} />}
-          {page === "risk"       && <RiskIntel go={go} toast={toast} />}
-          {page === "orgsettings"&& <OrgSettings go={go} toast={toast} />}
+          {page === "admin" && <Admin go={go} toast={toast} />}
+          {page === "auditlogs" && <AuditLogs go={go} toast={toast} />}
+          {page === "sessions" && <Sessions go={go} toast={toast} />}
+          {page === "recovery" && <Recovery go={go} toast={toast} />}
+          {page === "rbac" && <RBAC go={go} toast={toast} />}
+          {page === "policy" && <PolicyEngine go={go} toast={toast} />}
+          {page === "risk" && <RiskIntel go={go} toast={toast} />}
+          {page === "orgsettings" && <OrgSettings go={go} toast={toast} />}
         </>
       )}
     </AuthContext.Provider>
