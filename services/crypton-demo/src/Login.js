@@ -3,6 +3,7 @@ import { crypton, parseJwt, CryptonError, getSessionToken } from './sdk';
 import { _authRef } from './auth';
 import { BtnF } from './Buttons';
 import { MAIN_URL } from './config';
+import AnimatedHeading from './AnimatedHeading';
 
 // Minimal authenticated fetch for non-JSON endpoints
 async function _authFetch(path, options = {}) {
@@ -126,7 +127,12 @@ export default function Login({ go, toast }) {
         <button onClick={() => { if (view !== "login") setView("login"); else window.location.href = MAIN_URL; }} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "none", border: "none", cursor: "pointer", marginBottom: 48, display: "flex", alignItems: "center", gap: 10 }}
           onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>← {view === "login" ? "Back to Home" : "Cancel"}</button>
 
-        <h2 style={{ fontFamily: "var(--display)", fontSize: 52, textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 16 }}>
+        {view === "login" && (
+          <div style={{ fontFamily: "var(--display)", fontSize: "clamp(18px, 3vw, 26px)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>
+            <AnimatedHeading text="Login with Crypton" />
+          </div>
+        )}
+        <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(36px, 6vw, 52px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .95, marginBottom: 16 }}>
           {view === "login" && <>Authenticate<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>your identity</em></>}
           {view === "recover_start" && <>Recover<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>your account</em></>}
           {view === "recover_status" && <>Access<br /><em style={{ fontFamily: "var(--serif)", fontStyle: "italic" }}>Restricted</em></>}

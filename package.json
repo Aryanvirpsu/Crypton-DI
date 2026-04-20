@@ -2,7 +2,10 @@
   "name": "crypton",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["libs/*", "services/*"],
+  "workspaces": [
+    "libs/*",
+    "services/*"
+  ],
   "dependencies": {
     "@fal-ai/client": "^1.9.5",
     "@remotion/cli": "^4.0.438",
@@ -12,7 +15,7 @@
     "@testing-library/user-event": "^13.5.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-scripts": "^0.0.0",
+    "react-scripts": "^5.0.1",
     "remotion": "^4.0.443",
     "web-vitals": "^2.1.4"
   },

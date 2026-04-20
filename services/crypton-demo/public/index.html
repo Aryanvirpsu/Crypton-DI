@@ -5,9 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0A0A0A" />
     <title>Crypton Demo</title>
+    <style>
+      #pre-render-skeleton {
+        position: fixed; inset: 0;
+        background: #0A0A0A;
+        display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 18px;
+        z-index: 99999;
+        font-family: 'Bebas Neue', 'Arial Black', sans-serif;
+      }
+      #pre-render-skeleton .sk-word {
+        font-size: 52px; letter-spacing: 0.12em; color: #F4F1EC;
+        animation: skPulse 1.6s ease-in-out infinite;
+      }
+      #pre-render-skeleton .sk-bar {
+        width: 64px; height: 2px; background: #C8F55A;
+        animation: skPulse 1.6s ease-in-out infinite 0.5s;
+      }
+      @keyframes skPulse {
+        0%, 100% { opacity: 0.25; }
+        50%       { opacity: 0.85; }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="pre-render-skeleton">
+      <div class="sk-word">CRYPTON</div>
+      <div class="sk-bar"></div>
+    </div>
     <div id="root"></div>
   </body>
 </html>

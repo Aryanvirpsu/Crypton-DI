@@ -12,7 +12,9 @@
       "types": "./dist/types/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "build:esm": "tsc --project tsconfig.build.json --module ESNext --outDir dist/esm",
@@ -28,5 +30,8 @@
     "node-fetch": "^2.7.0",
     "ts-jest": "^29.1.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "crypton": "file:../../services/crypton-admin"
   }
 }

@@ -784,7 +784,7 @@ export default function Landing({ go, toast, openSim }) {
       {/* ── WAITLIST MODAL ── */}
       {wlOpen && (
         <div onClick={e => { if (e.target === e.currentTarget) { setWlOpen(false); setWlDone(false); setWlEmail(''); } }}
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.72)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          style={{ position:"fixed", inset:0, background:"rgba(10,10,10,0.60)", backdropFilter:"blur(14px) saturate(0.7)", WebkitBackdropFilter:"blur(14px) saturate(0.7)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"var(--ink)", border:"1px solid var(--line)", padding:"44px 52px", maxWidth:420, width:"90%", position:"relative" }}>
             <button onClick={() => { setWlOpen(false); setWlDone(false); setWlEmail(''); }}
               style={{ position:"absolute", top:16, right:18, background:"none", border:"none", color:"var(--muted)", fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>

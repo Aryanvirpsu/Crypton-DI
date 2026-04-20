@@ -11,3 +11,73 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ── Panel wall exit animation ───────────────────────────── */
+@keyframes panelReveal {
+  0%, 55% { opacity: 1; }
+  100%     { opacity: 0; }
+}
+
+/* ── Per-character heading drop ──────────────────────────── */
+@keyframes charDrop {
+  from { opacity: 0; transform: translateY(-30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Skeleton shimmer ────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ── Mobile: register / login layout ────────────────────── */
+@media (max-width: 768px) {
+  .register-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .register-vis {
+    display: none !important;
+  }
+  .register-form {
+    padding: 48px 28px !important;
+  }
+  .register-form h2 {
+    font-size: 40px !important;
+  }
+
+  /* Dashboard stat cards */
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard header */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 24px 20px 16px !important;
+  }
+  .page-header > div:last-child {
+    flex-wrap: wrap;
+  }
+
+  /* Dashboard body */
+  .page-body {
+    padding: 24px 20px 60px !important;
+  }
+
+  /* Orb section */
+  .orb-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .orb-vis {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(244,241,236,0.07) !important;
+    padding: 28px !important;
+  }
+
+  /* Sidebar: collapse on mobile */
+  .sb-label-txt { display: none !important; }
+  .si-label     { display: none !important; }
+  .si-badge     { display: none !important; }
+}

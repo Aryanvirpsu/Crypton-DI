@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { AuthContext } from './AuthContext';
+import PanelWall from './PanelWall';
 import { getToken, clearToken, getAdminToken, clearAdminToken, parseJwt, PROTECTED_PAGES, ADMIN_PAGES, _authRef, _adminAuthRef } from './auth';
 import { api, API_BASE } from './api';
 import { PAGE_TO_PATH, getPageFromPath } from './routes';
@@ -109,9 +110,41 @@ function ToastStack({ toasts }) {
   );
 }
 
+function PageLoadSkeleton() {
+  const sk = (h, w = '100%', mb = 8) => (
+    <div style={{
+      height: h, width: w,
+      background: 'var(--ink-3)',
+      backgroundImage: 'linear-gradient(90deg, var(--ink-3) 0%, rgba(255,255,255,0.05) 50%, var(--ink-3) 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.6s ease-in-out infinite',
+      marginBottom: mb, borderRadius: 2,
+    }} />
+  );
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--ink)', display: 'flex' }}>
+      <div style={{ width: 200, borderRight: '1px solid var(--line)', padding: '20px 12px', flexShrink: 0 }}>
+        {sk(24, '80%', 24)}
+        {[0,1,2].map(i => <div key={i} style={{ marginBottom: 4 }}>{sk(32)}</div>)}
+        {sk(12, '50%', 20)}
+        {[0,1,2,3,4].map(i => <div key={i} style={{ marginBottom: 4 }}>{sk(32)}</div>)}
+      </div>
+      <div style={{ flex: 1, padding: '36px 44px' }}>
+        {sk(36, '36%', 8)}
+        {sk(12, '18%', 32)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: 'var(--line)', marginBottom: 24 }}>
+          {[0,1,2].map(i => <div key={i} style={{ background: 'var(--ink-2)', padding: 24 }}>{sk(52)}{sk(12,'60%',0)}</div>)}
+        </div>
+        {sk(120, '100%', 0)}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
+  const [wallDone, setWallDone] = useState(() => sessionStorage.getItem('cw') === '1');
 
   const [authUser, setAuthUser] = useState(() => {
     const t = getToken();
@@ -296,11 +329,17 @@ export default function App() {
       <div className="grain" />
       <ToastStack toasts={toasts} />
 
+      {!wallDone && (
+        <PanelWall onDone={() => { sessionStorage.setItem('cw', '1'); setWallDone(true); }} />
+      )}
+
       {page === "landing" && <Landing go={go} toast={toast} />}
 
       {localAuthUi && page === "login" && <Login go={go} toast={toast} />}
       {localAuthUi && page === "admin_login" && <AdminLogin go={go} toast={toast} />}
       {localAuthUi && page === "register" && <Register go={go} toast={toast} />}
+
+      {!authReady && (PROTECTED_PAGES.has(page) || ADMIN_PAGES.has(page)) && <PageLoadSkeleton />}
 
       {authReady && (
         <>
