@@ -18,6 +18,7 @@ import Devices from "./Devices";
 import DemoActions from "./demo-app/DemoActions";
 
 import Admin from './Admin';
+import AdminDashboard from './AdminDashboard';
 import AuditLogs from './AuditLogs';
 import Sessions from './Sessions';
 import Recovery from './Recovery';
@@ -347,7 +348,7 @@ export default function App() {
           {page === "demo" && <DemoActions go={go} toast={toast} />}
           {page === "devices" && <Devices go={go} toast={toast} />}
 
-          {page === "admin" && <Admin go={go} toast={toast} />}
+          {page === "admin" && <AdminDashboard go={go} toast={toast} />}
           {page === "auditlogs" && <AuditLogs go={go} toast={toast} />}
           {page === "sessions" && <Sessions go={go} toast={toast} />}
           {page === "recovery" && <Recovery go={go} toast={toast} />}

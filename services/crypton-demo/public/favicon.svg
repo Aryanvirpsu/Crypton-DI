@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="32" fill="#0A0A0A"/>
+  <!--
+    Segmented C: circle r=20 at center (32,32)
+    Circumference = 2*pi*20 ≈ 125.66
+    Arc spans 270° = 3/4 of circle = ~94.25 units
+    7 segments over 270°, gap = 4° ≈ 1.40 units each (6 gaps)
+    Segment arc = (94.25 - 6*1.40) / 7 ≈ (94.25 - 8.38) / 7 ≈ 12.27 units each
+
+    stroke-dasharray: segment dash, gap between segments
+    rotate so the opening faces right (gap at 0°/right side)
+    Start at 225° (bottom-left going clockwise to top-left then across bottom)
+  -->
+  <circle
+    cx="32" cy="32" r="20"
+    fill="none"
+    stroke="#F4F1EC"
+    stroke-width="8"
+    stroke-linecap="square"
+    stroke-dasharray="12.27 3.57"
+    stroke-dashoffset="-15.7"
+    transform="rotate(135 32 32)"
+  />
+</svg>

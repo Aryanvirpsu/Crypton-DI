@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PAGE_LABELS } from './constants';
 import { useAuth } from './AuthContext';
 import { ADMIN_PAGES } from './auth';
@@ -14,12 +15,12 @@ function Breadcrumb({ page, go }) {
   );
 }
 
-function Sidebar({ active, go }) {
+function Sidebar({ active, go, isOpen, onClose }) {
   const { authUser, logout } = useAuth();
   const isAdmin = ADMIN_PAGES.has(active) || active === "admin";
 
   const navBtn = (item) => (
-    <button key={item.id} onClick={() => go(item.id)} style={{
+    <button key={item.id} onClick={() => { go(item.id); onClose && onClose(); }} style={{
       display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
       cursor: "pointer", fontSize: 13, color: active === item.id ? "var(--paper)" : "var(--muted)",
       border: "none", background: active === item.id ? "rgba(200,245,90,.07)" : "none",
@@ -54,12 +55,17 @@ function Sidebar({ active, go }) {
   ];
 
   return (
-    <aside style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", overflowX: "hidden" }}>
-      <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, cursor: "pointer" }} onClick={() => window.location.href = MAIN_URL}>
+    <aside className={`app-sidebar${isOpen ? " open" : ""}`} style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", overflowX: "hidden" }}>
+      <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => window.location.href = MAIN_URL}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
           <span className="sb-mark" style={{ fontFamily: "var(--display)", fontSize: 16, letterSpacing: ".12em" }}>CRYPTON</span>
         </div>
+        {onClose && (
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 4 }}>✕</button>
+        )}
+      </div>
+      <div style={{ padding: "8px 16px 12px", borderBottom: "1px solid var(--line)" }}>
         <a href={MAIN_URL} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", background: "rgba(255,255,255,.03)", border: "1px solid var(--line)", cursor: "pointer", transition: "color .2s, background .2s", textDecoration: "none" }}
           onMouseEnter={e => { e.currentTarget.style.color = "var(--paper)"; e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "rgba(255,255,255,.03)"; }}>
@@ -74,7 +80,7 @@ function Sidebar({ active, go }) {
             {sectionLabel("Operator Panel")}
             {adminNavItems.map(navBtn)}
             <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-              <button onClick={() => go("dashboard")} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left", fontFamily: "var(--body)", transition: "color .15s" }}
+              <button onClick={() => { go("dashboard"); onClose && onClose(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left", fontFamily: "var(--body)", transition: "color .15s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>
                 <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>◈</span>
                 <span className="si-label">← Demo App</span>
@@ -87,7 +93,7 @@ function Sidebar({ active, go }) {
             {userNavItems.map(navBtn)}
             <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
               {sectionLabel("Operator")}
-              <button onClick={() => go("admin")} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left", fontFamily: "var(--body)", transition: "color .15s" }}
+              <button onClick={() => { go("admin"); onClose && onClose(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left", fontFamily: "var(--body)", transition: "color .15s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>
                 <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>⚙</span>
                 <span className="si-label">Admin Panel →</span>
@@ -116,37 +122,36 @@ function Sidebar({ active, go }) {
   );
 }
 
-function BottomTabBar({ active, go }) {
-  const tabs = [
-    { id: "dashboard", ico: "◈", label: "Home" },
-    { id: "devices",   ico: "📱", label: "Devices" },
-    { id: "demo",      ico: "⚡", label: "Actions" },
-  ];
+function MobileHeader({ onMenuOpen }) {
   return (
-    <div className="bottom-tabs">
-      <div className="bottom-tabs-inner">
-        {tabs.map(t => (
-          <button key={t.id} className={`tab-btn${active === t.id ? " active" : ""}`} onClick={() => go(t.id)}>
-            <span>{t.ico}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
+    <div className="mobile-header" style={{ display: "none", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "var(--ink-2)", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 100, flexShrink: 0 }}>
+      <span style={{ fontFamily: "var(--display)", fontSize: 18, letterSpacing: ".12em" }}>CRYPTON</span>
+      <button onClick={onMenuOpen} style={{ background: "none", border: "1px solid var(--line2)", color: "var(--paper)", cursor: "pointer", fontSize: 16, padding: "6px 10px", lineHeight: 1 }}>☰</button>
     </div>
   );
 }
 
 export default function AppShell({ active, go, children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div style={{ display: "flex", flexDirection: "row", minHeight: "100vh", overflow: "hidden" }}>
-      <Sidebar active={active} go={go} />
+      {/* Backdrop for mobile sidebar */}
+      <div
+        className={`sidebar-backdrop${sidebarOpen ? " visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9400 }}
+      />
+
+      <Sidebar active={active} go={go} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       <main className="app-main" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <MobileHeader onMenuOpen={() => setSidebarOpen(true)} />
         <div className="breadcrumb-wrap" style={{ padding: "14px 44px 0", borderBottom: "none" }}>
           <Breadcrumb page={active} go={go} />
         </div>
         {children}
       </main>
-      <BottomTabBar active={active} go={go} />
     </div>
   );
 }

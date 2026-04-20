@@ -192,7 +192,7 @@ export default function UserDashboard({ go, toast }) {
             Recent Activity
             <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div className="pg-in" style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)" }}>
+          <div className="pg-in activity-feed" style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)" }}>
             {activity.map(a => <ActivityItem key={a.id} {...a} t={a.type || a.status} go={go} />)}
           </div>
         </div>

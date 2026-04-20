@@ -183,7 +183,7 @@ export default function AdminDashboard({ go, toast }) {
           </div>
 
           {/* Quick links + recent activity */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--line)', marginBottom: 28, border: '1px solid var(--line)' }}>
+          <div className="admin-quick-links" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--line)', marginBottom: 28, border: '1px solid var(--line)' }}>
             <div style={{ background: 'var(--ink-2)', padding: '28px 24px' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 16 }}>Quick Access</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -215,7 +215,7 @@ export default function AdminDashboard({ go, toast }) {
             <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
             <button onClick={() => go('auditlogs')} style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '.08em' }}>View all →</button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--line)' }}>
+          <div className="activity-feed" style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--line)' }}>
             {activity.map(a => <ActivityItem key={a.id} {...a} t={a.type} go={go} />)}
           </div>
         </div>
