@@ -105,7 +105,7 @@ export default function PanelWall({ onDone, intro = true }) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: intro ? 10000 : 0,
+        zIndex: intro ? 10000 : -1,
         pointerEvents: intro ? 'auto' : 'none',
         display: 'grid',
         gridTemplateColumns: `repeat(${COLS}, 1fr)`,
