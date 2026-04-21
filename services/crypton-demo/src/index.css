@@ -12,10 +12,11 @@ code {
     monospace;
 }
 
-/* ── Panel wall exit animation ───────────────────────────── */
-@keyframes panelReveal {
-  0%, 55% { opacity: 1; }
-  100%     { opacity: 0.05; }
+/* ── Panel wall drop-in animation ────────────────────────── */
+@keyframes panelDrop {
+  0%   { opacity: 0; transform: translateY(-40px); }
+  65%  { opacity: 1; transform: translateY(5px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Skeleton shimmer ────────────────────────────────────── */
