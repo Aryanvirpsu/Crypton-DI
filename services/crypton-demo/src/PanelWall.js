@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 
 const HOVER_RADIUS = 160;
 const STAGGER_MS   = 60;
-const DROP_MS      = 500;
+const DROP_MS      = 620;
 const LAND_MS      = 500;
 
 // Tile backgrounds — subtle radial gradient gives a soft pillowed 3D look
@@ -77,7 +77,7 @@ export default function PanelWall({ onDone, intro = true }) {
             // Animation on the WRAPPER so translateY(-100vh) escapes container
             // without overflow:hidden clipping it
             ...(intro ? {
-              animation: `panelDrop ${DROP_MS}ms cubic-bezier(0.23,1,0.32,1) ${delay}ms both`,
+              animation: `panelDrop ${DROP_MS}ms cubic-bezier(0.16,1,0.3,1) ${delay}ms both`,
             } : {}),
           }}
         >

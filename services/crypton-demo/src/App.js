@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { AuthContext } from './AuthContext';
 import PanelWall from './PanelWall';
 import { getToken, clearToken, getAdminToken, clearAdminToken, parseJwt, PROTECTED_PAGES, ADMIN_PAGES, _authRef, _adminAuthRef } from './auth';
@@ -145,7 +145,9 @@ function PageLoadSkeleton() {
 export default function App() {
   const [page, setPage] = useState(getPageFromPath);
   const [toasts, addToast] = useToasts();
-  const [wallDone, setWallDone] = useState(() => sessionStorage.getItem('cw') === '1');
+  const initialWallDone = useRef(sessionStorage.getItem('cw') === '1');
+  const [wallDone, setWallDone] = useState(() => initialWallDone.current);
+  const [showContent, setShowContent] = useState(() => initialWallDone.current);
 
   const [authUser, setAuthUser] = useState(() => {
     const t = getToken();
@@ -296,6 +298,7 @@ export default function App() {
   const onPanelWallDone = useCallback(() => {
     sessionStorage.setItem('cw', '1');
     setWallDone(true);
+    setTimeout(() => setShowContent(true), 80);
   }, []);
 
   const logout = useCallback(() => {
@@ -339,6 +342,15 @@ export default function App() {
         intro={!wallDone}
         onDone={onPanelWallDone}
       />
+
+      <div style={{
+        position: 'fixed', inset: 0,
+        background: 'var(--ink)',
+        zIndex: 5000,
+        opacity: showContent ? 0 : 1,
+        transition: showContent && !initialWallDone.current ? 'opacity 500ms ease' : 'none',
+        pointerEvents: 'none',
+      }} />
 
       {page === "landing" && <Landing go={go} toast={toast} />}
 

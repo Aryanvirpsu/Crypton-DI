@@ -14,9 +14,9 @@ code {
 
 /* ── Panel wall: tile falls from top of screen ───────────── */
 @keyframes panelDrop {
-  0%   { transform: translateY(-100vh); }
-  72%  { transform: translateY(6px); }
-  86%  { transform: translateY(-2px); }
+  0%   { transform: translateY(-100vh); opacity: 0; }
+  18%  { opacity: 1; }
+  80%  { transform: translateY(5px); }
   100% { transform: translateY(0); }
 }
 
