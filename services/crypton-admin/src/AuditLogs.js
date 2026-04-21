@@ -16,7 +16,8 @@ export default function AuditLogs({ go, toast }) {
     api.get("/audit-logs").then(data => {
       if (data && Array.isArray(data.logs)) setLogs(data.logs);
     }).catch(err => {
-      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+      if (err?.code === "access_denied") { go("login"); return; }
+      setPageError("load_failed");
     }).finally(() => setLoading(false));
   }, []);
 

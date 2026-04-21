@@ -25,7 +25,8 @@ export default function Sessions({ go, toast }) {
         })));
       }
     }).catch(err => {
-      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+      if (err?.code === "access_denied") { go("login"); return; }
+      setPageError("load_failed");
     }).finally(() => setLoaded(true));
   }, []);
 

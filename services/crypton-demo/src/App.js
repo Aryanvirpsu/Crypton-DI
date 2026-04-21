@@ -330,9 +330,10 @@ export default function App() {
       <div className="grain" />
       <ToastStack toasts={toasts} />
 
-      {!wallDone && (
-        <PanelWall onDone={() => { sessionStorage.setItem('cw', '1'); setWallDone(true); }} />
-      )}
+      <PanelWall
+        intro={!wallDone}
+        onDone={() => { sessionStorage.setItem('cw', '1'); setWallDone(true); }}
+      />
 
       {page === "landing" && <Landing go={go} toast={toast} />}
 

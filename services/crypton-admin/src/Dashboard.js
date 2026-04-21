@@ -58,14 +58,16 @@ export default function Dashboard({ go, toast }) {
     api.get("/admin/dashboard/stats").then(data => {
       if (data && typeof data === 'object') setStats(data);
     }).catch(err => {
+      if (err?.code === "access_denied") { go("login"); return; }
       setStats({});
-      setPageError(p => p || (err?.code === "access_denied" ? "access_denied" : "load_failed"));
+      setPageError(p => p || "load_failed");
     });
     api.get("/admin/dashboard/activity").then(data => {
       setActivity(Array.isArray(data) ? data : []);
     }).catch(err => {
+      if (err?.code === "access_denied") { go("login"); return; }
       setActivity([]);
-      setPageError(p => p || (err?.code === "access_denied" ? "access_denied" : "load_failed"));
+      setPageError(p => p || "load_failed");
     });
   }, []);
 

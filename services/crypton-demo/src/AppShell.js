@@ -55,7 +55,7 @@ function Sidebar({ active, go, isOpen, onClose }) {
   ];
 
   return (
-    <aside className={`app-sidebar${isOpen ? " open" : ""}`} style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", overflowX: "hidden" }}>
+    <aside className={`app-sidebar${isOpen ? " open" : ""}`} style={{ width: 220, flexShrink: 0, background: "var(--ink-2)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", overflowY: "auto", overflowX: "hidden" }}>
       <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => window.location.href = MAIN_URL}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
@@ -91,14 +91,6 @@ function Sidebar({ active, go, isOpen, onClose }) {
           <>
             {sectionLabel("Nexus Demo App")}
             {userNavItems.map(navBtn)}
-            <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-              {sectionLabel("Operator")}
-              <button onClick={() => { go("admin"); onClose && onClose(); }} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", fontSize: 13, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", width: "100%", textAlign: "left", fontFamily: "var(--body)", transition: "color .15s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "var(--paper)"} onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>
-                <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>⚙</span>
-                <span className="si-label">Admin Panel →</span>
-              </button>
-            </div>
           </>
         )}
       </nav>
@@ -124,7 +116,7 @@ function Sidebar({ active, go, isOpen, onClose }) {
 
 function MobileHeader({ onMenuOpen }) {
   return (
-    <div className="mobile-header" style={{ display: "none", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "var(--ink-2)", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 100, flexShrink: 0 }}>
+    <div className="mobile-header" style={{ alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "var(--ink-2)", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 100, flexShrink: 0 }}>
       <span style={{ fontFamily: "var(--display)", fontSize: 18, letterSpacing: ".12em" }}>CRYPTON</span>
       <button onClick={onMenuOpen} style={{ background: "none", border: "1px solid var(--line2)", color: "var(--paper)", cursor: "pointer", fontSize: 16, padding: "6px 10px", lineHeight: 1 }}>☰</button>
     </div>

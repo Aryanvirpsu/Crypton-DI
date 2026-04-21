@@ -15,7 +15,7 @@ code {
 /* ── Panel wall exit animation ───────────────────────────── */
 @keyframes panelReveal {
   0%, 55% { opacity: 1; }
-  100%     { opacity: 0; }
+  100%     { opacity: 0.05; }
 }
 
 /* ── Skeleton shimmer ────────────────────────────────────── */
@@ -36,6 +36,13 @@ code {
 @keyframes orbDanger {
   0%, 100% { opacity: 0.75; transform: scale(1); }
   50%      { opacity: 1;    transform: scale(1.08); }
+}
+
+/* ── Sidebar: sticky on desktop ─────────────────────────── */
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 
 /* ── Mobile: hide sidebar backdrop by default ────────────── */

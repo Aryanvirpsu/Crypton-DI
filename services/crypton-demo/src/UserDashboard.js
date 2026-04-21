@@ -149,7 +149,6 @@ export default function UserDashboard({ go, toast }) {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <BtnF onClick={() => go("register")} style={{ padding: "8px 16px", fontSize: 9 }}>+ Add Passkey</BtnF>
-          <BtnO onClick={() => go("admin_login")} style={{ padding: "8px 16px", fontSize: 9 }}>Admin Dashboard →</BtnO>
         </div>
       </div>
 

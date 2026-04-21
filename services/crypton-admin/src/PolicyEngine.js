@@ -15,7 +15,8 @@ export default function PolicyEngine({ go, toast }) {
     api.get("/policies").then(data => {
       if (Array.isArray(data) && data.length > 0) setPolicies(data);
     }).catch(err => {
-      setPageError(err?.code === "access_denied" ? "access_denied" : "load_failed");
+      if (err?.code === "access_denied") { go("login"); return; }
+      setPageError("load_failed");
     });
   }, []);
 

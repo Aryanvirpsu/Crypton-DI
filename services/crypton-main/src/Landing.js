@@ -610,7 +610,25 @@ export default function Landing({ go, toast, openSim }) {
             <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,6.5vw,88px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 48 }}>
               Every request.<br /><span style={{ color: "var(--accent)" }}>Cryptographically proven.</span>
             </h2>
-            <TrustAnimation />
+            <div className="trust-anim-wrap">
+              <TrustAnimation />
+            </div>
+            <div className="trust-mobile" style={{ display: "none", flexDirection: "column", gap: 0, border: "1px solid var(--line)" }}>
+              {[
+                { n: "01", t: "Challenge", d: "Server issues a time-bound nonce." },
+                { n: "02", t: "Sign",      d: "Device hardware signs the nonce." },
+                { n: "03", t: "Verify",    d: "Server verifies the signature." },
+                { n: "04", t: "Granted",   d: "Access confirmed. Sub-200ms." },
+              ].map((s, i) => (
+                <div key={s.n} style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 20px", borderBottom: i < 3 ? "1px solid var(--line)" : "none", background: "var(--ink-2)" }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", width: 24, flexShrink: 0 }}>{s.n}</div>
+                  <div>
+                    <div style={{ fontFamily: "var(--display)", fontSize: 18, letterSpacing: ".06em", textTransform: "uppercase" }}>{s.t}</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", marginTop: 2 }}>{s.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -619,7 +637,7 @@ export default function Landing({ go, toast, openSim }) {
           <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16 }}>
             <span>03 — Who It's For</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, border: "1px solid var(--line)" }}>
+          <div className="rv who-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, border: "1px solid var(--line)" }}>
             {[
               { tag: "FOR DEVELOPERS", icon: "</>", title: "Developers", line: "Ship zero-trust auth in a single SDK call.", chips: ["SaaS","Dev Tools","Open Source","API-first"] },
               { tag: "FOR TEAMS",      icon: "⬡⬡",  title: "Teams",      line: "Replace passwords across your org without friction.", chips: ["Fintech","HealthTech","Legal","Remote-first"] },
@@ -649,7 +667,9 @@ export default function Landing({ go, toast, openSim }) {
           <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 100 }}>
             <span>06 — Before vs After</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <BeforeAfter />
+          <div className="before-after-table">
+            <BeforeAfter />
+          </div>
         </section>
 
         {/* ══ PRICING ══ */}
@@ -657,7 +677,7 @@ export default function Landing({ go, toast, openSim }) {
           <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 140 }}>
             <span>07 — Pricing</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div className="rv" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
+          <div className="rv pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
             {[
               { badge: "Free",       sub: "Developer / Startup",    price: "$0",     note: "",        features: ["Up to 5 users / 10 devices","Passkey-based login","Basic device enrollment","Simple admin dashboard","Manual device approval"], cta: "Start Free" },
               { badge: "Starter",    sub: "Small Teams",            price: "$5",     note: "per user / mo",  features: ["Up to 50 users","Multiple devices per user","Device trust policies","Admin controls + logs","Email support"], cta: "Get Started" },
@@ -1350,7 +1370,7 @@ function AttackTerminal() {
         style={{border:'1px solid var(--line)'}}
       >
         {/* 6-card row */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:0}}>
+        <div className="attack-cards" style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:0}}>
           {ATTACKS.map((atk,i)=>{
             const isActive = active===atk.id;
             return (

@@ -90,8 +90,49 @@ code {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 767px) {
+  html, body { overflow-x: hidden; max-width: 100vw; }
+  * { box-sizing: border-box; }
+
+  /* Nav */
   .landing-nav { padding: 0 20px; }
   .nav-links-wrap { display: none !important; }
   .nav-desktop-btns { display: none !important; }
   .mob-menu-btn { display: flex; }
+
+  /* Section padding */
+  .section-pad { padding-left: 20px !important; padding-right: 20px !important; }
+  #hero { padding-left: 20px !important; padding-right: 20px !important; padding-bottom: 56px !important; }
+
+  /* Features — 2-col manifesto stacks */
+  .manifesto-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+
+  /* Protocol steps — stack vertically */
+  .hiw-grid { grid-template-columns: 1fr !important; }
+
+  /* Trust animation — hide canvas, show static fallback */
+  .trust-anim-wrap { display: none !important; }
+  .trust-mobile    { display: flex !important; }
+
+  /* Who It's For — stack cards */
+  .who-grid { grid-template-columns: 1fr !important; }
+
+  /* Attack cards — 2×3 grid instead of 6-col row */
+  .attack-cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1px !important;
+    background: var(--line) !important;
+  }
+
+  /* BeforeAfter table — horizontal scroll only */
+  .before-after-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Pricing — 2×2 */
+  .pricing-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* About — stack */
+  .about-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+
+  /* Footer — 2-col, brand spans full width */
+  .footer-grid { grid-template-columns: 1fr 1fr !important; gap: 24px !important; }
+  .footer-brand { grid-column: 1 / -1; }
 }
