@@ -12,12 +12,19 @@ code {
     monospace;
 }
 
-/* ── Panel wall drop-in animation ────────────────────────── */
+/* ── Panel wall: tile falls from top of screen ───────────── */
 @keyframes panelDrop {
   0%   { transform: translateY(-100vh); }
-  75%  { transform: translateY(6px); }
-  88%  { transform: translateY(-3px); }
+  72%  { transform: translateY(6px); }
+  86%  { transform: translateY(-2px); }
   100% { transform: translateY(0); }
+}
+
+/* ── Panel wall: brief green flash on landing ────────────── */
+@keyframes panelLand {
+  0%   { box-shadow: inset 0 0 28px rgba(200,245,90,0.6); }
+  60%  { box-shadow: inset 0 0 10px rgba(200,245,90,0.15); }
+  100% { box-shadow: none; }
 }
 
 /* ── Skeleton shimmer ────────────────────────────────────── */

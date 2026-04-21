@@ -293,6 +293,11 @@ export default function App() {
 
   const toast = useCallback((msg, type = "info") => addToast(msg, type), [addToast]);
 
+  const onPanelWallDone = useCallback(() => {
+    sessionStorage.setItem('cw', '1');
+    setWallDone(true);
+  }, []);
+
   const logout = useCallback(() => {
     import('./sdk').then(({ crypton }) => crypton.auth.logout()).catch(() => {});
     clearToken();
@@ -332,7 +337,7 @@ export default function App() {
 
       <PanelWall
         intro={!wallDone}
-        onDone={() => { sessionStorage.setItem('cw', '1'); setWallDone(true); }}
+        onDone={onPanelWallDone}
       />
 
       {page === "landing" && <Landing go={go} toast={toast} />}
