@@ -528,6 +528,7 @@ export default function Landing({ go, toast, openSim }) {
             <div style={{ overflow: "hidden" }}>
               <div className="hl2" style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "clamp(52px,12.5vw,180px)", lineHeight: .9, transform: "translateY(110%)", display: "block" }}>Redefined.</div>
             </div>
+            <div className="hero-sub" style={{ fontFamily: "var(--body)", fontSize: "clamp(14px,1.4vw,18px)", color: "var(--muted)", fontWeight: 300, letterSpacing: ".01em", marginTop: 20, opacity: 0, transform: "translateY(12px)", transition: "opacity .6s ease, transform .6s ease" }}>Passwordless login. No OTPs. No compromises.</div>
             <div className="hero-meta" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--line)", opacity: 0, flexWrap: "wrap", gap: 16 }}>
               <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 300, lineHeight: 1.75, fontWeight: 300 }}>Authentication powered by hardware cryptography. Every request verified. Every device accountable.</p>
               <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted)", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => scrollTo("about")}>
@@ -567,7 +568,7 @@ export default function Landing({ go, toast, openSim }) {
             {/* Left — headline */}
             <div>
               <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(40px,4.5vw,66px)", lineHeight: 1.1, letterSpacing: "-.01em", marginBottom: 48 }}>
-                Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built the alternative.
+                Passwords were a<br /><em style={{ fontStyle: "italic", color: "var(--muted)" }}>compromise.</em><br />We built what comes next.
               </div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <BtnF onClick={() => go('demo')}>Try Demo →</BtnF>
@@ -577,9 +578,9 @@ export default function Landing({ go, toast, openSim }) {
             {/* Right — bullet features */}
             <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: "1px solid var(--line)" }}>
               {[
-                { i: "F.01", t: "No Passwords", b: "Eliminate the entire password attack surface. No phishing, no credential stuffing, no breached database exposure." },
-                { i: "F.02", t: "Hardware Keys", b: "Private keys generated and stored in device secure enclaves. Extraction is physically impossible by design." },
-                { i: "F.03", t: "Zero Trust", b: "Every single request independently verified. No implicit trust. Deny by default, verify by cryptographic proof." },
+                { i: "F.01", t: "No Passwords", b: "Nothing to remember. Nothing to steal." },
+                { i: "F.02", t: "Hardware Keys", b: "Identity tied to your device, not your memory." },
+                { i: "F.03", t: "Zero Trust", b: "Every request proven, not assumed." },
               ].map((f, idx) => (
                 <FeatureBullet key={f.i} f={f} />
               ))}
@@ -596,9 +597,9 @@ export default function Landing({ go, toast, openSim }) {
           <p className="rv rv-1" style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, fontWeight: 300, lineHeight: 1.75, marginBottom: 0 }}>A deterministic challenge-response protocol. No shared secrets. No replay attacks. Mathematically sound.</p>
           <div className="rv rv-1 hiw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, background: "var(--line)", marginTop: 72, border: "1px solid var(--line)" }}>
             {[
-              { n: "01", t: "Challenge", b: "Server issues a time-bound nonce. Non-repeatable. Cannot be predicted." },
-              { n: "02", t: "Sign", b: "Device hardware signs the nonce. Private key never leaves the chip." },
-              { n: "03", t: "Verify", b: "Server verifies the signature against your public key. Sub-200ms." },
+              { n: "01", t: "Challenge", b: "Server asks you to prove it's you." },
+              { n: "02", t: "Sign", b: "Your device signs the request. Private key never leaves the chip." },
+              { n: "03", t: "Verify", b: "We verify it. Access granted." },
             ].map(c => <HiWCard key={c.n} {...c} />)}
           </div>
           {/* Live animation — merged into protocol */}
@@ -608,7 +609,7 @@ export default function Landing({ go, toast, openSim }) {
               <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
             </div>
             <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,6.5vw,88px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 48 }}>
-              Every request.<br /><span style={{ color: "var(--accent)" }}>Cryptographically proven.</span>
+              Every request.<br /><span style={{ color: "var(--accent)" }}>Proven, not trusted.</span>
             </h2>
             <div className="trust-anim-wrap">
               <TrustAnimation />
@@ -639,9 +640,9 @@ export default function Landing({ go, toast, openSim }) {
           </div>
           <div className="rv who-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, border: "1px solid var(--line)" }}>
             {[
-              { tag: "FOR DEVELOPERS", icon: "</>", title: "Developers", line: "Ship zero-trust auth in a single SDK call.", chips: ["SaaS","Dev Tools","Open Source","API-first"] },
-              { tag: "FOR TEAMS",      icon: "⬡⬡",  title: "Teams",      line: "Replace passwords across your org without friction.", chips: ["Fintech","HealthTech","Legal","Remote-first"] },
-              { tag: "FOR ENTERPRISE", icon: "▣",   title: "Enterprises", line: "Hardware-attested identity with compliance built in.", chips: ["Banking","Defence","Gov","Critical Infra"] },
+              { tag: "FOR DEVELOPERS", icon: "</>", title: "Developers", line: "Ship authentication in minutes, not weeks.", chips: ["SaaS","Dev Tools","Open Source","API-first"] },
+              { tag: "FOR TEAMS",      icon: "⬡⬡",  title: "Teams",      line: "Remove passwords across your entire organization without friction.", chips: ["Fintech","HealthTech","Legal","Remote-first"] },
+              { tag: "FOR ENTERPRISE", icon: "▣",   title: "Enterprise",  line: "Security that scales without added friction.", chips: ["Banking","Defence","Gov","Critical Infra"] },
             ].map((c, idx) => <WhoCard key={c.tag} card={c} idx={idx} scrollTo={scrollTo} />)}
           </div>
         </section>
@@ -677,14 +678,12 @@ export default function Landing({ go, toast, openSim }) {
           <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 140 }}>
             <span>07 — Pricing</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <div className="rv pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)" }}>
-            {[
-              { badge: "Free",       sub: "Developer / Startup",    price: "$0",     note: "",        features: ["Up to 5 users / 10 devices","Passkey-based login","Basic device enrollment","Simple admin dashboard","Manual device approval"], cta: "Start Free" },
-              { badge: "Starter",    sub: "Small Teams",            price: "$5",     note: "per user / mo",  features: ["Up to 50 users","Multiple devices per user","Device trust policies","Admin controls + logs","Email support"], cta: "Get Started" },
-              { badge: "Growth",     sub: "Scaling Companies",      price: "$10",    note: "per user / mo",  features: ["Unlimited users & devices","Advanced trust policies","Risk-based access decisions","API access & integrations","Audit logs + compliance"], cta: "Start Growing" },
-              { badge: "Enterprise", sub: "Security-First Orgs",    price: "Custom", note: "contact us",     features: ["Custom deployment","SOC2 / HIPAA alignment","Dedicated support","On-prem / hybrid options","SLA guarantees"], cta: "Get in Touch" },
-            ].map((p, i) => <PricingCard2 key={p.badge} plan={p} go={go} toast={toast} />)}
-          </div>
+          <PricingGrid go={go} toast={toast} plans={[
+            { badge: "Free",       sub: "Developer / Startup",    price: "$0",     note: "",               features: ["Up to 5 users / 10 devices","Passkey-based login","Basic device enrollment","Simple admin dashboard","Manual device approval"], cta: "Start Free" },
+            { badge: "Starter",    sub: "Small Teams",            price: "$5",     note: "per user / mo",  features: ["Up to 50 users","Multiple devices per user","Device trust policies","Admin controls + logs","Email support"], cta: "Get Started" },
+            { badge: "Growth",     sub: "Scaling Companies",      price: "$10",    note: "per user / mo",  features: ["Unlimited users & devices","Advanced trust policies","Risk-based access decisions","API access & integrations","Audit logs + compliance"], cta: "Start Growing" },
+            { badge: "Enterprise", sub: "Security-First Orgs",    price: "Custom", note: "contact us",     features: ["Custom deployment","SOC2 / HIPAA alignment","Dedicated support","On-prem / hybrid options","SLA guarantees"], cta: "Get in Touch" },
+          ]} />
         </section>
 
         {/* ══ 04 — ABOUT ══ */}
@@ -700,7 +699,7 @@ export default function Landing({ go, toast, openSim }) {
               </h2>
               <div style={{ width: 40, height: 1, background: "var(--accent)", marginBottom: 36 }} />
               <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.9, fontWeight: 300, marginBottom: 24 }}>
-                Crypton is a zero-trust identity platform built on hardware cryptography. We replace passwords, OTPs, and shared secrets with device-bound keys that never leave your hardware.
+                Crypton removes passwords, OTPs, and shared secrets. Every login is tied to a real device. Every request is verified.
               </p>
               <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.9, fontWeight: 300, marginBottom: 36 }}>
                 Every authentication is a cryptographic proof. Every device is independently verified. Every session is visible and revocable in real time.
@@ -734,7 +733,7 @@ export default function Landing({ go, toast, openSim }) {
           {/* Big headline */}
           <div className="rv" style={{ marginBottom: 96 }}>
             <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(52px,8vw,110px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .92, maxWidth: 900 }}>
-              Trust as a<br /><span style={{ color: "var(--accent)" }}>built-in</span><br />property.
+              Trust isn't added later.<br /><span style={{ color: "var(--accent)" }}>It's built in.</span>
             </h2>
           </div>
           {/* Two column layout — pull quote left, body right */}
@@ -1211,8 +1210,23 @@ function FeatureBullet({ f }) {
   );
 }
 
+/* ── PricingGrid — shared hover state so all cards expand together ── */
+function PricingGrid({ plans, go, toast }) {
+  const [hovering, setHovering] = useState(false);
+  return (
+    <div
+      className="rv pricing-grid"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'var(--line)', border: '1px solid var(--line)' }}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
+      {plans.map(p => <PricingCard2 key={p.badge} plan={p} go={go} toast={toast} expanded={hovering} />)}
+    </div>
+  );
+}
+
 /* ── PricingCard2 — single row, hover border, expand on hover ── */
-function PricingCard2({ plan, go, toast }) {
+function PricingCard2({ plan, go, toast, expanded = false }) {
   const [hov, setHov] = useState(false);
   const isEnt = plan.badge === 'Enterprise';
   return (
@@ -1246,9 +1260,9 @@ function PricingCard2({ plan, go, toast }) {
       <div style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--muted)',letterSpacing:'.08em',marginBottom:0}}>{plan.note}</div>
       {/* Divider */}
       <div style={{height:1,background:'var(--line)',margin:'20px 0 0',transition:'margin .35s'}}/>
-      {/* Features — expand on hover */}
-      <div style={{maxHeight:hov?`${plan.features.length*40}px`:'0',overflow:'hidden',
-        transition:'max-height .45s cubic-bezier(.16,1,.3,1)',marginBottom:hov?20:0}}>
+      {/* Features — expand when any card in the grid is hovered */}
+      <div style={{maxHeight:expanded?`${plan.features.length*40}px`:'0',overflow:'hidden',
+        transition:'max-height .45s cubic-bezier(.16,1,.3,1)',marginBottom:expanded?20:0}}>
         <ul style={{listStyle:'none',paddingTop:16,display:'flex',flexDirection:'column',gap:0}}>
           {plan.features.map((f,fi)=>(
             <li key={f} style={{display:'flex',gap:10,alignItems:'flex-start',fontSize:12,
@@ -1261,7 +1275,7 @@ function PricingCard2({ plan, go, toast }) {
         </ul>
       </div>
       {/* CTA */}
-      <div style={{paddingTop:hov?0:16,transition:'padding .35s',marginTop:'auto'}}>
+      <div style={{paddingTop:expanded?0:16,transition:'padding .35s',marginTop:'auto'}}>
         {isEnt
           ? <BtnO onClick={()=>toast('Enterprise — contact@crypton.dev','info')} style={{fontSize:9,padding:'9px 16px',width:'100%',justifyContent:'center'}}>Get in Touch →</BtnO>
           : <BtnF onClick={()=>go('register')} style={{fontSize:9,padding:'9px 16px',width:'100%',justifyContent:'center'}}>{plan.cta} →</BtnF>
@@ -1333,32 +1347,32 @@ function AttackTerminal() {
     {
       id:'phishing', label:'Phishing', color:'#F87171', blocked:'14.2M',
       what:'A fake login page tricks the user into entering credentials.',
-      how:'Phishing link clicked — no credentials exist to steal. Crypton uses hardware-bound keys, not passwords. The fake form captures nothing.',
+      how:'Fake login page. No credentials to steal.',
     },
     {
       id:'bruteforce', label:'Brute Force', color:'#FBBF24', blocked:'892K',
       what:'Automated tool tries millions of passwords per second.',
-      how:'10,000 requests per second hit the auth endpoint — every one rejected. No password surface exists. Crypton requires a device signature, not a guess.',
+      how:'No passwords. Nothing to brute force.',
     },
     {
       id:'mitm', label:'Man in the Middle', color:'#F87171', blocked:'3.1M',
       what:'Attacker sits between client and server, intercepting traffic.',
-      how:'Auth token captured in transit — useless. The nonce it signed expired in 500ms and is single-use. Replaying it returns an immediate rejection.',
+      how:'No shared secrets to intercept.',
     },
     {
       id:'stuffing', label:'Credential Stuffing', color:'#FBBF24', blocked:'7.8M',
       what:'Leaked password databases are tried across other services.',
-      how:'2.4M leaked credentials loaded and attempted — all fail. Crypton accounts have no passwords. Leaked credentials have zero attack surface here.',
+      how:'No credentials. No reuse.',
     },
     {
       id:'session', label:'Session Hijack', color:'#F87171', blocked:'521K',
       what:'A stolen session cookie is used to impersonate a logged-in user.',
-      how:'Cookie exfiltrated via XSS and presented — rejected. Sessions are cryptographically bound to the originating device. Cookie alone is worthless.',
+      how:'Sessions tied to real devices.',
     },
     {
       id:'replay', label:'Replay Attack', color:'#FBBF24', blocked:'2.3M',
       what:'A valid auth request is captured and resent later.',
-      how:'Signed request replayed 1 second later — expired. Each nonce is server-issued, single-use, and has a 500ms window. Replay is mathematically impossible.',
+      how:'Requests cannot be reused.',
     },
   ];
 
@@ -1503,7 +1517,7 @@ const { verified, deviceId } =
   });
 
 if (verified) {
-  // ✓ cryptographically proven
+  // ✓ biometrically proven
   grantAccess(deviceId);
 }`;
   return (
