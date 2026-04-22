@@ -1,0 +1,22 @@
+---
+source: tests/golden.rs
+expression: "run(\"ip_abuse_heavily_reported\", ctx).await"
+---
+scenario: ip_abuse_heavily_reported
+decision: Allow
+score: 38
+base_score: 38
+adjusted_score: 38
+required_action: None
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: false
+notify_admin: false
+breakdown: D=5 S=0 N=30 B=0 C=0 base=35 m_action=1.20 m_org=1.00 a=0 final=38
+top_factors:
+  - name: ip_abuse_confidence  component: Network  contribution: 30
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["headless_ua", "ip_abuse_confidence"]

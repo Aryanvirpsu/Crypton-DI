@@ -1,0 +1,20 @@
+---
+source: tests/golden.rs
+expression: "run(\"impossible_travel_via_tor\", ctx).await"
+---
+scenario: impossible_travel_via_tor
+decision: Deny
+score: 100
+base_score: 100
+adjusted_score: 100
+required_action: None
+hold_reason: None
+triggered_gates: [ImpossibleTravelViaTor]
+escalated: false
+signals_degraded: false
+lock_account: true
+notify_user: true
+notify_admin: true
+breakdown: D=50 S=50 N=50 B=50 C=100 base=255 m_action=3.00 m_org=2.00 a=50 final=100
+top_factors:
+triggered_rules: ["ImpossibleTravelViaTor"]

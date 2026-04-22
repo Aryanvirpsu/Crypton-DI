@@ -1,0 +1,94 @@
+[package]
+name        = "risk-engine"
+version     = "0.1.0"
+edition     = "2021"
+description = "Standalone deterministic risk scoring and policy engine for Crypton-DI"
+authors     = ["Crypton Security Team"]
+
+[lib]
+name = "risk_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# Serialisation
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUIDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Async runtime + traits
+tokio       = { version = "1", features = ["rt", "macros", "time", "sync"] }
+async-trait = "0.1"
+
+# Hashing (for JWT fingerprint — no external network call)
+sha2 = "0.10"
+sha1 = "0.10"
+hex  = "0.4"
+
+# Tracing
+tracing = "0.1"
+
+# Error handling
+thiserror = "1"
+anyhow    = "1"
+
+# ── Optional adapter deps (Phase 3) ──────────────────────────────────────────
+# All of these are off by default. Enable a feature to pull in the adapter:
+#   cargo build --features fred-store
+#   cargo build --features sqlx-loader
+#   cargo build --features axum-server
+#   cargo build --features server          # all three
+# The core library (no features) keeps zero new deps, matching the original
+# "standalone, deterministic" contract in lib.rs.
+fred = { version = "10", optional = true, default-features = false, features = [
+    "i-keys",
+    "i-lists",
+    "i-scripts",
+    "i-hashes",
+] }
+sqlx = { version = "0.8", optional = true, default-features = false, features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "macros",
+] }
+axum       = { version = "0.7", optional = true }
+tower      = { version = "0.5", optional = true, features = ["util"] }
+tower-http = { version = "0.6", optional = true, features = ["trace", "limit", "timeout"] }
+
+# Metrics facade (Phase 4). The consumer installs a concrete recorder
+# (metrics-exporter-prometheus, etc.) at startup; we only emit.
+metrics    = { version = "0.23", optional = true }
+
+# MaxMind GeoLite2 reader (Phase C — enrichment signals). Optional so the
+# core crate stays dependency-light; enable via the `geoip` feature.
+maxminddb  = { version = "0.24", optional = true }
+
+[features]
+default = []
+fred-store   = ["dep:fred"]
+sqlx-loader  = ["dep:sqlx"]
+axum-server  = ["dep:axum", "dep:tower", "dep:tower-http"]
+metrics      = ["dep:metrics"]
+geoip        = ["dep:maxminddb"]
+server       = ["fred-store", "sqlx-loader", "axum-server", "metrics"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+insta = { version = "1", features = ["yaml"] }
+proptest = "1"
+# For axum-server integration test:
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+# Benchmarks (Phase F5):
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name    = "engine_evaluate"
+harness = false

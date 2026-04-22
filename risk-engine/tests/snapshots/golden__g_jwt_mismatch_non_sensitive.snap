@@ -1,0 +1,22 @@
+---
+source: tests/golden.rs
+expression: "run(\"jwt_mismatch_non_sensitive\", ctx).await"
+---
+scenario: jwt_mismatch_non_sensitive
+decision: Challenge
+score: 50
+base_score: 50
+adjusted_score: 50
+required_action: ReverifyDevice
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: true
+notify_admin: false
+breakdown: D=5 S=45 N=0 B=0 C=0 base=50 m_action=1.00 m_org=1.00 a=0 final=50
+top_factors:
+  - name: jwt_fingerprint_mismatch  component: Session  contribution: 45
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["headless_ua", "jwt_fingerprint_mismatch"]

@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"shadow_session\", ctx).await"
+---
+scenario: shadow_session
+decision: Hold
+score: 76
+base_score: 76
+adjusted_score: 76
+required_action: AdminApproval
+hold_reason: Some("Score threshold exceeded. Top signals: ua_family_mismatch, headless_ua, concurrent_sessions_elevated. Action: login.")
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: true
+notify_admin: true
+breakdown: D=20 S=10 N=12 B=0 C=40 base=82 m_action=1.20 m_org=1.00 a=0 final=76
+top_factors:
+  - name: shadow_session_pattern  component: Correlation  contribution: 40
+  - name: ua_family_mismatch  component: Device  contribution: 15
+  - name: unknown_ip_for_user  component: Network  contribution: 12
+triggered_rules: ["concurrent_sessions_elevated", "headless_ua", "shadow_session_pattern", "ua_family_mismatch", "unknown_ip_for_user"]

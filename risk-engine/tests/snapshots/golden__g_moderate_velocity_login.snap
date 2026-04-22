@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"moderate_velocity_login\", ctx).await"
+---
+scenario: moderate_velocity_login
+decision: Allow
+score: 38
+base_score: 38
+adjusted_score: 38
+required_action: None
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: false
+notify_admin: false
+breakdown: D=5 S=0 N=0 B=30 C=0 base=35 m_action=1.20 m_org=1.00 a=0 final=38
+top_factors:
+  - name: failed_attempts_elevated  component: Behavioral  contribution: 20
+  - name: login_velocity_moderate  component: Behavioral  contribution: 10
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["failed_attempts_elevated", "headless_ua", "login_velocity_moderate"]
