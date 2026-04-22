@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"headless_ua_on_cloud\", ctx).await"
+---
+scenario: headless_ua_on_cloud
+decision: Hold
+score: 87
+base_score: 87
+adjusted_score: 87
+required_action: AdminApproval
+hold_reason: Some("Score threshold exceeded. Top signals: headless_ua, webdriver_detected, datacenter_ip. Action: login.")
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: true
+notify_admin: true
+breakdown: D=50 S=0 N=23 B=0 C=30 base=103 m_action=1.20 m_org=1.00 a=0 final=87
+top_factors:
+  - name: webdriver_detected  component: Device  contribution: 45
+  - name: automated_scraper_pattern  component: Correlation  contribution: 30
+  - name: datacenter_ip  component: Network  contribution: 15
+triggered_rules: ["automated_scraper_pattern", "datacenter_ip", "headless_ua", "new_ip_address", "webdriver_detected"]

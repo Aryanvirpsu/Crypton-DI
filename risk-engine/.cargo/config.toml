@@ -1,0 +1,19 @@
+# Linker configuration for Windows builds.
+#
+# MSVC target (canonical for production):
+#   Requires a Visual Studio installation or Windows SDK Build Tools.
+#   Build from a VS Developer Command Prompt so that MSVC's link.exe is first
+#   in PATH (Git's link.exe shadows it otherwise).
+#
+# GNU target (alternative for local dev/test on this machine):
+#   Uses the self-contained MinGW gcc bundled with the Rust GNU toolchain,
+#   but requires `as` (assembler) to be in PATH (e.g. from a full MSYS2 install).
+
+[target.x86_64-pc-windows-msvc]
+# Uncomment if VS is installed; adjust path for your VS version:
+# linker = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.xx.xxxxx\\bin\\Hostx64\\x64\\link.exe"
+
+[target.x86_64-pc-windows-gnu]
+# Uncomment if MinGW/MSYS2 is installed:
+# linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
+# ar = "C:\\msys64\\mingw64\\bin\\ar.exe"

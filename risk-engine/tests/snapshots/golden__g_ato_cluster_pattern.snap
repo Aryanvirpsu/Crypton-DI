@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"ato_cluster_pattern\", ctx).await"
+---
+scenario: ato_cluster_pattern
+decision: Deny
+score: 90
+base_score: 90
+adjusted_score: 90
+required_action: None
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: true
+notify_user: true
+notify_admin: true
+breakdown: D=5 S=0 N=16 B=0 C=40 base=61 m_action=2.00 m_org=1.00 a=0 final=90
+top_factors:
+  - name: ato_cluster_pattern  component: Correlation  contribution: 40
+  - name: unknown_ip_for_user  component: Network  contribution: 12
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["ato_cluster_pattern", "headless_ua", "unknown_ip_for_user", "vpn_ip"]

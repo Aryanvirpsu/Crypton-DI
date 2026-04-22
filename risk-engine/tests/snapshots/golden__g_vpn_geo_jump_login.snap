@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"vpn_geo_jump_login\", ctx).await"
+---
+scenario: vpn_geo_jump_login
+decision: Challenge
+score: 59
+base_score: 59
+adjusted_score: 59
+required_action: StepUpWebAuthn
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: true
+notify_admin: false
+breakdown: D=5 S=0 N=34 B=0 C=15 base=54 m_action=1.20 m_org=1.00 a=0 final=59
+top_factors:
+  - name: large_geo_jump  component: Network  contribution: 20
+  - name: travel_anomaly_pattern  component: Correlation  contribution: 15
+  - name: country_change  component: Network  contribution: 10
+triggered_rules: ["country_change", "headless_ua", "large_geo_jump", "travel_anomaly_pattern", "vpn_ip"]
