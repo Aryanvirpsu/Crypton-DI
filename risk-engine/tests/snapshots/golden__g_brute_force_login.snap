@@ -8,7 +8,7 @@ score: 89
 base_score: 89
 adjusted_score: 89
 required_action: AdminApproval
-hold_reason: Some("Score threshold exceeded. Top signals: headless_ua, datacenter_ip, new_ip_address. Action: login.")
+hold_reason: Some("Score threshold exceeded. Top signals: login_velocity_critical, automated_scraper_pattern, datacenter_ip. Action: login.")
 triggered_gates: []
 escalated: false
 signals_degraded: false

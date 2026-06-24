@@ -158,7 +158,7 @@ fn base_ctx() -> RiskContext {
         ip_is_relay: None,
         ip_abuse_confidence: None,
         geo_allowed_countries: None,
-        is_sanctioned_country: None,
+        is_sanctioned_country: Some(false),
         webdriver_detected: None,
         captcha_score: None,
         screen_resolution: None,

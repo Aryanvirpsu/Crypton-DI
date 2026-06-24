@@ -63,9 +63,12 @@ pub trait RateLimiter: Send + Sync {
 /// This is an in-process limiter — state is NOT shared between replicas. For
 /// multi-replica deployments, implement [`RateLimiter`] on top of a shared
 /// backend (e.g. Redis `INCR` with TTL) and swap it in at the call site.
+const DEFAULT_MAX_KEYS: usize = 100_000;
+
 pub struct InMemoryRateLimiter {
     capacity: f64,
     rate_per_sec: f64,
+    max_keys: usize,
     buckets: Mutex<HashMap<String, Bucket>>,
 }
 
@@ -79,11 +82,17 @@ impl InMemoryRateLimiter {
     /// `capacity`: max burst size. `rate_per_sec`: sustained refill rate.
     /// Both must be positive.
     pub fn new(capacity: u32, rate_per_sec: u32) -> Self {
+        Self::with_max_keys(capacity, rate_per_sec, DEFAULT_MAX_KEYS)
+    }
+
+    pub fn with_max_keys(capacity: u32, rate_per_sec: u32, max_keys: usize) -> Self {
         assert!(capacity > 0, "rate limiter capacity must be > 0");
         assert!(rate_per_sec > 0, "rate limiter refill rate must be > 0");
+        assert!(max_keys > 0, "rate limiter max_keys must be > 0");
         Self {
             capacity: capacity as f64,
             rate_per_sec: rate_per_sec as f64,
+            max_keys,
             buckets: Mutex::new(HashMap::new()),
         }
     }
@@ -92,7 +101,14 @@ impl InMemoryRateLimiter {
     /// callers that prefer not to pay for an async hop can use it directly.
     pub fn check_sync(&self, key: &str) -> Result<(), RiskEngineError> {
         let now = Instant::now();
-        let mut buckets = self.buckets.lock().unwrap();
+        let mut buckets = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
+
+        if buckets.len() >= self.max_keys && !buckets.contains_key(key) {
+            let stale_after =
+                std::time::Duration::from_secs_f64(self.capacity / self.rate_per_sec);
+            buckets.retain(|_, b| now.duration_since(b.last_refill) < stale_after);
+        }
+
         let bucket = buckets.entry(key.to_string()).or_insert(Bucket {
             tokens: self.capacity,
             last_refill: now,
@@ -107,16 +123,19 @@ impl InMemoryRateLimiter {
             bucket.tokens -= 1.0;
             Ok(())
         } else {
-            Err(RiskEngineError::RateLimited(format!(
-                "key={key} cap={} rate_per_sec={}",
-                self.capacity as u32, self.rate_per_sec as u32
-            )))
+            // Sanitized: the error propagates to callers (and potentially to
+            // HTTP responses). Exposing the internal key, capacity, and refill
+            // rate would leak rate-limit configuration to attackers, letting
+            // them tune their request cadence to stay just under the limit.
+            Err(RiskEngineError::RateLimited(
+                "rate limit exceeded".to_string(),
+            ))
         }
     }
 
     /// Drop the bucket for `key`. Intended for tests and operator tooling.
     pub fn reset(&self, key: &str) {
-        self.buckets.lock().unwrap().remove(key);
+        self.buckets.lock().unwrap_or_else(|p| p.into_inner()).remove(key);
     }
 }
 
@@ -269,6 +288,36 @@ mod tests {
         limiter.check_sync("k").unwrap();
     }
 
+    #[test]
+    fn evicts_stale_buckets_at_capacity() {
+        let limiter = InMemoryRateLimiter::with_max_keys(1, 10, 2);
+        limiter.check_sync("a").unwrap();
+        limiter.check_sync("b").unwrap();
+        // Both buckets consumed their token. Wait for refill so they become stale.
+        sleep(Duration::from_millis(200));
+        // Map is at max_keys (2). Inserting "c" triggers eviction of stale buckets.
+        limiter.check_sync("c").unwrap();
+        let buckets = limiter.buckets.lock().unwrap();
+        assert!(buckets.len() <= 2, "stale buckets should have been evicted");
+        assert!(buckets.contains_key("c"));
+    }
+
+    #[test]
+    fn error_message_does_not_leak_config() {
+        let limiter = InMemoryRateLimiter::new(42, 7);
+        limiter.check_sync("secret-key").unwrap();
+        // Exhaust the bucket (capacity=42, we already consumed 1).
+        for _ in 0..41 {
+            let _ = limiter.check_sync("secret-key");
+        }
+        let err = limiter.check_sync("secret-key").unwrap_err();
+        let msg = err.to_string();
+        // The error MUST NOT contain the key, capacity, or refill rate.
+        assert!(!msg.contains("secret-key"), "leaked key: {msg}");
+        assert!(!msg.contains("42"), "leaked capacity: {msg}");
+        assert!(!msg.contains("7"), "leaked rate: {msg}");
+    }
+
     // ── Fail-mode tests ──────────────────────────────────────────────────────
 
     /// Limiter that always surfaces `Timeout` — simulates a dead Redis.
@@ -413,7 +462,7 @@ mod tests {
             ip_is_relay: None,
             ip_abuse_confidence: None,
             geo_allowed_countries: None,
-            is_sanctioned_country: None,
+            is_sanctioned_country: Some(false),
             webdriver_detected: None,
             captcha_score: None,
             screen_resolution: None,
@@ -421,7 +470,7 @@ mod tests {
             account_age_days: None,
             email_verified: None,
             email_domain_disposable: None,
-            breached_credential: None,
+            breached_credential: Some(false),
             user_typical_hours: None,
             accept_language: None,
             previous_accept_language: None,

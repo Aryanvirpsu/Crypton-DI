@@ -12,6 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config;
+use crate::error::RiskEngineError;
 
 fn default_version() -> String {
     "v3.1".to_string()
@@ -151,6 +152,17 @@ pub struct PolicyConfig {
     pub c_shadow_session: u8,
     pub c_travel_anomaly: u8,
     pub c_cloner_pattern: u8,
+
+    // ── Gate configuration (per-tenant overridable) ────────────────────────
+    /// Minutes after credential creation during which privileged actions are
+    /// blocked by hard gate 15. Set to 0 to effectively disable.
+    pub gate_fresh_credential_minutes: u8,
+    /// Whether hard gate 11 blocks VPN/proxy/relay on critical privileged actions.
+    pub gate_block_vpn_on_critical: bool,
+    /// Whether hard gate 6 blocks Tor exit nodes on sensitive actions.
+    pub gate_block_tor_on_sensitive: bool,
+    /// Whether hard gate 12 blocks Tor exit nodes on recovery flows.
+    pub gate_block_tor_on_recovery: bool,
 }
 
 impl Default for PolicyConfig {
@@ -161,7 +173,7 @@ impl Default for PolicyConfig {
             cap_session: config::CAP_SESSION,
             cap_network: config::CAP_NETWORK,
             cap_behavioral: config::CAP_BEHAVIORAL,
-            cap_correlation: 100,
+            cap_correlation: config::CAP_CORRELATION,
             max_org_cluster_bias: config::MAX_ORG_CLUSTER_BIAS,
 
             threshold_allow_max: config::THRESHOLD_ALLOW_MAX,
@@ -180,7 +192,7 @@ impl Default for PolicyConfig {
             multiplier_audit_log_export: config::MULTIPLIER_AUDIT_LOG_EXPORT,
             multiplier_recovery_approve: config::MULTIPLIER_RECOVERY_APPROVE,
             multiplier_recovery_complete: config::MULTIPLIER_RECOVERY_COMPLETE,
-            multiplier_action_challenge: 1.3,
+            multiplier_action_challenge: config::MULTIPLIER_ACTION_CHALLENGE,
             multiplier_execute_export_data: config::MULTIPLIER_EXECUTE_EXPORT_DATA,
             multiplier_execute_rotate_api_key: config::MULTIPLIER_EXECUTE_ROTATE_API_KEY,
             multiplier_execute_delete_resource: config::MULTIPLIER_EXECUTE_DELETE_RESOURCE,
@@ -265,6 +277,151 @@ impl Default for PolicyConfig {
             c_shadow_session: config::C_SHADOW_SESSION,
             c_travel_anomaly: config::C_TRAVEL_ANOMALY,
             c_cloner_pattern: config::C_CLONER_PATTERN,
+
+            gate_fresh_credential_minutes: config::GATE_FRESH_CREDENTIAL_MINUTES,
+            gate_block_vpn_on_critical: config::GATE_BLOCK_VPN_ON_CRITICAL,
+            gate_block_tor_on_sensitive: config::GATE_BLOCK_TOR_ON_SENSITIVE,
+            gate_block_tor_on_recovery: config::GATE_BLOCK_TOR_ON_RECOVERY,
         }
+    }
+}
+
+impl PolicyConfig {
+    /// Verify that invariants hold after construction or override merge.
+    /// Returns `ConfigError` on the first violation found.
+    pub fn validate(&self) -> Result<(), RiskEngineError> {
+        if self.threshold_allow_max >= self.threshold_challenge_max {
+            return Err(RiskEngineError::ConfigError(format!(
+                "threshold_allow_max ({}) must be < threshold_challenge_max ({})",
+                self.threshold_allow_max, self.threshold_challenge_max
+            )));
+        }
+        if self.threshold_challenge_max >= self.threshold_hold_max {
+            return Err(RiskEngineError::ConfigError(format!(
+                "threshold_challenge_max ({}) must be < threshold_hold_max ({})",
+                self.threshold_challenge_max, self.threshold_hold_max
+            )));
+        }
+        // Thresholds must not exceed the score range — a hold_max > 100 makes
+        // Deny unreachable via scoring (only hard gates could trigger it).
+        if self.threshold_hold_max > 100 {
+            return Err(RiskEngineError::ConfigError(format!(
+                "threshold_hold_max ({}) exceeds max score (100): Deny becomes unreachable via scoring",
+                self.threshold_hold_max
+            )));
+        }
+
+        // NaN comparisons always return false, so the negated form catches NaN.
+        if !(self.score_damping_rate > 0.0 && self.score_damping_rate <= 1.0) {
+            return Err(RiskEngineError::ConfigError(format!(
+                "score_damping_rate ({}) must be in (0.0, 1.0]",
+                self.score_damping_rate
+            )));
+        }
+        if self.score_damping_threshold > 100 {
+            return Err(RiskEngineError::ConfigError(format!(
+                "score_damping_threshold ({}) exceeds max score (100)",
+                self.score_damping_threshold
+            )));
+        }
+
+        // ── Component caps must be in [0, 100] ──────────────────────────────
+        let caps = [
+            ("cap_device", self.cap_device),
+            ("cap_session", self.cap_session),
+            ("cap_network", self.cap_network),
+            ("cap_behavioral", self.cap_behavioral),
+            ("cap_correlation", self.cap_correlation),
+            ("max_org_cluster_bias", self.max_org_cluster_bias),
+        ];
+        for (name, value) in caps {
+            if value > 100 {
+                return Err(RiskEngineError::ConfigError(format!(
+                    "{name} ({value}) exceeds maximum of 100"
+                )));
+            }
+        }
+
+        let multipliers = [
+            ("multiplier_login", self.multiplier_login),
+            ("multiplier_register", self.multiplier_register),
+            ("multiplier_oauth_complete", self.multiplier_oauth_complete),
+            ("multiplier_device_mark_lost", self.multiplier_device_mark_lost),
+            ("multiplier_device_revoke", self.multiplier_device_revoke),
+            ("multiplier_recovery_start", self.multiplier_recovery_start),
+            ("multiplier_audit_log_export", self.multiplier_audit_log_export),
+            ("multiplier_recovery_approve", self.multiplier_recovery_approve),
+            ("multiplier_recovery_complete", self.multiplier_recovery_complete),
+            ("multiplier_action_challenge", self.multiplier_action_challenge),
+            ("multiplier_execute_export_data", self.multiplier_execute_export_data),
+            ("multiplier_execute_rotate_api_key", self.multiplier_execute_rotate_api_key),
+            ("multiplier_execute_delete_resource", self.multiplier_execute_delete_resource),
+            ("multiplier_execute_add_admin", self.multiplier_execute_add_admin),
+            ("multiplier_execute_default", self.multiplier_execute_default),
+        ];
+        for (name, value) in multipliers {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(RiskEngineError::ConfigError(format!(
+                    "{name} ({value}) must be a finite positive number"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate that the merged config does not weaken security bounds
+    /// relative to the base config. Called by [`crate::policy_overrides`]
+    /// after structural validation passes.
+    ///
+    /// # Rules
+    ///
+    /// - **Thresholds can only be lowered** (stricter). Raising any threshold
+    ///   widens the Allow/Challenge/Hold bands, which weakens security.
+    /// - **Component caps cannot be zeroed.** A cap of 0 disables an entire
+    ///   scoring dimension, silently removing signal coverage.
+    ///
+    /// These bounds ensure that tenant self-service overrides can make policy
+    /// *stricter* but never *weaker* than the base config. Relaxations require
+    /// a control-plane change to the base config itself.
+    pub fn validate_security_bounds(&self, base: &PolicyConfig) -> Result<(), RiskEngineError> {
+        // ── Thresholds: can only be lowered (stricter) ──────────────────────
+        if self.threshold_allow_max > base.threshold_allow_max {
+            return Err(RiskEngineError::ConfigError(format!(
+                "override threshold_allow_max ({}) cannot exceed base ({}): \
+                 tenants may lower thresholds (stricter) but not raise them",
+                self.threshold_allow_max, base.threshold_allow_max
+            )));
+        }
+        if self.threshold_challenge_max > base.threshold_challenge_max {
+            return Err(RiskEngineError::ConfigError(format!(
+                "override threshold_challenge_max ({}) cannot exceed base ({})",
+                self.threshold_challenge_max, base.threshold_challenge_max
+            )));
+        }
+        if self.threshold_hold_max > base.threshold_hold_max {
+            return Err(RiskEngineError::ConfigError(format!(
+                "override threshold_hold_max ({}) cannot exceed base ({})",
+                self.threshold_hold_max, base.threshold_hold_max
+            )));
+        }
+
+        // ── Component caps: cannot be zeroed ────────────────────────────────
+        let caps = [
+            ("cap_device", self.cap_device),
+            ("cap_session", self.cap_session),
+            ("cap_network", self.cap_network),
+            ("cap_behavioral", self.cap_behavioral),
+        ];
+        for (name, value) in caps {
+            if value == 0 {
+                return Err(RiskEngineError::ConfigError(format!(
+                    "override {name} cannot be 0: disabling a scoring dimension \
+                     is not permitted via tenant overrides"
+                )));
+            }
+        }
+
+        Ok(())
     }
 }

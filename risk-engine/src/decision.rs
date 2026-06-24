@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::context::RequiredAction;
 use crate::org_graph::ClusterFactor;
+use crate::policy_config::PolicyConfig;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Decision
@@ -51,8 +52,9 @@ pub struct ScoreBreakdown {
     pub b: u8,
     /// Pattern correlation bonus (capped 0–100).
     pub c: u8,
-    /// Sum of D+S+N+B+C before multipliers.
-    pub base: u8,
+    /// Sum of D+S+N+B+C before multipliers. u16 because the theoretical max
+    /// (50+50+50+50+100 = 300) exceeds u8 range.
+    pub base: u16,
     /// Action sensitivity multiplier applied.
     pub m_action: f32,
     /// Org risk-level multiplier applied.
@@ -64,14 +66,23 @@ pub struct ScoreBreakdown {
 }
 
 impl ScoreBreakdown {
-    pub fn zeroed_max() -> Self {
+    /// Produce a worst-case breakdown for gate-blocked decisions where no
+    /// scoring took place. Reads caps from the active [`PolicyConfig`] so
+    /// the breakdown reflects tenant-specific tuning rather than hardcoded
+    /// defaults.
+    pub fn zeroed_max(policy: &PolicyConfig) -> Self {
+        let d = policy.cap_device;
+        let s = policy.cap_session;
+        let n = policy.cap_network;
+        let b = policy.cap_behavioral;
+        let c = policy.cap_correlation;
         ScoreBreakdown {
-            d: 50,
-            s: 50,
-            n: 50,
-            b: 50,
-            c: 100,
-            base: 255, // Saturating u8 max
+            d,
+            s,
+            n,
+            b,
+            c,
+            base: d as u16 + s as u16 + n as u16 + b as u16 + c as u16,
             m_action: 3.0,
             m_org: 2.0,
             a: 50,
@@ -150,6 +161,18 @@ pub enum HardGate {
     /// expired tokens at the boundary; this gate catches cases where that
     /// validation is missing or buggy.
     ExpiredJwtOnSensitive,
+}
+
+impl HardGate {
+    /// Hold-class gates produce Hold instead of Deny when no deny-class gate
+    /// also fired. New hold-class variants MUST be added here — all other
+    /// variants default to deny-class.
+    pub fn is_hold_class(&self) -> bool {
+        matches!(
+            self,
+            HardGate::TorOnRecovery | HardGate::PrivilegedActionOnFreshCredential
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

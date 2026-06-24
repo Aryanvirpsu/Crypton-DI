@@ -85,7 +85,7 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
             );
             return decision;
         }
-        GateOutcome::Passed(_) => {
+        GateOutcome::Passed => {
             debug!("all hard gates passed");
         }
     }
@@ -118,7 +118,11 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
     
     // Apply Org multiplier to the combined risk foundation
     let scaled_pre_bias = damped_base + m_penalty;
-    let scaled = (scaled_pre_bias * m_org).clamp(0.0, 255.0) as u8;
+    // NaN guard: if any float in the pipeline is NaN (corrupt config, division
+    // anomaly), the clamp returns NaN and `NaN as u8 = 0` → forced Allow.
+    // Fail-closed: treat NaN as score 100 so it maps to Deny, not Allow.
+    let scaled_f = (scaled_pre_bias * m_org).clamp(0.0, 255.0);
+    let scaled = if scaled_f.is_nan() { 100u8 } else { scaled_f as u8 };
 
     let a = compute_absolute_adder(&ctx, &mut factors);
 
@@ -130,14 +134,14 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
         n,
         b,
         c,
-        base: base_raw as u8,
+        base: base_raw.round() as u16,
         m_action,
         m_org,
         a,
         final_score,
     };
 
-    debug!(d, s, n, b, base = base_raw as u8, final_score, "score computed");
+    debug!(d, s, n, b, base = base_raw.round() as u16, final_score, "score computed");
 
     // ── Step 3: Handle degraded signals ──────────────────────────────────────
     // If we could not collect signals and this is a sensitive action, we must
@@ -231,7 +235,7 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
         .check_and_record_escalation(
             ctx.user_id,
             &decision,
-            final_score,
+            effective_score,
             evaluated_at.timestamp(),
         )
         .await
@@ -253,6 +257,10 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
     }
 
     // ── Step 7: Directives ────────────────────────────────────────────────────
+    // Sort factors by contribution descending BEFORE building hold_reason,
+    // so the "top signals" in the reason string are the actual highest scorers.
+    factors.sort_by(|a, b| b.contribution.cmp(&a.contribution));
+
     let lock_account = should_lock_account(&decision, &ctx.action);
     let notify_user = decision.is_blocking();
     let notify_admin = matches!(decision, Decision::Hold | Decision::Deny);
@@ -261,9 +269,6 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
     } else {
         None
     };
-
-    // Sort factors by contribution descending for readability
-    factors.sort_by(|a, b| b.contribution.cmp(&a.contribution));
 
     let triggered_rules = factors.iter().map(|f| f.name.clone()).collect();
 
@@ -285,8 +290,8 @@ pub async fn evaluate<S: SignalStore>(ctx: RiskContext, store: &S) -> RiskDecisi
 
     info!(
         decision = ?decision,
-        score = final_score,
-        adj_score = effective_score,
+        score = effective_score,
+        base_score = final_score,
         d = breakdown.d,
         s = breakdown.s,
         n = breakdown.n,
@@ -341,7 +346,7 @@ fn compute_absolute_adder(ctx: &RiskContext, factors: &mut Vec<Factor>) -> u8 {
         .evaluated_at
         .signed_duration_since(ctx.credential_created_at)
         .num_minutes();
-    if age_minutes < 5 && ctx.action.is_sensitive() {
+    if age_minutes < ctx.policy.gate_fresh_credential_minutes as i64 && ctx.action.is_sensitive() {
         let eff = capped_add(&mut a, CAP, 20);
         if eff > 0 {
             factors.push(Factor {
@@ -370,7 +375,7 @@ fn compute_absolute_adder(ctx: &RiskContext, factors: &mut Vec<Factor>) -> u8 {
     }
 
     // add_admin by low-history user
-    if matches!(&ctx.action, RiskAction::ActionExecute { action_name } if action_name == "add_admin")
+    if matches!(&ctx.action, RiskAction::ActionExecute { action_name } if action_name.eq_ignore_ascii_case("add_admin"))
         && ctx.prior_audit_event_count < 10
     {
         let eff = capped_add(&mut a, CAP, 20);
@@ -492,8 +497,15 @@ pub fn score_to_decision(score: u8, ctx: &RiskContext) -> (Decision, Option<Requ
 
 /// Choose the most appropriate challenge type based on score bracket and action.
 fn challenge_action_for(score: u8, ctx: &RiskContext) -> RequiredAction {
-    // High-bracket challenge (60–64 in v2): re-login, not just step-up
-    if score >= 60 {
+    // High-bracket challenge: if the score is within 4 points of the hold
+    // threshold, escalate to a full re-login rather than a lighter step-up.
+    // This tracks the policy's challenge_max so tenant overrides propagate.
+    // Floor is clamped to the start of the challenge band (allow_max + 1)
+    // so absurdly narrow bands don't make the high bracket leak below the
+    // challenge range.
+    let band_start = ctx.policy.threshold_allow_max.saturating_add(1);
+    let high_bracket_floor = ctx.policy.threshold_challenge_max.saturating_sub(4).max(band_start);
+    if score >= high_bracket_floor {
         return RequiredAction::ReLogin;
     }
     // Credential/session anomalies → reverify device identity
@@ -539,11 +551,17 @@ fn should_lock_account(decision: &Decision, action: &RiskAction) -> bool {
         | RiskAction::RecoveryComplete
         | RiskAction::DeviceRevoke
         | RiskAction::DeviceMarkLost => true,
-        RiskAction::ActionExecute { action_name } => matches!(
-            action_name.as_str(),
-            "add_admin" | "rotate_api_key" | "delete_resource"
-        ),
-        _ => false,
+        // AuditLogExport is privileged and sensitive — a Denied export attempt
+        // is attacker reconnaissance (probing what they can exfiltrate). Lock
+        // to prevent repeated probing, same rationale as DeviceRevoke.
+        RiskAction::AuditLogExport => true,
+        RiskAction::ActionExecute { .. } => action.is_critical_privileged(),
+        // Exhaustive: benign actions must NOT trigger account lock. If a new
+        // RiskAction variant is added, this match will fail to compile,
+        // forcing the author to decide whether the new action warrants locking.
+        RiskAction::DeviceList
+        | RiskAction::ActionChallenge
+        | RiskAction::Unknown { .. } => false,
     }
 }
 
@@ -584,11 +602,7 @@ fn build_gate_verdict(
     // a Hold-class gate must never downgrade a Deny triggered in the same
     // request. The Hold-class overrides apply only when NO Deny-class gate
     // fired.
-    let hold_only_gates: [HardGate; 2] = [
-        HardGate::TorOnRecovery,
-        HardGate::PrivilegedActionOnFreshCredential,
-    ];
-    let has_deny_gate = gates.iter().any(|g| !hold_only_gates.contains(g));
+    let has_deny_gate = gates.iter().any(|g| !g.is_hold_class());
 
     let (decision, score, req_action, hold_reason) = if has_deny_gate {
         (Decision::Deny, 100u8, None, None)
@@ -628,7 +642,7 @@ fn build_gate_verdict(
         decision,
         score,
         required_action: req_action,
-        score_breakdown: ScoreBreakdown::zeroed_max(),
+        score_breakdown: ScoreBreakdown::zeroed_max(&ctx.policy),
         triggered_gates: gates,
         triggered_rules: gate_names,
         contributing_factors: vec![],

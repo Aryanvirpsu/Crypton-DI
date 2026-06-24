@@ -1,10 +1,12 @@
+use std::net::IpAddr;
+
 use crate::context::{AsnType, CredentialStatus, RiskAction, RiskContext};
 use crate::decision::HardGate;
 
 /// Result of hard gate evaluation.
 pub enum GateOutcome {
     /// All gates passed. Scoring may proceed.
-    Passed(Vec<HardGate>),
+    Passed,
 
     /// One or more gates fired a hard block.
     Blocked(Vec<HardGate>),
@@ -15,8 +17,9 @@ pub enum GateOutcome {
 /// Hard gates are binary: they either block immediately (returning `Blocked`)
 /// or pass through to continuous scoring. No partial scores are assigned here.
 ///
-/// Evaluation order matters: earlier gates short-circuit later ones. The
-/// ordering below prioritises the most severe conditions.
+/// All 16 gates are evaluated unconditionally so the returned `Blocked` vec
+/// contains every gate that fired — this gives callers full diagnostic
+/// visibility rather than stopping at the first match.
 pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     let mut blocking: Vec<HardGate> = Vec::new();
 
@@ -61,16 +64,21 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     }
 
     // ── GATE 5: Impossible travel + Tor ──────────────────────────────────────
-    let impossible_travel = is_impossible_travel(ctx);
-    if impossible_travel && matches!(&ctx.ip_asn_type, Some(AsnType::Tor)) {
+    let is_tor = matches!(&ctx.ip_asn_type, Some(AsnType::Tor));
+    let impossible_travel_via_tor = is_impossible_travel(ctx) && is_tor;
+    if impossible_travel_via_tor {
         blocking.push(HardGate::ImpossibleTravelViaTor);
     }
 
     // ── GATE 6: Tor on sensitive action ──────────────────────────────────────
-    if matches!(&ctx.ip_asn_type, Some(AsnType::Tor)) && ctx.action.is_sensitive() {
-        if !blocking.contains(&HardGate::ImpossibleTravelViaTor) {
-            blocking.push(HardGate::TorOnSensitiveAction);
-        }
+    // Dedup via flag — if Gate 5 already fired, don't double-count Tor.
+    // Per-tenant configurable via `gate_block_tor_on_sensitive`.
+    if ctx.policy.gate_block_tor_on_sensitive
+        && is_tor
+        && ctx.action.is_sensitive()
+        && !impossible_travel_via_tor
+    {
+        blocking.push(HardGate::TorOnSensitiveAction);
     }
 
     // ── GATE 7: Recovery complete with no active recovery ────────────────────
@@ -82,8 +90,11 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     // The OAuth authorization code is a single-use credential; any change of
     // IP between /authorize and /token is treated as code theft.
     // Tor-specific variant is preserved for alerting differentiation.
+    // IPs are canonicalized so ::ffff:1.2.3.4 matches 1.2.3.4.
     if let (Some(auth_ip), Some(req_ip)) = (ctx.oauth_authorize_ip, ctx.request_ip) {
-        if auth_ip != req_ip && matches!(&ctx.action, RiskAction::OauthComplete) {
+        if canonicalize_ip(auth_ip) != canonicalize_ip(req_ip)
+            && matches!(&ctx.action, RiskAction::OauthComplete)
+        {
             if matches!(&ctx.ip_asn_type, Some(AsnType::Tor)) {
                 blocking.push(HardGate::OauthNonceIpMismatchOnTor);
             } else {
@@ -95,14 +106,20 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     // ── GATE 9: Sanctioned country ───────────────────────────────────────────
     // Legal compliance requirement — requests from OFAC/EU sanctioned
     // jurisdictions must be denied regardless of score. No override path.
-    if ctx.is_sanctioned_country == Some(true) {
+    // FAIL-CLOSED: if the adapter could not determine sanctions status (None),
+    // the request is blocked. The adapter MUST resolve this field; a GeoIP
+    // outage must not silently bypass sanctions enforcement.
+    if ctx.is_sanctioned_country != Some(false) {
         blocking.push(HardGate::SanctionedCountry);
     }
 
     // ── GATE 10: Breached credential on sensitive action ─────────────────────
     // If the credential has been found in a known breach database, deny any
     // sensitive action. The user must rotate the credential first.
-    if ctx.breached_credential == Some(true) && ctx.action.is_sensitive() {
+    // FAIL-CLOSED on sensitive actions: if the breach-check service is
+    // unavailable (None), sensitive actions are blocked. A breach-database
+    // outage must not allow compromised credentials through.
+    if ctx.action.is_sensitive() && ctx.breached_credential != Some(false) {
         blocking.push(HardGate::BreachedCredentialOnSensitive);
     }
 
@@ -110,12 +127,14 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     // Critical actions that require full attribution (recovery approve/complete,
     // add_admin, rotate_api_key, delete_resource) are blocked when a VPN is
     // detected. This forces the user to connect from an attributable network.
-    if is_vpn_detected(ctx) && is_critical_privileged_action(&ctx.action) {
+    // Per-tenant configurable via `gate_block_vpn_on_critical`.
+    if ctx.policy.gate_block_vpn_on_critical && is_vpn_detected(ctx) && ctx.action.is_critical_privileged() {
         blocking.push(HardGate::VpnOnCriticalAction);
     }
 
     // ── GATE 12: Tor on recovery (zero tolerance) ────────────────────────────
-    if matches!(&ctx.ip_asn_type, Some(AsnType::Tor)) && ctx.action.is_recovery() {
+    // Per-tenant configurable via `gate_block_tor_on_recovery`.
+    if ctx.policy.gate_block_tor_on_recovery && is_tor && ctx.action.is_recovery() {
         blocking.push(HardGate::TorOnRecovery);
     }
 
@@ -133,8 +152,11 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     }
 
     // ── GATE 15: Fresh Credential + Privileged Action ────────────────────────
+    // Negative age (credential_created_at in the future) is anomalous and
+    // satisfies `< threshold`, blocking correctly without special handling.
+    // Per-tenant configurable via `gate_fresh_credential_minutes`.
     let age_mins = (ctx.evaluated_at - ctx.credential_created_at).num_minutes();
-    if age_mins < 5 && ctx.action.is_privileged() {
+    if age_mins < ctx.policy.gate_fresh_credential_minutes as i64 && ctx.action.is_privileged() {
         blocking.push(HardGate::PrivilegedActionOnFreshCredential);
     }
 
@@ -148,7 +170,7 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
     }
 
     if blocking.is_empty() {
-        GateOutcome::Passed(vec![])
+        GateOutcome::Passed
     } else {
         GateOutcome::Blocked(blocking)
     }
@@ -157,6 +179,28 @@ pub fn evaluate_hard_gates(ctx: &RiskContext) -> GateOutcome {
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Canonicalize IPv4-mapped IPv6 addresses (::ffff:a.b.c.d) to their IPv4
+/// equivalent so comparisons work regardless of which representation the
+/// adapter or load balancer used.
+fn canonicalize_ip(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V6(v6) => {
+            let segs = v6.segments();
+            if segs[..5] == [0, 0, 0, 0, 0] && segs[5] == 0xffff {
+                IpAddr::V4(std::net::Ipv4Addr::new(
+                    (segs[6] >> 8) as u8,
+                    segs[6] as u8,
+                    (segs[7] >> 8) as u8,
+                    segs[7] as u8,
+                ))
+            } else {
+                ip
+            }
+        }
+        _ => ip,
+    }
+}
 
 fn is_impossible_travel(ctx: &RiskContext) -> bool {
     match (&ctx.last_login_geo, &ctx.request_geo, ctx.last_login_at) {
@@ -184,20 +228,6 @@ fn is_vpn_detected(ctx: &RiskContext) -> bool {
         || ctx.ip_is_vpn == Some(true)
         || ctx.ip_is_proxy == Some(true)
         || ctx.ip_is_relay == Some(true)
-}
-
-/// Critical privileged actions that require full network attribution.
-/// These actions have irreversible security consequences if performed
-/// by an attacker, so VPN/proxy anonymization is not tolerated.
-fn is_critical_privileged_action(action: &RiskAction) -> bool {
-    match action {
-        RiskAction::RecoveryApprove | RiskAction::RecoveryComplete => true,
-        RiskAction::ActionExecute { action_name } => matches!(
-            action_name.as_str(),
-            "add_admin" | "rotate_api_key" | "delete_resource"
-        ),
-        _ => false,
-    }
 }
 
 #[cfg(test)]
@@ -275,7 +305,7 @@ mod tests {
             ip_abuse_confidence: None,
             // Geo intelligence
             geo_allowed_countries: None,
-            is_sanctioned_country: None,
+            is_sanctioned_country: Some(false),
             // Bot / browser integrity
             webdriver_detected: None,
             captcha_score: None,
@@ -285,7 +315,7 @@ mod tests {
             account_age_days: None,
             email_verified: None,
             email_domain_disposable: None,
-            breached_credential: None,
+            breached_credential: Some(false),
             // Time / behavioral
             user_typical_hours: None,
             accept_language: None,
@@ -299,7 +329,7 @@ mod tests {
     #[test]
     fn clean_context_passes_all_gates() {
         let ctx = base_ctx();
-        assert!(matches!(evaluate_hard_gates(&ctx), GateOutcome::Passed(_)));
+        assert!(matches!(evaluate_hard_gates(&ctx), GateOutcome::Passed));
     }
 
     #[test]
@@ -322,7 +352,7 @@ mod tests {
                 assert!(!gates.contains(&HardGate::RevokedCredential),
                     "Lost credentials must NOT be misreported as RevokedCredential");
             }
-            GateOutcome::Passed(_) => panic!("Lost credential must block"),
+            GateOutcome::Passed => panic!("Lost credential must block"),
         }
     }
 
@@ -361,7 +391,7 @@ mod tests {
         ctx.ip_asn_type = Some(AsnType::Tor);
         ctx.action = RiskAction::DeviceList;
         let outcome = evaluate_hard_gates(&ctx);
-        assert!(matches!(outcome, GateOutcome::Passed(_)));
+        assert!(matches!(outcome, GateOutcome::Passed));
     }
 
     #[test]
@@ -399,8 +429,19 @@ mod tests {
             GateOutcome::Blocked(gates) => {
                 assert!(!gates.contains(&HardGate::SignCountRollback));
             }
-            GateOutcome::Passed(_) => {} // expected
+            GateOutcome::Passed => {} // expected
         }
+    }
+
+    #[test]
+    fn negative_sign_count_blocks() {
+        let mut ctx = base_ctx();
+        ctx.credential_sign_count_new = -1;
+        let outcome = evaluate_hard_gates(&ctx);
+        assert!(matches!(
+            outcome,
+            GateOutcome::Blocked(gates) if gates.contains(&HardGate::SignCountRollback)
+        ));
     }
 
     #[test]
@@ -409,7 +450,7 @@ mod tests {
         ctx.credential_sign_count_prev = 10;
         ctx.credential_sign_count_new = 11;
         let outcome = evaluate_hard_gates(&ctx);
-        assert!(matches!(outcome, GateOutcome::Passed(_)));
+        assert!(matches!(outcome, GateOutcome::Passed));
     }
 
     // ── Gate 9: Sanctioned country ───────────────────────────────────────────
@@ -430,15 +471,18 @@ mod tests {
         let mut ctx = base_ctx();
         ctx.is_sanctioned_country = Some(false);
         let outcome = evaluate_hard_gates(&ctx);
-        assert!(matches!(outcome, GateOutcome::Passed(_)));
+        assert!(matches!(outcome, GateOutcome::Passed));
     }
 
     #[test]
-    fn unknown_sanctions_status_passes() {
+    fn unknown_sanctions_status_blocks() {
         let mut ctx = base_ctx();
-        ctx.is_sanctioned_country = None; // adapter didn't check
+        ctx.is_sanctioned_country = None;
         let outcome = evaluate_hard_gates(&ctx);
-        assert!(matches!(outcome, GateOutcome::Passed(_)));
+        assert!(matches!(
+            outcome,
+            GateOutcome::Blocked(gates) if gates.contains(&HardGate::SanctionedCountry)
+        ));
     }
 
     // ── Gate 10: Breached credential on sensitive action ─────────────────────
@@ -466,7 +510,7 @@ mod tests {
             GateOutcome::Blocked(gates) => {
                 assert!(!gates.contains(&HardGate::BreachedCredentialOnSensitive));
             }
-            GateOutcome::Passed(_) => {} // expected
+            GateOutcome::Passed => {} // expected
         }
     }
 
@@ -480,7 +524,33 @@ mod tests {
             GateOutcome::Blocked(gates) => {
                 assert!(!gates.contains(&HardGate::BreachedCredentialOnSensitive));
             }
-            GateOutcome::Passed(_) => {}
+            GateOutcome::Passed => {}
+        }
+    }
+
+    #[test]
+    fn unknown_breach_status_on_sensitive_action_blocks() {
+        let mut ctx = base_ctx();
+        ctx.breached_credential = None;
+        ctx.action = RiskAction::DeviceRevoke; // sensitive
+        let outcome = evaluate_hard_gates(&ctx);
+        assert!(matches!(
+            outcome,
+            GateOutcome::Blocked(gates) if gates.contains(&HardGate::BreachedCredentialOnSensitive)
+        ));
+    }
+
+    #[test]
+    fn unknown_breach_status_on_non_sensitive_passes() {
+        let mut ctx = base_ctx();
+        ctx.breached_credential = None;
+        ctx.action = RiskAction::DeviceList; // non-sensitive
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(!gates.contains(&HardGate::BreachedCredentialOnSensitive));
+            }
+            GateOutcome::Passed => {}
         }
     }
 
@@ -536,7 +606,7 @@ mod tests {
             GateOutcome::Blocked(gates) => {
                 assert!(!gates.contains(&HardGate::VpnOnCriticalAction));
             }
-            GateOutcome::Passed(_) => {}
+            GateOutcome::Passed => {}
         }
     }
 
@@ -550,7 +620,159 @@ mod tests {
             GateOutcome::Blocked(gates) => {
                 assert!(!gates.contains(&HardGate::VpnOnCriticalAction));
             }
-            GateOutcome::Passed(_) => {}
+            GateOutcome::Passed => {}
+        }
+    }
+
+    // ── IPv4-mapped IPv6 canonicalization ────────────────────────────────────
+
+    #[test]
+    fn canonicalize_ipv4_mapped_ipv6() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+        let v4 = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
+        let v6_mapped: IpAddr = IpAddr::V6("::ffff:1.2.3.4".parse::<Ipv6Addr>().unwrap());
+        assert_eq!(super::canonicalize_ip(v4), super::canonicalize_ip(v6_mapped));
+    }
+
+    #[test]
+    fn oauth_ip_mismatch_ignores_ipv4_v6_representation() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+        let mut ctx = base_ctx();
+        ctx.action = RiskAction::OauthComplete;
+        // Same IP, different representations — must NOT fire the gate
+        ctx.oauth_authorize_ip = Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
+        ctx.request_ip = Some(IpAddr::V6("::ffff:10.0.0.1".parse::<Ipv6Addr>().unwrap()));
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(!gates.contains(&HardGate::OauthIpMismatch),
+                    "Same IP in v4 vs v6-mapped form must not trigger OauthIpMismatch");
+            }
+            GateOutcome::Passed => {}
+        }
+    }
+
+    #[test]
+    fn oauth_ip_mismatch_fires_on_truly_different_ips() {
+        use std::net::{IpAddr, Ipv4Addr};
+        let mut ctx = base_ctx();
+        ctx.action = RiskAction::OauthComplete;
+        ctx.oauth_authorize_ip = Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
+        ctx.request_ip = Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)));
+        let outcome = evaluate_hard_gates(&ctx);
+        assert!(matches!(
+            outcome,
+            GateOutcome::Blocked(gates) if gates.contains(&HardGate::OauthIpMismatch)
+        ));
+    }
+
+    // ── N1: Per-tenant gate configuration ───────────────────────────────────
+
+    #[test]
+    fn gate_tor_on_sensitive_disabled_by_policy() {
+        let mut policy = PolicyConfig::default();
+        policy.gate_block_tor_on_sensitive = false;
+        let mut ctx = base_ctx();
+        ctx.policy = Arc::new(policy);
+        ctx.ip_asn_type = Some(AsnType::Tor);
+        ctx.action = RiskAction::DeviceRevoke; // sensitive
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(
+                    !gates.contains(&HardGate::TorOnSensitiveAction),
+                    "Gate 6 should be disabled by policy"
+                );
+            }
+            GateOutcome::Passed => {} // expected
+        }
+    }
+
+    #[test]
+    fn gate_vpn_on_critical_disabled_by_policy() {
+        let mut policy = PolicyConfig::default();
+        policy.gate_block_vpn_on_critical = false;
+        let mut ctx = base_ctx();
+        ctx.policy = Arc::new(policy);
+        ctx.ip_asn_type = Some(AsnType::Vpn);
+        ctx.action = RiskAction::RecoveryApprove;
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(
+                    !gates.contains(&HardGate::VpnOnCriticalAction),
+                    "Gate 11 should be disabled by policy"
+                );
+            }
+            GateOutcome::Passed => {} // expected
+        }
+    }
+
+    #[test]
+    fn gate_tor_on_recovery_disabled_by_policy() {
+        let mut policy = PolicyConfig::default();
+        policy.gate_block_tor_on_recovery = false;
+        let mut ctx = base_ctx();
+        ctx.policy = Arc::new(policy);
+        ctx.ip_asn_type = Some(AsnType::Tor);
+        ctx.action = RiskAction::RecoveryStart;
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(
+                    !gates.contains(&HardGate::TorOnRecovery),
+                    "Gate 12 should be disabled by policy"
+                );
+            }
+            GateOutcome::Passed => {} // expected
+        }
+    }
+
+    #[test]
+    fn gate_fresh_credential_uses_policy_threshold() {
+        // Default is 5 minutes — a 2-minute-old credential should block.
+        let mut ctx = base_ctx();
+        ctx.credential_created_at = ctx.evaluated_at - chrono::Duration::minutes(2);
+        ctx.action = RiskAction::DeviceRevoke; // privileged
+        let outcome = evaluate_hard_gates(&ctx);
+        assert!(matches!(
+            outcome,
+            GateOutcome::Blocked(gates) if gates.contains(&HardGate::PrivilegedActionOnFreshCredential)
+        ));
+
+        // Now set threshold to 1 minute — 2-minute-old credential passes.
+        let mut policy = PolicyConfig::default();
+        policy.gate_fresh_credential_minutes = 1;
+        ctx.policy = Arc::new(policy);
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(
+                    !gates.contains(&HardGate::PrivilegedActionOnFreshCredential),
+                    "2-minute-old credential should pass with 1-minute threshold"
+                );
+            }
+            GateOutcome::Passed => {} // expected
+        }
+    }
+
+    #[test]
+    fn gate_fresh_credential_zero_effectively_disables() {
+        let mut policy = PolicyConfig::default();
+        policy.gate_fresh_credential_minutes = 0;
+        let mut ctx = base_ctx();
+        ctx.policy = Arc::new(policy);
+        ctx.credential_created_at = ctx.evaluated_at - chrono::Duration::seconds(30);
+        ctx.action = RiskAction::DeviceRevoke; // privileged
+        let outcome = evaluate_hard_gates(&ctx);
+        match outcome {
+            GateOutcome::Blocked(gates) => {
+                assert!(
+                    !gates.contains(&HardGate::PrivilegedActionOnFreshCredential),
+                    "gate_fresh_credential_minutes=0 should effectively disable gate 15"
+                );
+            }
+            GateOutcome::Passed => {} // expected
         }
     }
 }

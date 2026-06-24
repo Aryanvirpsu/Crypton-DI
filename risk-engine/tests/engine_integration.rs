@@ -72,7 +72,7 @@ impl SignalStore for MockStore {
         ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let mut v = self.recent_decisions.lock().unwrap();
-        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v);
+        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v, ts_unix, 300);
         let (final_decision, escalated) = match outcome {
             risk_engine::engine::escalation::EscalationOutcome::EscalateTo(d) => (d, true),
             risk_engine::engine::escalation::EscalationOutcome::NoChange => {
@@ -184,7 +184,7 @@ fn clean_login_ctx() -> RiskContext {
         ip_abuse_confidence: None,
         // Geo intelligence
         geo_allowed_countries: None,
-        is_sanctioned_country: None,
+        is_sanctioned_country: Some(false),
         // Bot / browser integrity
         webdriver_detected: None,
         captcha_score: None,
@@ -194,7 +194,7 @@ fn clean_login_ctx() -> RiskContext {
         account_age_days: None,
         email_verified: None,
         email_domain_disposable: None,
-        breached_credential: None,
+        breached_credential: Some(false),
         // Time / behavioral
         user_typical_hours: None,
         accept_language: None,
@@ -372,7 +372,7 @@ async fn decision_includes_score_breakdown() {
     let decision = evaluate(ctx, &store).await;
     // Breakdown fields should be internally consistent
     let b = &decision.score_breakdown;
-    let expected_base = b.d + b.s + b.n + b.b;
+    let expected_base = b.d as u16 + b.s as u16 + b.n as u16 + b.b as u16 + b.c as u16;
     assert_eq!(b.base, expected_base);
     assert!(b.m_action >= 1.0);
     assert!(b.m_org >= 1.0);

@@ -73,7 +73,7 @@ impl SignalStore for TestStore {
         ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let mut v = self.recent_decisions.lock().unwrap();
-        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v);
+        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v, ts_unix, 300);
         let (final_decision, escalated) = match outcome {
             risk_engine::engine::escalation::EscalationOutcome::EscalateTo(d) => (d, true),
             risk_engine::engine::escalation::EscalationOutcome::NoChange => {
@@ -440,12 +440,16 @@ async fn test_score_breakdown_structure() {
     let store = TestStore::default();
     let decision = evaluate(ctx, &store).await;
     
-    // Verify score breakdown is populated
+    // Verify score breakdown is internally consistent. `base` is the exact
+    // integer sum of the components (the engine rounds an all-integer sum, so
+    // equality holds); the previous `>= 0` checks on u8 fields were vacuous.
     let b = &decision.score_breakdown;
-    assert!(b.d >= 0);
-    assert!(b.s >= 0);
-    assert!(b.n >= 0);
-    assert!(b.b >= 0);
+    assert_eq!(
+        b.base,
+        b.d as u16 + b.s as u16 + b.n as u16 + b.b as u16 + b.c as u16,
+        "base must equal D+S+N+B+C"
+    );
+    assert!(b.final_score <= 100, "final score must be clamped to 0..=100");
     assert!(b.m_action >= 1.0);
     assert!(b.m_org >= 1.0);
 }

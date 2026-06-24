@@ -166,49 +166,68 @@ pub fn score_network(ctx: &RiskContext, factors: &mut Vec<Factor>) -> u8 {
         (&ctx.last_login_geo, &ctx.request_geo, ctx.last_login_at)
     {
         let km = last_geo.distance_km(cur_geo);
-        let elapsed_h = crate::signals::geo::elapsed_hours(last_at, ctx.evaluated_at);
 
-        // Impossible travel: distance exceeds what a commercial flight can cover.
-        // Hard gate handles Tor + impossible travel; here we score the non-Tor variant.
-        let max_possible_km = elapsed_h * 900.0 + 500.0;
-
-        if km > max_possible_km {
+        // Inverted timestamp (last_at in the future relative to evaluated_at) is
+        // a clock/data anomaly, not travel. `elapsed_hours` clamps such cases to
+        // 0.0, which would collapse max_possible_km to the 500km floor and
+        // misfire `impossible_travel` for any legitimate >500km relocation.
+        // Treat the inversion as its own anomaly and skip the travel maths.
+        if last_at > ctx.evaluated_at {
             let eff = capped_add(&mut n, cap, ctx.policy.n_impossible_travel);
             if eff > 0 {
                 factors.push(factor(
-                    "impossible_travel",
+                    "inverted_login_timestamp",
                     ScoreComponent::Network,
                     eff,
-                    format!(
-                        "{}km in {:.1}h exceeds max possible travel distance ({:.0}km)",
-                        km as u32, elapsed_h, max_possible_km
-                    ),
+                    "Last-login timestamp is in the future (clock skew or tampering)",
                 ));
             }
-        } else if km > 1000.0 {
-            let eff = capped_add(&mut n, cap, ctx.policy.n_geo_jump_large);
-            if eff > 0 {
-                factors.push(factor(
-                    "large_geo_jump",
-                    ScoreComponent::Network,
-                    eff,
-                    format!("Login location changed by {}km since last session", km as u32),
-                ));
-            }
-        } else if km > 500.0 {
-            let eff = capped_add(&mut n, cap, ctx.policy.n_geo_jump_moderate);
-            if eff > 0 {
-                factors.push(factor(
-                    "moderate_geo_jump",
-                    ScoreComponent::Network,
-                    eff,
-                    format!("Login location changed by {}km since last session", km as u32),
-                ));
+        } else {
+            let elapsed_h = crate::signals::geo::elapsed_hours(last_at, ctx.evaluated_at);
+
+            // Impossible travel: distance exceeds what a commercial flight can cover.
+            // Hard gate handles Tor + impossible travel; here we score the non-Tor variant.
+            let max_possible_km = elapsed_h * 900.0 + 500.0;
+
+            if km > max_possible_km {
+                let eff = capped_add(&mut n, cap, ctx.policy.n_impossible_travel);
+                if eff > 0 {
+                    factors.push(factor(
+                        "impossible_travel",
+                        ScoreComponent::Network,
+                        eff,
+                        format!(
+                            "{}km in {:.1}h exceeds max possible travel distance ({:.0}km)",
+                            km as u32, elapsed_h, max_possible_km
+                        ),
+                    ));
+                }
+            } else if km > 1000.0 {
+                let eff = capped_add(&mut n, cap, ctx.policy.n_geo_jump_large);
+                if eff > 0 {
+                    factors.push(factor(
+                        "large_geo_jump",
+                        ScoreComponent::Network,
+                        eff,
+                        format!("Login location changed by {}km since last session", km as u32),
+                    ));
+                }
+            } else if km > 500.0 {
+                let eff = capped_add(&mut n, cap, ctx.policy.n_geo_jump_moderate);
+                if eff > 0 {
+                    factors.push(factor(
+                        "moderate_geo_jump",
+                        ScoreComponent::Network,
+                        eff,
+                        format!("Login location changed by {}km since last session", km as u32),
+                    ));
+                }
             }
         }
 
         // ── Country change detection ─────────────────────────────────────────
-        // Even if distance is moderate, a country change is noteworthy.
+        // A country change is noteworthy regardless of elapsed time, so it runs
+        // for both the normal and inverted-timestamp branches above.
         if last_geo.country_code != cur_geo.country_code {
             let eff = capped_add(&mut n, cap, ctx.policy.n_country_change);
             if eff > 0 {

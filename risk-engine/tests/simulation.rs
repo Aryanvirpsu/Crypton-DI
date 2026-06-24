@@ -73,7 +73,7 @@ impl SignalStore for MockStore {
         ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let mut v = self.recent_decisions.lock().unwrap();
-        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v);
+        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v, ts_unix, 300);
         let (final_decision, escalated) = match outcome {
             risk_engine::engine::escalation::EscalationOutcome::EscalateTo(d) => (d, true),
             risk_engine::engine::escalation::EscalationOutcome::NoChange => {
@@ -181,7 +181,7 @@ fn default_context() -> RiskContext {
         ip_is_relay: None,
         ip_abuse_confidence: None,
         geo_allowed_countries: None,
-        is_sanctioned_country: None,
+        is_sanctioned_country: Some(false),
         webdriver_detected: Some(false),
         captcha_score: None,
         screen_resolution: None,
@@ -189,7 +189,7 @@ fn default_context() -> RiskContext {
         account_age_days: None,
         email_verified: None,
         email_domain_disposable: None,
-        breached_credential: None,
+        breached_credential: Some(false),
         user_typical_hours: None,
         accept_language: None,
         previous_accept_language: None,

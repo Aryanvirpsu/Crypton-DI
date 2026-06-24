@@ -1,4 +1,4 @@
-use crate::context::RiskContext;
+use crate::context::{RiskAction, RiskContext};
 use crate::decision::{Factor, ScoreComponent};
 use crate::scoring::{capped_add, factor};
 
@@ -75,19 +75,24 @@ pub fn score_session(ctx: &RiskContext, factors: &mut Vec<Factor>) -> u8 {
     // ── OAuth authorize-IP mismatch ───────────────────────────────────────────
     // If the IP that hit /authorize differs from /oauth/complete, the session
     // may have been transferred (potential session hijack).
-    if let (Some(auth_ip), Some(req_ip)) = (ctx.oauth_authorize_ip, ctx.request_ip) {
-        if auth_ip != req_ip {
-            let eff = capped_add(&mut s, cap, ctx.policy.s_oauth_ip_mismatch);
-            if eff > 0 {
-                factors.push(factor(
-                    "oauth_ip_mismatch",
-                    ScoreComponent::Session,
-                    eff,
-                    format!(
-                        "OAuth session started from {} but completing from {}",
-                        auth_ip, req_ip
-                    ),
-                ));
+    // Guard on OauthComplete: oauth_authorize_ip only has meaning for that
+    // action. Without this guard the +15 penalty leaks onto every unrelated
+    // action (login, device ops, recovery) whenever an authorize IP is present.
+    if matches!(&ctx.action, RiskAction::OauthComplete) {
+        if let (Some(auth_ip), Some(req_ip)) = (ctx.oauth_authorize_ip, ctx.request_ip) {
+            if auth_ip != req_ip {
+                let eff = capped_add(&mut s, cap, ctx.policy.s_oauth_ip_mismatch);
+                if eff > 0 {
+                    factors.push(factor(
+                        "oauth_ip_mismatch",
+                        ScoreComponent::Session,
+                        eff,
+                        format!(
+                            "OAuth session started from {} but completing from {}",
+                            auth_ip, req_ip
+                        ),
+                    ));
+                }
             }
         }
     }

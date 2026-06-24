@@ -31,8 +31,8 @@
 //! your control plane publishes a tenant-update event so the next request
 //! refetches instead of waiting for TTL.
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -57,6 +57,17 @@ pub struct PolicyOverrides {
     pub fields: HashMap<String, Value>,
 }
 
+impl std::fmt::Display for PolicyOverrides {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.fields.is_empty() {
+            return write!(f, "(no overrides)");
+        }
+        let mut keys: Vec<&str> = self.fields.keys().map(|k| k.as_str()).collect();
+        keys.sort_unstable();
+        write!(f, "{} override(s): {}", keys.len(), keys.join(", "))
+    }
+}
+
 impl PolicyOverrides {
     pub fn new() -> Self {
         Self::default()
@@ -70,6 +81,26 @@ impl PolicyOverrides {
     pub fn insert<V: Into<Value>>(mut self, key: &str, value: V) -> Self {
         self.fields.insert(key.to_string(), value.into());
         self
+    }
+
+    /// Validated insert: checks the key name and value type against
+    /// [`PolicyConfig`] by trial-merging a single-field override onto the
+    /// default config. Returns `ConfigError` on unknown keys or type
+    /// mismatches so callers catch mistakes at build time rather than at the
+    /// final `with_overrides` merge.
+    pub fn insert_validated<V: Into<Value>>(
+        mut self,
+        key: &str,
+        value: V,
+    ) -> Result<Self, RiskEngineError> {
+        let val = value.into();
+        // Trial merge — exercises deny_unknown_fields + type checking.
+        let trial = PolicyOverrides {
+            fields: [(key.to_string(), val.clone())].into_iter().collect(),
+        };
+        PolicyConfig::default().with_overrides(&trial)?;
+        self.fields.insert(key.to_string(), val);
+        Ok(self)
     }
 
     /// Parse from a JSON string (the shape stored in Redis).
@@ -108,9 +139,13 @@ impl PolicyConfig {
         for (k, v) in &overrides.fields {
             obj.insert(k.clone(), v.clone());
         }
-        serde_json::from_value(base).map_err(|e| {
+        let merged: Self = serde_json::from_value(base).map_err(|e| {
             RiskEngineError::ConfigError(format!("apply overrides (likely a typo or type mismatch): {e}"))
-        })
+        })?;
+        merged.validate()?;
+        // Security bounds: overrides cannot weaken policy beyond the base.
+        merged.validate_security_bounds(&self)?;
+        Ok(merged)
     }
 
     /// Fetch tenant overrides from `store`, merge them over `base`, and return
@@ -122,8 +157,12 @@ impl PolicyConfig {
         store: &S,
         tenant_id: &str,
     ) -> Result<PolicyConfig, RiskEngineError> {
-        let overrides = store.load_overrides(tenant_id).await?;
-        base.clone().with_overrides(&overrides)
+        let overrides = store.load_overrides(tenant_id).await.map_err(|e| {
+            RiskEngineError::ConfigError(format!("tenant {tenant_id}: load overrides: {e}"))
+        })?;
+        base.clone().with_overrides(&overrides).map_err(|e| {
+            RiskEngineError::ConfigError(format!("tenant {tenant_id}: {e}"))
+        })
     }
 }
 
@@ -154,30 +193,57 @@ pub trait PolicyStore: Send + Sync {
 /// The cache is an `RwLock<HashMap>` — fine for the expected cardinality (one
 /// entry per active tenant). For very high tenant counts, swap to a bounded
 /// LRU without changing the public API.
+///
+/// ## Thundering-herd protection
+///
+/// When a cached entry expires, the first request to notice promotes itself to
+/// "refresher" and fetches from the inner store. Concurrent requests that arrive
+/// while the refresh is in-flight receive the stale (expired) entry rather than
+/// stampeding the backing store. Cold misses (no stale entry) cannot be
+/// deduplicated without async coordination, so those still fan out.
+const DEFAULT_MAX_TENANTS: usize = 10_000;
+
 pub struct CachedPolicyStore<S: PolicyStore + ?Sized> {
     inner: Arc<S>,
     ttl: Duration,
+    max_entries: usize,
     entries: RwLock<HashMap<String, (PolicyOverrides, Instant)>>,
+    /// Tenant IDs currently being refreshed by another task. Used for
+    /// stale-while-revalidate: if a refresh is already in flight, concurrent
+    /// readers serve the expired entry instead of stampeding the store.
+    refreshing: Mutex<HashSet<String>>,
 }
 
 impl<S: PolicyStore + ?Sized> CachedPolicyStore<S> {
     pub fn new(inner: Arc<S>, ttl: Duration) -> Self {
+        Self::with_max_entries(inner, ttl, DEFAULT_MAX_TENANTS)
+    }
+
+    pub fn with_max_entries(inner: Arc<S>, ttl: Duration, max_entries: usize) -> Self {
         Self {
             inner,
             ttl,
+            max_entries,
             entries: RwLock::new(HashMap::new()),
+            refreshing: Mutex::new(HashSet::new()),
         }
     }
 
     /// Drop the cached entry for `tenant_id`. Call this from whatever channel
     /// your control plane uses to announce tenant-policy updates.
     pub fn invalidate(&self, tenant_id: &str) {
-        self.entries.write().unwrap().remove(tenant_id);
+        self.entries
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(tenant_id);
     }
 
     /// Drop every cached entry. Intended for operator tooling, not a hot path.
     pub fn invalidate_all(&self) {
-        self.entries.write().unwrap().clear();
+        self.entries
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
     }
 }
 
@@ -187,17 +253,63 @@ impl<S: PolicyStore + ?Sized> PolicyStore for CachedPolicyStore<S> {
         &self,
         tenant_id: &str,
     ) -> Result<PolicyOverrides, RiskEngineError> {
-        if let Some((cached, inserted_at)) = self.entries.read().unwrap().get(tenant_id).cloned() {
+        // Fast path: fresh cache hit.
+        if let Some((cached, inserted_at)) = self
+            .entries
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(tenant_id)
+            .cloned()
+        {
             if inserted_at.elapsed() < self.ttl {
                 return Ok(cached);
             }
+            // Stale entry — try to become the sole refresher.
+            let already_refreshing = {
+                let mut set = self.refreshing
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner());
+                !set.insert(tenant_id.to_string()) // false if we just added it
+            };
+            if already_refreshing {
+                // Another task is already refreshing — serve stale.
+                return Ok(cached);
+            }
+            // We are the refresher — fall through to fetch.
         }
 
-        let fresh = self.inner.load_overrides(tenant_id).await?;
-        self.entries
+        // Cold miss or we are the designated refresher for a stale entry.
+        let result = self.inner.load_overrides(tenant_id).await;
+
+        // Always clear the refreshing flag so the next miss retries.
+        self.refreshing
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(tenant_id);
+
+        let fresh = result?;
+        let now = Instant::now();
+        let mut map = self.entries
             .write()
-            .unwrap()
-            .insert(tenant_id.to_string(), (fresh.clone(), Instant::now()));
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if map.len() >= self.max_entries && !map.contains_key(tenant_id) {
+            let ttl = self.ttl;
+            map.retain(|_, (_, inserted)| now.duration_since(*inserted) < ttl);
+            // Hard bound: if TTL-based eviction didn't free space (all entries
+            // are still fresh), evict the oldest entry to guarantee the cache
+            // never exceeds max_entries. Without this, a burst of distinct
+            // tenant IDs could grow the map unboundedly.
+            if map.len() >= self.max_entries {
+                if let Some(oldest_key) = map
+                    .iter()
+                    .min_by_key(|(_, (_, ts))| *ts)
+                    .map(|(k, _)| k.clone())
+                {
+                    map.remove(&oldest_key);
+                }
+            }
+        }
+        map.insert(tenant_id.to_string(), (fresh.clone(), now));
         Ok(fresh)
     }
 }
@@ -222,11 +334,12 @@ mod tests {
     #[test]
     fn overrides_replace_named_fields() {
         let base = PolicyConfig::default();
+        // Value must be <= base (39) to satisfy security bounds.
         let overrides = PolicyOverrides::new()
-            .insert("threshold_allow_max", 42_u8)
+            .insert("threshold_allow_max", 20_u8)
             .insert("version", "tenant-acme");
         let merged = base.clone().with_overrides(&overrides).unwrap();
-        assert_eq!(merged.threshold_allow_max, 42);
+        assert_eq!(merged.threshold_allow_max, 20);
         assert_eq!(merged.version, "tenant-acme");
         // Untouched field still matches base.
         assert_eq!(merged.cap_device, base.cap_device);
@@ -315,5 +428,255 @@ mod tests {
         let base = PolicyConfig::default();
         let effective = PolicyConfig::for_tenant(&base, &cached, "acme").await.unwrap();
         assert_eq!(effective.threshold_allow_max, 10);
+    }
+
+    // ── I1: validate() ──────────────────────────────────────────────────────
+
+    #[test]
+    fn validate_rejects_inverted_thresholds() {
+        let base = PolicyConfig::default();
+        let overrides = PolicyOverrides::new()
+            .insert("threshold_allow_max", 70_u8)
+            .insert("threshold_challenge_max", 50_u8);
+        let err = base.with_overrides(&overrides).unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("threshold_allow_max"), "{msg}");
+    }
+
+    #[test]
+    fn validate_rejects_negative_multiplier() {
+        let mut cfg = PolicyConfig::default();
+        cfg.multiplier_login = -1.0;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("multiplier_login"), "{msg}");
+    }
+
+    #[test]
+    fn validate_rejects_zero_damping_rate() {
+        let mut cfg = PolicyConfig::default();
+        cfg.score_damping_rate = 0.0;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("score_damping_rate"), "{msg}");
+    }
+
+    #[test]
+    fn validate_accepts_default_config() {
+        PolicyConfig::default().validate().unwrap();
+    }
+
+    // ── I8: Display ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn display_empty_overrides() {
+        let o = PolicyOverrides::default();
+        assert_eq!(format!("{o}"), "(no overrides)");
+    }
+
+    #[test]
+    fn display_shows_override_keys() {
+        let o = PolicyOverrides::new()
+            .insert("threshold_allow_max", 10_u8)
+            .insert("cap_device", 40_u8);
+        let s = format!("{o}");
+        assert!(s.contains("2 override(s)"), "{s}");
+        assert!(s.contains("cap_device"), "{s}");
+        assert!(s.contains("threshold_allow_max"), "{s}");
+    }
+
+    // ── N3: Component cap validation ────────────────────────────────────────
+
+    #[test]
+    fn validate_rejects_cap_over_100() {
+        let mut cfg = PolicyConfig::default();
+        cfg.cap_device = 101;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("cap_device"), "{msg}");
+        assert!(msg.contains("101"), "{msg}");
+    }
+
+    #[test]
+    fn validate_accepts_cap_at_100() {
+        let mut cfg = PolicyConfig::default();
+        cfg.cap_device = 100;
+        cfg.validate().unwrap();
+    }
+
+    #[test]
+    fn validate_accepts_cap_at_zero() {
+        let mut cfg = PolicyConfig::default();
+        cfg.cap_device = 0;
+        cfg.validate().unwrap();
+    }
+
+    #[test]
+    fn validate_rejects_org_cluster_bias_over_100() {
+        let mut cfg = PolicyConfig::default();
+        cfg.max_org_cluster_bias = 101;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("max_org_cluster_bias"), "{msg}");
+    }
+
+    // ── N4: insert_validated ────────────────────────────────────────────────
+
+    #[test]
+    fn insert_validated_accepts_valid_field() {
+        let o = PolicyOverrides::new()
+            .insert_validated("threshold_allow_max", 20_u8)
+            .unwrap();
+        assert_eq!(o.fields["threshold_allow_max"], serde_json::json!(20));
+    }
+
+    #[test]
+    fn insert_validated_rejects_unknown_field() {
+        let err = PolicyOverrides::new()
+            .insert_validated("not_a_real_field", 1_u8)
+            .unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("not_a_real_field"), "{msg}");
+    }
+
+    #[test]
+    fn insert_validated_rejects_type_mismatch() {
+        let err = PolicyOverrides::new()
+            .insert_validated("threshold_allow_max", "oops")
+            .unwrap_err();
+        assert!(matches!(err, RiskEngineError::ConfigError(_)), "{err:?}");
+    }
+
+    #[test]
+    fn insert_validated_rejects_invalid_value() {
+        // threshold_allow_max = 70 would violate threshold ordering (>= challenge_max=64)
+        let err = PolicyOverrides::new()
+            .insert_validated("threshold_allow_max", 70_u8)
+            .unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("threshold_allow_max"), "{msg}");
+    }
+
+    #[test]
+    fn insert_validated_accepts_gate_config() {
+        let o = PolicyOverrides::new()
+            .insert_validated("gate_fresh_credential_minutes", 30_u8)
+            .unwrap()
+            .insert_validated("gate_block_vpn_on_critical", false)
+            .unwrap();
+        assert_eq!(
+            o.fields["gate_fresh_credential_minutes"],
+            serde_json::json!(30)
+        );
+        assert_eq!(
+            o.fields["gate_block_vpn_on_critical"],
+            serde_json::json!(false)
+        );
+    }
+
+    // ── V1: Security bounds (validate_security_bounds) ──────────────────────
+
+    #[test]
+    fn security_bounds_rejects_raised_allow_threshold() {
+        let base = PolicyConfig::default();
+        // Attempt to raise threshold_allow_max (make Allow easier = weaker security)
+        let overrides = PolicyOverrides::new()
+            .insert("threshold_allow_max", (base.threshold_allow_max + 1));
+        let err = base.with_overrides(&overrides).unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("threshold_allow_max"), "{msg}");
+        assert!(msg.contains("cannot exceed base"), "{msg}");
+    }
+
+    #[test]
+    fn security_bounds_rejects_raised_hold_threshold() {
+        let base = PolicyConfig::default();
+        let overrides = PolicyOverrides::new()
+            .insert("threshold_hold_max", (base.threshold_hold_max + 1));
+        let err = base.with_overrides(&overrides).unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("threshold_hold_max"), "{msg}");
+    }
+
+    #[test]
+    fn security_bounds_allows_lowered_thresholds() {
+        let base = PolicyConfig::default();
+        // Lowering thresholds = stricter policy, always allowed
+        let overrides = PolicyOverrides::new()
+            .insert("threshold_allow_max", 20_u8)
+            .insert("threshold_challenge_max", 50_u8)
+            .insert("threshold_hold_max", 80_u8);
+        let merged = base.with_overrides(&overrides).unwrap();
+        assert_eq!(merged.threshold_allow_max, 20);
+        assert_eq!(merged.threshold_challenge_max, 50);
+        assert_eq!(merged.threshold_hold_max, 80);
+    }
+
+    #[test]
+    fn security_bounds_rejects_zeroed_cap() {
+        let base = PolicyConfig::default();
+        let overrides = PolicyOverrides::new().insert("cap_device", 0_u8);
+        let err = base.with_overrides(&overrides).unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("cap_device"), "{msg}");
+        assert!(msg.contains("cannot be 0"), "{msg}");
+    }
+
+    #[test]
+    fn security_bounds_allows_lowered_cap() {
+        let base = PolicyConfig::default();
+        let overrides = PolicyOverrides::new().insert("cap_device", 1_u8);
+        let merged = base.with_overrides(&overrides).unwrap();
+        assert_eq!(merged.cap_device, 1);
+    }
+
+    #[test]
+    fn security_bounds_allows_same_thresholds() {
+        let base = PolicyConfig::default();
+        // Same values as base — should pass
+        let overrides = PolicyOverrides::new()
+            .insert("threshold_allow_max", base.threshold_allow_max);
+        base.with_overrides(&overrides).unwrap();
+    }
+
+    // ── V5: NaN/Infinity validation ─────────────────────────────────────────
+
+    #[test]
+    fn validate_rejects_nan_damping_rate() {
+        let mut cfg = PolicyConfig::default();
+        cfg.score_damping_rate = f32::NAN;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("score_damping_rate"), "{msg}");
+    }
+
+    #[test]
+    fn validate_rejects_infinite_multiplier() {
+        let mut cfg = PolicyConfig::default();
+        cfg.multiplier_login = f32::INFINITY;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("multiplier_login"), "{msg}");
+    }
+
+    #[test]
+    fn validate_rejects_nan_multiplier() {
+        let mut cfg = PolicyConfig::default();
+        cfg.multiplier_login = f32::NAN;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("multiplier_login"), "{msg}");
+    }
+
+    // ── I1: Threshold ceiling ───────────────────────────────────────────────
+
+    #[test]
+    fn validate_rejects_hold_max_over_100() {
+        let mut cfg = PolicyConfig::default();
+        cfg.threshold_hold_max = 101;
+        let err = cfg.validate().unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("threshold_hold_max"), "{msg}");
+        assert!(msg.contains("100"), "{msg}");
     }
 }

@@ -8,7 +8,7 @@ score: 76
 base_score: 76
 adjusted_score: 76
 required_action: AdminApproval
-hold_reason: Some("Score threshold exceeded. Top signals: ua_family_mismatch, headless_ua, concurrent_sessions_elevated. Action: login.")
+hold_reason: Some("Score threshold exceeded. Top signals: shadow_session_pattern, ua_family_mismatch, unknown_ip_for_user. Action: login.")
 triggered_gates: []
 escalated: false
 signals_degraded: false

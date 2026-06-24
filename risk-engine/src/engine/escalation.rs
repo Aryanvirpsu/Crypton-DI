@@ -1,5 +1,3 @@
-use chrono::Utc;
-
 use crate::decision::Decision;
 use crate::store::EscalationEntry;
 
@@ -27,14 +25,12 @@ pub enum EscalationOutcome {
 pub fn check_escalation(
     current_decision: &Decision,
     entries: &[EscalationEntry],
+    now_unix: i64,
+    window_secs: i64,
 ) -> EscalationOutcome {
-    let now = Utc::now().timestamp();
-    let window_secs: i64 = 300; // 5 minutes
-
-    // Only entries within the time window count.
     let recent: Vec<&EscalationEntry> = entries
         .iter()
-        .filter(|e| now - e.ts_unix <= window_secs)
+        .filter(|e| now_unix - e.ts_unix <= window_secs)
         .collect();
 
     // Count by decision type in recent window
@@ -69,66 +65,69 @@ mod tests {
     use crate::store::EscalationEntry;
     use chrono::Utc;
 
-    fn entry(decision: Decision, seconds_ago: i64) -> EscalationEntry {
+    fn entry(decision: Decision, seconds_ago: i64, now: i64) -> EscalationEntry {
         EscalationEntry {
             score: 45,
             decision,
-            ts_unix: Utc::now().timestamp() - seconds_ago,
+            ts_unix: now - seconds_ago,
         }
     }
 
     #[test]
     fn three_recent_challenges_escalates_to_hold() {
+        let now = Utc::now().timestamp();
         let entries = vec![
-            entry(Decision::Challenge, 30),
-            entry(Decision::Challenge, 60),
-            entry(Decision::Challenge, 90),
+            entry(Decision::Challenge, 30, now),
+            entry(Decision::Challenge, 60, now),
+            entry(Decision::Challenge, 90, now),
         ];
-        let outcome = check_escalation(&Decision::Challenge, &entries);
+        let outcome = check_escalation(&Decision::Challenge, &entries, now, 300);
         assert_eq!(outcome, EscalationOutcome::EscalateTo(Decision::Hold));
     }
 
     #[test]
     fn two_recent_holds_escalates_to_deny() {
+        let now = Utc::now().timestamp();
         let entries = vec![
-            entry(Decision::Hold, 30),
-            entry(Decision::Hold, 60),
+            entry(Decision::Hold, 30, now),
+            entry(Decision::Hold, 60, now),
         ];
-        let outcome = check_escalation(&Decision::Challenge, &entries);
+        let outcome = check_escalation(&Decision::Challenge, &entries, now, 300);
         assert_eq!(outcome, EscalationOutcome::EscalateTo(Decision::Deny));
     }
 
     #[test]
     fn old_challenges_outside_window_do_not_escalate() {
+        let now = Utc::now().timestamp();
         let entries = vec![
-            entry(Decision::Challenge, 400), // >300s ago, outside window
-            entry(Decision::Challenge, 500),
-            entry(Decision::Challenge, 600),
+            entry(Decision::Challenge, 400, now),
+            entry(Decision::Challenge, 500, now),
+            entry(Decision::Challenge, 600, now),
         ];
-        let outcome = check_escalation(&Decision::Challenge, &entries);
+        let outcome = check_escalation(&Decision::Challenge, &entries, now, 300);
         assert_eq!(outcome, EscalationOutcome::NoChange);
     }
 
     #[test]
     fn allow_decision_never_escalated() {
+        let now = Utc::now().timestamp();
         let entries = vec![
-            entry(Decision::Challenge, 10),
-            entry(Decision::Challenge, 20),
-            entry(Decision::Challenge, 30),
+            entry(Decision::Challenge, 10, now),
+            entry(Decision::Challenge, 20, now),
+            entry(Decision::Challenge, 30, now),
         ];
-        // Even with 3 recent challenges, if the *current* decision is Allow,
-        // no escalation applies.
-        let outcome = check_escalation(&Decision::Allow, &entries);
+        let outcome = check_escalation(&Decision::Allow, &entries, now, 300);
         assert_eq!(outcome, EscalationOutcome::NoChange);
     }
 
     #[test]
     fn deny_decision_never_further_escalated() {
+        let now = Utc::now().timestamp();
         let entries = vec![
-            entry(Decision::Hold, 10),
-            entry(Decision::Hold, 20),
+            entry(Decision::Hold, 10, now),
+            entry(Decision::Hold, 20, now),
         ];
-        let outcome = check_escalation(&Decision::Deny, &entries);
+        let outcome = check_escalation(&Decision::Deny, &entries, now, 300);
         assert_eq!(outcome, EscalationOutcome::NoChange);
     }
 }

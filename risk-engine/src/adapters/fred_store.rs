@@ -21,6 +21,7 @@ use fred::interfaces::{HashesInterface, KeysInterface, ListInterface, LuaInterfa
 use fred::types::{Expiration, SetOptions};
 use uuid::Uuid;
 
+use crate::config::ESCALATION_WINDOW_SECS;
 use crate::decision::Decision;
 use crate::engine::escalation::{check_escalation, EscalationOutcome};
 use crate::error::RiskEngineError;
@@ -314,7 +315,7 @@ impl SignalStore for FredSignalStore {
                 .map_err(to_engine_err)?;
 
             let snapshot = decode_entries(&raw);
-            let outcome = check_escalation(current_decision, &snapshot);
+            let outcome = check_escalation(current_decision, &snapshot, ts_unix, ESCALATION_WINDOW_SECS);
             Ok(match outcome {
                 EscalationOutcome::EscalateTo(d) => (d, true),
                 EscalationOutcome::NoChange => (current_decision.clone(), false),

@@ -75,6 +75,12 @@ pub enum RiskEngineError {
 
     /// Pre-filter (see [`crate::rate_limit`]) rejected the request before
     /// scoring. Callers should map this to HTTP 429.
+    ///
+    /// The inner string is a **sanitized, opaque** reason — it deliberately
+    /// does NOT contain the bucket key, capacity, or refill rate.  Callers
+    /// must match on the variant, not parse the string.  Exposing rate-limit
+    /// configuration in error payloads lets attackers tune request cadence to
+    /// stay just under the limit.
     #[error("rate limit exceeded: {0}")]
     RateLimited(String),
 }

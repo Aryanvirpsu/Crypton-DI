@@ -12,13 +12,15 @@ pub fn score_device(ctx: &RiskContext, factors: &mut Vec<Factor>) -> u8 {
     // Revoked is handled as a hard gate before scoring, but Lost still reaches
     // the scorer and carries maximum device distrust.
     if ctx.credential_status == CredentialStatus::Lost {
-        capped_add(&mut d, cap, ctx.policy.d_credential_lost);
-        factors.push(factor(
-            "credential_lost",
-            ScoreComponent::Device,
-            d,
-            "Device is explicitly marked as lost",
-        ));
+        let eff = capped_add(&mut d, cap, ctx.policy.d_credential_lost);
+        if eff > 0 {
+            factors.push(factor(
+                "credential_lost",
+                ScoreComponent::Device,
+                eff,
+                "Device is explicitly marked as lost",
+            ));
+        }
         return d;
     }
 

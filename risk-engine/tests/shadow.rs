@@ -62,7 +62,7 @@ impl SignalStore for MockStore {
         ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let mut v = self.recent.lock().unwrap();
-        let outcome = risk_engine::engine::escalation::check_escalation(d, &v);
+        let outcome = risk_engine::engine::escalation::check_escalation(d, &v, ts_unix, 300);
         let (final_d, escalated) = match outcome {
             risk_engine::engine::escalation::EscalationOutcome::EscalateTo(x) => (x, true),
             risk_engine::engine::escalation::EscalationOutcome::NoChange => (d.clone(), false),
@@ -159,7 +159,7 @@ fn minimal_login_ctx() -> RiskContext {
         ip_is_relay: None,
         ip_abuse_confidence: None,
         geo_allowed_countries: None,
-        is_sanctioned_country: None,
+        is_sanctioned_country: Some(false),
         webdriver_detected: None,
         captcha_score: None,
         screen_resolution: None,
@@ -167,7 +167,7 @@ fn minimal_login_ctx() -> RiskContext {
         account_age_days: None,
         email_verified: None,
         email_domain_disposable: None,
-        breached_credential: None,
+        breached_credential: Some(false),
         user_typical_hours: None,
         accept_language: None,
         previous_accept_language: None,

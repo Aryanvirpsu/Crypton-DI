@@ -119,7 +119,7 @@ impl SignalStore for GoldenStore {
         ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let mut v = self.recent_decisions.lock().unwrap();
-        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v);
+        let outcome = risk_engine::engine::escalation::check_escalation(current_decision, &v, ts_unix, 300);
         let (final_decision, escalated) = match outcome {
             risk_engine::engine::escalation::EscalationOutcome::EscalateTo(d) => (d, true),
             risk_engine::engine::escalation::EscalationOutcome::NoChange => {

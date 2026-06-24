@@ -32,6 +32,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::config::ESCALATION_WINDOW_SECS;
 use crate::context::RiskContext;
 use crate::decision::{Decision, RiskDecision};
 use crate::engine::escalation::{check_escalation, EscalationOutcome};
@@ -186,10 +187,10 @@ impl<'a, S: SignalStore + ?Sized> SignalStore for ReadOnlyStore<'a, S> {
         user_id: Uuid,
         current_decision: &Decision,
         _score: u8,
-        _ts_unix: i64,
+        ts_unix: i64,
     ) -> Result<(Decision, bool), RiskEngineError> {
         let recent = self.inner.get_recent_decisions(user_id).await?;
-        match check_escalation(current_decision, &recent) {
+        match check_escalation(current_decision, &recent, ts_unix, ESCALATION_WINDOW_SECS) {
             EscalationOutcome::NoChange => Ok((current_decision.clone(), false)),
             EscalationOutcome::EscalateTo(promoted) => Ok((promoted, true)),
         }

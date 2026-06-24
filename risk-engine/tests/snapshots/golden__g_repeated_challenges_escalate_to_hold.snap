@@ -8,7 +8,7 @@ score: 49
 base_score: 49
 adjusted_score: 49
 required_action: AdminApproval
-hold_reason: Some("Escalated from repeated challenges. Top signals: headless_ua, login_velocity_elevated, failed_attempts_elevated. Action: login.")
+hold_reason: Some("Escalated from repeated challenges. Top signals: login_velocity_elevated, failed_attempts_elevated, headless_ua. Action: login.")
 triggered_gates: []
 escalated: true
 signals_degraded: false

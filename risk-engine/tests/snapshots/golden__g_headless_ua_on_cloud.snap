@@ -8,7 +8,7 @@ score: 87
 base_score: 87
 adjusted_score: 87
 required_action: AdminApproval
-hold_reason: Some("Score threshold exceeded. Top signals: headless_ua, webdriver_detected, datacenter_ip. Action: login.")
+hold_reason: Some("Score threshold exceeded. Top signals: webdriver_detected, automated_scraper_pattern, datacenter_ip. Action: login.")
 triggered_gates: []
 escalated: false
 signals_degraded: false

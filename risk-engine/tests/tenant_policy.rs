@@ -164,7 +164,7 @@ fn login_ctx(policy: Arc<PolicyConfig>) -> RiskContext {
         ip_is_relay: None,
         ip_abuse_confidence: None,
         geo_allowed_countries: None,
-        is_sanctioned_country: None,
+        is_sanctioned_country: Some(false),
         webdriver_detected: None,
         captcha_score: None,
         screen_resolution: None,
@@ -172,7 +172,7 @@ fn login_ctx(policy: Arc<PolicyConfig>) -> RiskContext {
         account_age_days: None,
         email_verified: None,
         email_domain_disposable: None,
-        breached_credential: None,
+        breached_credential: Some(false),
         user_typical_hours: None,
         accept_language: None,
         previous_accept_language: None,
@@ -184,12 +184,14 @@ fn login_ctx(policy: Arc<PolicyConfig>) -> RiskContext {
 #[tokio::test]
 async fn tenant_override_changes_live_decision() {
     // Stricter tenant: allow_max=0 forces everything to Challenge.
+    // Security bounds enforce that thresholds can only be lowered (stricter).
     let inner = Arc::new(InMemoryPolicyStore::default());
     inner.set(
         "acme",
         PolicyOverrides::new()
             .insert("threshold_allow_max", 0_u8)
-            .insert("threshold_challenge_max", 100_u8)
+            .insert("threshold_challenge_max", 60_u8)
+            .insert("threshold_hold_max", 85_u8)
             .insert("version", "acme-strict"),
     );
     let cache = CachedPolicyStore::new(inner, Duration::from_secs(60));

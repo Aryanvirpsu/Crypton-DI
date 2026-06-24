@@ -19,6 +19,9 @@ pub const CAP_NETWORK: u8 = 50;
 /// Maximum points allowed for the Behavioral (B) component.
 pub const CAP_BEHAVIORAL: u8 = 50;
 
+/// Maximum points allowed for the Correlation (C) component.
+pub const CAP_CORRELATION: u8 = 100;
+
 /// Maximum additive bias from org/cluster signals.
 pub const MAX_ORG_CLUSTER_BIAS: u8 = 25;
 
@@ -29,7 +32,7 @@ pub const MAX_ORG_CLUSTER_BIAS: u8 = 25;
 pub const THRESHOLD_ALLOW_MAX: u8 = 39;
 pub const THRESHOLD_CHALLENGE_MAX: u8 = 64;
 pub const THRESHOLD_HOLD_MAX: u8 = 89;
-// Any score >= 85 is DENY.
+// Any score >= 90 is DENY.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCORING MATH CONSTANTS (v3.1)
@@ -54,6 +57,8 @@ pub const MULTIPLIER_RECOVERY_START: f32 = 2.0;
 pub const MULTIPLIER_AUDIT_LOG_EXPORT: f32 = 2.0;
 pub const MULTIPLIER_RECOVERY_APPROVE: f32 = 2.2;
 pub const MULTIPLIER_RECOVERY_COMPLETE: f32 = 2.5;
+
+pub const MULTIPLIER_ACTION_CHALLENGE: f32 = 1.3;
 
 // ActionExecute multipliers
 pub const MULTIPLIER_EXECUTE_EXPORT_DATA: f32 = 2.0;
@@ -200,3 +205,27 @@ pub const C_AUTOMATED_SCRAPER: u8 = 30;
 pub const C_SHADOW_SESSION: u8 = 40;
 pub const C_TRAVEL_ANOMALY: u8 = 15;
 pub const C_CLONER_PATTERN: u8 = 45;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE CONFIGURATION (per-tenant overridable)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Minutes after credential creation during which privileged actions are blocked.
+pub const GATE_FRESH_CREDENTIAL_MINUTES: u8 = 5;
+
+/// Whether to block VPN/proxy/relay users on critical privileged actions.
+pub const GATE_BLOCK_VPN_ON_CRITICAL: bool = true;
+
+/// Whether to block Tor exit nodes on sensitive actions.
+pub const GATE_BLOCK_TOR_ON_SENSITIVE: bool = true;
+
+/// Whether to block Tor exit nodes on recovery flows (zero tolerance).
+pub const GATE_BLOCK_TOR_ON_RECOVERY: bool = true;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ESCALATION MEMORY
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Sliding window (in seconds) for escalation memory lookups.
+/// Recent decisions within this window count toward escalation promotion.
+pub const ESCALATION_WINDOW_SECS: i64 = 300;

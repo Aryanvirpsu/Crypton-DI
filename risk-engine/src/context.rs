@@ -72,6 +72,21 @@ impl RiskAction {
         }
     }
 
+    /// Actions with irreversible security consequences that require full
+    /// network attribution. VPN/proxy anonymization is not tolerated.
+    /// This is the single source of truth — used by hard gates and
+    /// account-lock logic.
+    pub fn is_critical_privileged(&self) -> bool {
+        match self {
+            RiskAction::RecoveryApprove | RiskAction::RecoveryComplete => true,
+            RiskAction::ActionExecute { action_name } => matches!(
+                action_name.to_ascii_lowercase().as_str(),
+                "add_admin" | "rotate_api_key" | "delete_resource"
+            ),
+            _ => false,
+        }
+    }
+
     /// Human-readable label used in audit entries and factor descriptions.
     pub fn label(&self) -> &str {
         match self {
@@ -204,7 +219,18 @@ pub struct GeoPoint {
 
 impl GeoPoint {
     /// Haversine distance in kilometres between two points.
+    ///
+    /// Returns [`f64::INFINITY`] if any coordinate is NaN or infinite, so
+    /// callers that compare against a distance threshold fail-closed (the
+    /// distance appears maximal rather than zero).
     pub fn distance_km(&self, other: &GeoPoint) -> f64 {
+        if !self.lat.is_finite()
+            || !self.lon.is_finite()
+            || !other.lat.is_finite()
+            || !other.lon.is_finite()
+        {
+            return f64::INFINITY;
+        }
         const R: f64 = 6371.0;
         let dlat = (other.lat - self.lat).to_radians();
         let dlon = (other.lon - self.lon).to_radians();
@@ -516,6 +542,13 @@ pub struct RiskContext {
     /// Runtime-tunable scoring weights, thresholds, and multipliers.
     /// Populated by the adapter from tenant config; defaults reproduce the
     /// hard-coded v3.1 values.
+    ///
+    /// `#[serde(skip)]` is intentional: the policy config is an engine-internal
+    /// concern resolved by the adapter layer from tenant configuration. It must
+    /// NOT be settable by external callers via the request JSON, as that would
+    /// let an attacker weaken their own scoring parameters. The
+    /// `default_policy_arc` fallback ensures deserialized contexts always get
+    /// the standard v3.1 policy.
     #[serde(skip, default = "default_policy_arc")]
     pub policy: Arc<PolicyConfig>,
 }
@@ -645,7 +678,7 @@ mod redacted_tests {
             ip_is_relay: None,
             ip_abuse_confidence: None,
             geo_allowed_countries: None,
-            is_sanctioned_country: None,
+            is_sanctioned_country: Some(false),
             webdriver_detected: None,
             captcha_score: None,
             screen_resolution: None,
@@ -653,7 +686,7 @@ mod redacted_tests {
             account_age_days: None,
             email_verified: None,
             email_domain_disposable: None,
-            breached_credential: None,
+            breached_credential: Some(false),
             user_typical_hours: None,
             accept_language: None,
             previous_accept_language: None,
