@@ -1,19 +1,23 @@
 use axum::{
-    extract::{Path, State},
-    routing::{delete, get, post},
     Json, Router,
+    extract::{Path, State},
+    routing::{get, post},
 };
 use serde::Serialize;
 use sqlx::Row;
 use uuid::Uuid;
 
-use crate::{audit, error::{AppError, ApiResponse}, jwt::AuthUser, state::AppState};
+use crate::{
+    audit,
+    error::{ApiResponse, AppError},
+    jwt::AuthUser,
+    state::AppState,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/devices", get(list_devices))
-        .route("/devices/:id", delete(revoke_device))
-        .route("/devices/:id/revoke", post(revoke_device_post))
+        .route("/devices/:id/revoke", post(revoke_device))
         .route("/devices/:id/mark-lost", post(mark_lost))
 }
 
@@ -69,7 +73,7 @@ async fn list_devices(
     Ok(Json(ApiResponse::success(devices)))
 }
 
-// ── DELETE /devices/:id ───────────────────────────────────────────────────────
+// ── POST /devices/:id/revoke ──────────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]
 struct RevokeResp {
@@ -111,48 +115,7 @@ async fn revoke_device(
     )
     .await;
 
-    tracing::info!(user_id = %auth.user_id, credential_id = %id, "device revoked");
-    Ok(Json(ApiResponse::success(RevokeResp { status: "revoked" })))
-}
-
-// ── POST /devices/:id/revoke ──────────────────────────────────────────────────
-
-async fn revoke_device_post(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<ApiResponse<RevokeResp>>, AppError> {
-    let db = state
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::internal("database_not_configured"))?;
-
-    let result = sqlx::query(
-        "UPDATE credentials SET status = 'revoked' \
-         WHERE id = $1 AND user_id = $2",
-    )
-    .bind(id)
-    .bind(auth.user_id)
-    .execute(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
-
-    if result.rows_affected() == 0 {
-        return Err(AppError::not_found("credential_not_found"));
-    }
-
-    audit::log_event(
-        db,
-        Some(auth.user_id),
-        &auth.username,
-        Some(id),
-        "device_revoke",
-        serde_json::json!({}),
-        "success",
-    )
-    .await;
-
-    tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked via POST");
+    tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked");
     Ok(Json(ApiResponse::success(RevokeResp { status: "revoked" })))
 }
 
@@ -200,4 +163,151 @@ async fn mark_lost(
 
     tracing::info!(user_id = %auth.user_id, device_id = %id, "device marked lost");
     Ok(Json(ApiResponse::success(MarkLostResp { status: "lost" })))
+}
+
+// ── Integration tests ────────────────────────────────────────────────────────
+// Real Postgres via `#[sqlx::test]` (spins up a throwaway DB per test and
+// runs migrations/ automatically) — not mocked. Requires DATABASE_URL to
+// point at a Postgres server with CREATEDB privilege; CI provides one (see
+// .github/workflows/ci.yml). Handlers are called directly (bypassing HTTP)
+// since AuthUser/Path/State are plain structs with public fields — this
+// exercises the real SQL and real authorization checks without needing a
+// running server or a simulated WebAuthn ceremony.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::PgPool;
+    use webauthn_rs::prelude::WebauthnBuilder;
+
+    fn test_state(pool: PgPool) -> AppState {
+        let origin = url::Url::parse("http://localhost:8080").unwrap();
+        let webauthn = WebauthnBuilder::new("localhost", &origin)
+            .unwrap()
+            .rp_name("Crypton Test")
+            .build()
+            .unwrap();
+        AppState {
+            db: Some(pool),
+            redis: None,
+            webauthn,
+            jwt_secret: "test-secret".into(),
+            cors_origin: "http://localhost:3001".into(),
+        }
+    }
+
+    async fn seed_user_with_device(pool: &PgPool, status: &str) -> (Uuid, Uuid) {
+        let user_id: Uuid =
+            sqlx::query_scalar("INSERT INTO users (username) VALUES ($1) RETURNING id")
+                .bind(format!("user-{}", Uuid::new_v4()))
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        let cred_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO credentials (user_id, credential_id, status, nickname) \
+             VALUES ($1, $2, $3, 'Test Device') RETURNING id",
+        )
+        .bind(user_id)
+        .bind(Uuid::new_v4().as_bytes().to_vec())
+        .bind(status)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (user_id, cred_id)
+    }
+
+    #[sqlx::test]
+    async fn list_devices_returns_only_the_caller_own_devices(pool: PgPool) {
+        let (user_a, _) = seed_user_with_device(&pool, "active").await;
+        let (_user_b, _) = seed_user_with_device(&pool, "active").await;
+        let state = test_state(pool);
+
+        let auth = AuthUser {
+            user_id: user_a,
+            username: "a".into(),
+            cred_id: Uuid::new_v4(),
+        };
+        let Json(resp) = list_devices(auth, State(state)).await.unwrap();
+        let devices = resp.data.unwrap();
+
+        assert_eq!(devices.len(), 1, "must not see another user's device");
+    }
+
+    #[sqlx::test]
+    async fn revoke_device_sets_status_and_is_idempotent_safe(pool: PgPool) {
+        let (user_id, cred_id) = seed_user_with_device(&pool, "active").await;
+        let state = test_state(pool.clone());
+        let auth = AuthUser {
+            user_id,
+            username: "a".into(),
+            cred_id: Uuid::new_v4(),
+        };
+
+        let Json(resp) = revoke_device(auth, State(state.clone()), Path(cred_id))
+            .await
+            .unwrap();
+        assert_eq!(resp.data.unwrap().status, "revoked");
+
+        let status: String = sqlx::query_scalar("SELECT status FROM credentials WHERE id = $1")
+            .bind(cred_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(status, "revoked");
+
+        // A different user attempting to revoke this same credential ID
+        // must be rejected (the UPDATE's WHERE clause requires user_id
+        // to match, so a mismatched caller affects zero rows -> 404).
+        let auth_wrong_user = AuthUser {
+            user_id: Uuid::new_v4(),
+            username: "eve".into(),
+            cred_id: Uuid::new_v4(),
+        };
+        let result = revoke_device(auth_wrong_user, State(state), Path(cred_id)).await;
+        assert!(
+            result.is_err(),
+            "revoking someone else's device must fail, not silently succeed"
+        );
+    }
+
+    #[sqlx::test]
+    async fn mark_lost_refuses_when_not_currently_active(pool: PgPool) {
+        let (user_id, cred_id) = seed_user_with_device(&pool, "revoked").await;
+        let state = test_state(pool.clone());
+        let auth = AuthUser {
+            user_id,
+            username: "a".into(),
+            cred_id: Uuid::new_v4(),
+        };
+
+        let result = mark_lost(auth, State(state), Path(cred_id)).await;
+        assert!(
+            result.is_err(),
+            "marking a revoked device as lost must be rejected"
+        );
+
+        let status: String = sqlx::query_scalar("SELECT status FROM credentials WHERE id = $1")
+            .bind(cred_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            status, "revoked",
+            "status must be unchanged after the rejected transition"
+        );
+    }
+
+    #[sqlx::test]
+    async fn mark_lost_succeeds_from_active(pool: PgPool) {
+        let (user_id, cred_id) = seed_user_with_device(&pool, "active").await;
+        let state = test_state(pool.clone());
+        let auth = AuthUser {
+            user_id,
+            username: "a".into(),
+            cred_id: Uuid::new_v4(),
+        };
+
+        let Json(resp) = mark_lost(auth, State(state), Path(cred_id)).await.unwrap();
+        assert_eq!(resp.data.unwrap().status, "lost");
+    }
 }

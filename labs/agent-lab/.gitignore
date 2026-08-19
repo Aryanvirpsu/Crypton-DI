@@ -1,0 +1,10 @@
+# Generated at runtime — sqlite db + JSONL trace files (requirement 5).
+# Delete this directory any time to reset the lab to a clean state.
+data/*.db
+data/traces/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/

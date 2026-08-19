@@ -3,24 +3,33 @@ mod audit;
 mod config;
 mod error;
 mod jwt;
+mod redis;
 mod routes;
 mod state;
-mod db;
-mod redis;
 
-use std::net::SocketAddr;
 use crate::{config::Config, state::AppState};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use axum_server::tls_rustls::RustlsConfig;
+use std::net::SocketAddr;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    let filter =
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
+    // Set LOG_FORMAT=json for structured logs (matches crypton-gateway).
+    if std::env::var("LOG_FORMAT").as_deref() == Ok("json") {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
 
     let cfg = Config::from_env()?;
     let state = AppState::new(&cfg).await?;
@@ -39,15 +48,25 @@ async fn main() -> anyhow::Result<()> {
 
     match RustlsConfig::from_pem_file("crypton.local.pem", "crypton.local-key.pem").await {
         Ok(tls_config) => {
-            tracing::info!("TLS enabled (crypton.local.pem found) — https://crypton.local:{}", cfg.app_port);
+            tracing::info!(
+                "TLS enabled (crypton.local.pem found) — https://crypton.local:{}",
+                cfg.app_port
+            );
             axum_server::bind_rustls(socket_addr, tls_config)
                 .serve(app.into_make_service_with_connect_info::<SocketAddr>())
                 .await?;
         }
         Err(e) => {
-            tracing::warn!("TLS certs not found ({}). Running plain HTTP — for cloudflared tunnel use HTTP.", e);
+            tracing::warn!(
+                "TLS certs not found ({}). Running plain HTTP — for cloudflared tunnel use HTTP.",
+                e
+            );
             let listener = tokio::net::TcpListener::bind(&addr).await?;
-            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await?;
         }
     }
 

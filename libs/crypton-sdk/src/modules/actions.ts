@@ -1,32 +1,26 @@
 import { CryptonTransport } from '../client';
-import { CryptonError } from '../errors';
 import { fromB64url, b64url } from '../utils/base64';
+import { wrapWebAuthnError } from '../webauthn-errors';
 
 export interface ActionResult {
   status: string;
-  result: Record<string, unknown>;
-}
-
-function wrapWebAuthnError(err: unknown): never {
-  if (err instanceof DOMException) {
-    const code =
-      err.name === 'NotAllowedError' ? 'webauthn_cancelled' :
-      err.name === 'InvalidStateError' ? 'webauthn_already_registered' :
-      'webauthn_security_error';
-    throw new CryptonError(code, err.message);
-  }
-  throw err;
+  verified: boolean;
+  intent: string;
 }
 
 /**
- * ActionsModule — WebAuthn-protected server-side actions.
+ * ActionsModule — step-up (re-authentication) verification.
  *
- * Each action follows the pattern:
- *   1. challenge(action) → backend issues a WebAuthn assertion challenge
+ * Proves the signed-in user still holds a registered passkey right now,
+ * for a caller-supplied intent label (e.g. "confirm_role_change"). This
+ * does not execute any business action itself — it just gives the caller
+ * a fresh, audited proof-of-presence to gate one with.
+ *
+ *   1. challenge(intent) → backend issues a WebAuthn assertion challenge
  *   2. user signs with registered device (navigator.credentials.get)
- *   3. execute(challengeId, action, assertion) → backend verifies + runs action
+ *   3. execute(challengeId, intent, assertion) → backend verifies + audits
  *
- * sign(action) is the recommended one-shot wrapper for most callers.
+ * sign(intent) is the recommended one-shot wrapper for most callers.
  * challenge() and execute() are available as escape hatches for custom UI.
  */
 export class ActionsModule {

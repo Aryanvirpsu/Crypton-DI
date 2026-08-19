@@ -1,0 +1,142 @@
+"""
+Tiny isolated datastore for Agent Lab.
+
+Deliberately NOT the real Crypton Postgres database — Agent Lab's tools
+operate on their own seed data (a local SQLite file) so the lab can be
+run and reset without touching crypton-id's real user data. Every row
+carries an `owner_user_id`, the human identity that owns it, so tools can
+enforce per-user data isolation (requirement: "separate users' data
+remains isolated"). See tools.py for where that's enforced.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+import threading
+from pathlib import Path
+
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "agentlab.db"
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS customers (
+    customer_id TEXT PRIMARY KEY,
+    owner_user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    tier TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    owner_user_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    total_cents INTEGER NOT NULL,
+    items TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS case_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL,
+    owner_user_id TEXT NOT NULL,
+    note TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    created_by_agent_instance TEXT NOT NULL
+);
+
+-- v0.3: the Agent Registry. See agents.py — the only module allowed to
+-- write this table. (owner_user_id, name, version) is unique: the same
+-- human can't register the same name+version twice, but different
+-- humans may each register their own agent under the same name.
+
+CREATE TABLE IF NOT EXISTS agents (
+    agent_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    owner_user_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    UNIQUE(owner_user_id, name, version)
+);
+CREATE INDEX IF NOT EXISTS idx_agents_owner ON agents(owner_user_id);
+
+-- v0.2: Session / Task / AgentInstance. See sessions.py, tasks.py,
+-- instances.py — each table's rows are only ever read/written through
+-- those modules' ownership-enforced functions, never raw SQL elsewhere.
+
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id TEXT PRIMARY KEY,
+    human_user_id TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_human ON sessions(human_user_id);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    task_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(session_id),
+    human_user_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL REFERENCES agents(agent_id),  -- v0.3: always a canonical registered id
+    goal TEXT NOT NULL,
+    status TEXT NOT NULL,
+    state TEXT NOT NULL,           -- JSON-encoded tasks.TaskState
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    completed_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_human ON tasks(human_user_id);
+
+CREATE TABLE IF NOT EXISTS agent_instances (
+    instance_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL REFERENCES agents(agent_id),  -- v0.3: always a canonical registered id
+    human_user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions(session_id),
+    task_id TEXT NOT NULL REFERENCES tasks(task_id),
+    started_at REAL NOT NULL,
+    ended_at REAL,
+    status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_instances_task ON agent_instances(task_id);
+"""
+
+_lock = threading.Lock()
+
+
+def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
+    """Open (creating if needed) the lab's SQLite file and ensure schema
+    exists. Pass a tmp_path in tests to get a fully isolated database per
+    test."""
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    with _lock:
+        conn.executescript(_SCHEMA)
+        conn.commit()
+    return conn
+
+
+def seed(conn: sqlite3.Connection) -> None:
+    """Idempotent demo data for two different human users — deliberately
+    two different owners, so isolation between them is exercisable end to
+    end (tools.py, tests/test_tools.py)."""
+    with _lock:
+        if conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0] > 0:
+            return
+        conn.executemany(
+            "INSERT INTO customers (customer_id, owner_user_id, name, email, tier) VALUES (?, ?, ?, ?, ?)",
+            [
+                ("cust_1", "user-alice", "Alice Anders", "alice@example.com", "gold"),
+                ("cust_2", "user-bob", "Bob Baker", "bob@example.com", "silver"),
+            ],
+        )
+        conn.executemany(
+            "INSERT INTO orders (order_id, customer_id, owner_user_id, status, total_cents, items) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("ord_1", "cust_1", "user-alice", "shipped", 4599, "widget x2"),
+                ("ord_2", "cust_2", "user-bob", "pending", 1299, "gadget x1"),
+            ],
+        )
+        conn.commit()

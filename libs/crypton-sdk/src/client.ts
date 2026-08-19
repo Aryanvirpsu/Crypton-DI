@@ -42,7 +42,6 @@ export class CryptonTransport {
 
   get = <T>(path: string) => this.request<T>(path, { method: 'GET' });
   post = <T>(path: string, body?: unknown) => this.request<T>(path, { method: 'POST', body: JSON.stringify(body) });
-  del = <T>(path: string) => this.request<T>(path, { method: 'DELETE' });
   patch = <T>(path: string, body?: unknown) => this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 
   /** Raw fetch with auth headers — for non-JSON responses (e.g. blob downloads). */

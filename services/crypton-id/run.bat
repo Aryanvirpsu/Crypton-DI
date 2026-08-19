@@ -1,20 +1,28 @@
 @echo off
-REM Crypton Identity Launcher
-REM Sets all required env vars explicitly — not affected by .env file changes.
-REM Redis 3.0 on localhost has no password — use plain URL.
-
-set APP_PORT=8080
-set DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/crypton
-set REDIS_URL=redis://127.0.0.1:6379
-set RUST_LOG=info
-set JWT_SECRET=aefa5ac024afaf0556299762a25041422c6a3dfe3017398b7af1a020159e8ad8
-set WEBAUTHN_RP_NAME=Crypton Identity
-set WEBAUTHN_RP_ID=localhost
-set WEBAUTHN_ORIGIN=http://localhost:3000
-set OAUTH_CLIENT_ID=demo-site
-set OAUTH_CLIENT_SECRET=demo-secret-change-in-prod
-set OAUTH_REDIRECT_URIS=http://localhost:4000/callback
-set FRONTEND_ORIGIN=http://localhost:3000
-
+REM Crypton Identity Launcher (dev)
+REM
+REM Secrets live in .env.local, which is gitignored and generated on first
+REM run - nothing secret is ever committed. Everything else has a plain-text
+REM dev default here since none of it is sensitive.
 cd /d "%~dp0"
+
+if not exist ".env.local" (
+    echo [crypton-id] No .env.local found - generating a local-only dev JWT secret.
+    powershell -NoProfile -Command "$b=(1..32|ForEach-Object{Get-Random -Maximum 256}); 'JWT_SECRET=' + (($b | ForEach-Object { '{0:x2}' -f $_ }) -join '')" > .env.local
+)
+
+for /f "usebackq tokens=1,2 delims==" %%A in (".env.local") do set "%%A=%%B"
+
+if not defined APP_PORT set APP_PORT=8080
+if not defined DATABASE_URL set DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/crypton
+if not defined REDIS_URL set REDIS_URL=redis://127.0.0.1:6379
+if not defined RUST_LOG set RUST_LOG=info
+if not defined WEBAUTHN_RP_NAME set WEBAUTHN_RP_NAME=Crypton Identity
+if not defined WEBAUTHN_RP_ID set WEBAUTHN_RP_ID=localhost
+if not defined WEBAUTHN_ORIGIN set WEBAUTHN_ORIGIN=http://localhost:3000
+
+REM OAuth is an experimental, incomplete surface - see routes/oauth.rs.
+REM It stays unmounted unless explicitly enabled.
+if not defined ENABLE_OAUTH set ENABLE_OAUTH=false
+
 target\release\crypton-identity.exe

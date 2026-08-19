@@ -12,7 +12,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-crypton_dev_redis}
+    # No password: this is local-only dev infra (bound to localhost, never
+    # exposed). A previous version required one here but every service's
+    # REDIS_URL (dev.env.example, .env.example) connects without a
+    # password, so auth failed on first run. Don't reintroduce a password
+    # here without also updating every REDIS_URL to match.
     ports:
       - "6379:6379"
     volumes:

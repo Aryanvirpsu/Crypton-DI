@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Keep this fast and boring: format/check/test each crate and each frontend
+# package. No deployment steps here on purpose.
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: crypton
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # crypton-id's #[sqlx::test] tests create throwaway per-test databases
+      # against this connection, and the redis/sessions.rs denylist test
+      # uses REDIS_URL directly. Values below are CI-only, never real secrets.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/crypton
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci-only-secret-never-used-outside-this-workflow
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_ORIGIN: http://localhost:8080
+      WEBAUTHN_RP_NAME: Crypton CI
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            services/crypton-id
+            services/crypton-gateway
+
+      - name: crypton-id — fmt check
+        working-directory: services/crypton-id
+        run: cargo fmt --check
+
+      - name: crypton-id — check
+        working-directory: services/crypton-id
+        run: cargo check --all-targets
+
+      - name: crypton-id — test
+        working-directory: services/crypton-id
+        run: cargo test
+
+      - name: crypton-gateway — fmt check
+        working-directory: services/crypton-gateway
+        run: cargo fmt --check
+
+      - name: crypton-gateway — check
+        working-directory: services/crypton-gateway
+        run: cargo check --all-targets
+
+      - name: crypton-gateway — test
+        working-directory: services/crypton-gateway
+        run: cargo test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Build SDK (cjs + esm + types)
+        run: npm run build:sdk
+
+      - name: Typecheck SDK
+        working-directory: libs/crypton-sdk
+        run: npm run typecheck
+
+      - name: Test SDK
+        working-directory: libs/crypton-sdk
+        run: npm test
+
+      # CI=false here on purpose: react-scripts treats build warnings as
+      # errors when CI=true (GitHub Actions sets it by default), and
+      # crypton-main carries some pre-existing lint warnings in Landing.js
+      # that are marketing-copy/JSX nits, not correctness bugs. See
+      # DECISIONS.md.
+      - name: Build crypton-main
+        working-directory: services/crypton-main
+        run: npm install && npm run build
+        env:
+          CI: false
+
+      - name: Test crypton-main
+        working-directory: services/crypton-main
+        run: npm test -- --watchAll=false --passWithNoTests
+
+      - name: Build crypton-console
+        working-directory: services/crypton-console
+        run: npm install && npm run build
+        env:
+          CI: false
+
+      - name: Test crypton-console
+        working-directory: services/crypton-console
+        run: npm test -- --watchAll=false

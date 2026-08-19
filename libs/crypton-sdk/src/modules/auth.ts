@@ -1,24 +1,21 @@
 import { CryptonTransport } from '../client';
-import { CryptonError } from '../errors';
 import { fromB64url, b64url } from '../utils/base64';
 import { setSessionToken, clearSessionToken } from '../session';
-
-function wrapWebAuthnError(err: unknown): never {
-  if (err instanceof DOMException) {
-    const code =
-      err.name === 'NotAllowedError' ? 'webauthn_cancelled' :
-      err.name === 'InvalidStateError' ? 'webauthn_already_registered' :
-      'webauthn_security_error';
-    throw new CryptonError(code, err.message);
-  }
-  throw err;
-}
+import { wrapWebAuthnError } from '../webauthn-errors';
 
 export class AuthModule {
   constructor(private client: CryptonTransport) {}
 
-  async register(email: string): Promise<{ user_id: string, token?: string }> {
-    const start: any = await this.client.post("/auth/register/start", { username: email });
+  /**
+   * @param enrollmentToken required to add a passkey to an *existing*
+   *   account from a browser with no valid session — this is the token
+   *   returned by recovery.claimRecovery(). Omit for a brand-new account.
+   */
+  async register(email: string, enrollmentToken?: string): Promise<{ user_id: string, token?: string }> {
+    const start: any = await this.client.post("/auth/register/start", {
+      username: email,
+      ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
+    });
     const pk = start.publicKey;
 
     const createOpts: PublicKeyCredentialCreationOptions = {

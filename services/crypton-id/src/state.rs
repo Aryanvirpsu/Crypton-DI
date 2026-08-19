@@ -5,7 +5,7 @@ use uuid::Uuid;
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration, Webauthn, WebauthnBuilder};
 
 // ── Challenge state types (serialised to Redis) ──────────────────────────────
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct RegChallenge {
