@@ -1,9 +1,29 @@
 # Omen Handoff — Crypton
 
-Audit date: 2026-08-19. Old machine → new HP Omen (Windows). Practical
-reference only — no roadmap, no marketing language.
+Audit date: 2026-08-19. Updated same day after the baseline commit landed
+and pushed. Old machine → new HP Omen (Windows). Practical reference
+only — no roadmap, no marketing language.
 
-## 1. Git state (source of truth)
+## Status: committed and pushed (superseded §1 below)
+
+- **Branch**: `refactor/agent-identity-foundation`, pushed to `origin`
+  with upstream tracking set
+- **Final commit**: `60740921b4935b5aebcb296c6efb691b9dd98195` —
+  "refactor: establish agent identity foundation and Agent Lab v0.3"
+- **Tag**: `agent-lab-v0.3` (annotated, pushed) → same commit
+- **Working tree**: clean. `labs/agent-lab/` is now fully tracked (source,
+  tests, docs — `.venv/`, `__pycache__/`, `.pytest_cache/`, the runtime
+  SQLite DB, and trace files remain gitignored, as intended).
+- Local HEAD == `origin/refactor/agent-identity-foundation` HEAD, verified
+  after push.
+- **Known pre-existing issue, not fixed by this commit**: a hardcoded dev
+  `JWT_SECRET` that was already committed in `services/crypton-id/run.bat`
+  / `start.sh` on `origin/main` prior to this session remains in git
+  history (this commit replaces the mechanism going forward with a
+  gitignored, auto-generated `.env.local` secret, but does not rewrite
+  history). Rotate that value on any real deployment still using it.
+
+## 1. Git state at time of original audit (historical — see status above)
 
 - **Branch**: `refactor/agent-identity-foundation`
 - **HEAD**: `4e614750542eeb5760a8d6ec6a0c989f3cb9215f` ("changed landing page")
@@ -210,45 +230,40 @@ the C++ Build Tools workload before trusting any `cargo` step below.
 ### Setup sequence
 
 ```powershell
-# 1. Clone and get on the right commit
+# 1. Clone and get on the right commit — git alone is now sufficient,
+#    everything (including labs/agent-lab/) is committed and pushed.
 git clone https://github.com/Aryanvirpsu/Crypton-DI.git
 cd Crypton-DI
-git checkout refactor/agent-identity-foundation   # only exists if pushed first — see §1
-git rev-parse HEAD                                 # confirm it matches the commit recorded in this doc
+git checkout refactor/agent-identity-foundation
+git rev-parse HEAD
+# expect: 60740921b4935b5aebcb296c6efb691b9dd98195
+git tag -l agent-lab-v0.3   # should exist, points at the same commit
 
-# 2. Bring over what git won't (see §4) — copy from the old machine via
-#    external drive / network share / zip, NOT git:
-#      labs/agent-lab/  (whole folder, including its own .gitignore)
-#      the 343 staged + 2 modified files, if not committed+pushed first
-#    Then, once transferred:
-git add labs/agent-lab
-git status   # review before committing anything
-
-# 3. Root + workspace JS dependencies
+# 2. Root + workspace JS dependencies
 npm install
 
-# 4. Rust — sanity check before building anything real
+# 3. Rust — sanity check before building anything real
 rustc --version
 cargo --version
 where.exe link.exe
 
-# 5. Start Postgres + Redis (Docker Desktop must be running first)
+# 4. Start Postgres + Redis (Docker Desktop must be running first)
 docker compose -f infra/docker-compose.yml up -d --wait
 
-# 6. SDK — typecheck, test, build
+# 5. SDK — typecheck, test, build
 cd libs/crypton-sdk
 npm run typecheck
 npm test
 npm run build
 cd ../..
 
-# 7. Console — test, production build
+# 6. Console — test, production build
 cd services/crypton-console
 npm test -- --watchAll=false
 npm run build
 cd ../..
 
-# 8. Agent Lab — fresh venv (do not copy .venv from the old machine)
+# 7. Agent Lab — fresh venv (do not copy .venv from the old machine)
 cd labs/agent-lab
 python -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt
@@ -263,7 +278,7 @@ $env:PYTHONPATH = "src"
     --dev-user user-alice --fake
 cd ../..
 
-# 9. Full local stack (existing script — prefer this over ad hoc commands)
+# 8. Full local stack (existing script — prefer this over ad hoc commands)
 .\start-all.ps1 -KillExisting
 # generates dev.env automatically on first run if missing (fresh random
 # JWT_SECRET), builds Rust in release mode if no binary exists yet,
@@ -314,36 +329,42 @@ Not started here, per audit scope.
 
 ## FINAL DECISION
 
-**NOT SAFE TO MOVE TO OMEN** (via `git clone` alone)
+**SAFE TO MOVE TO OMEN**
 
-Blockers:
-1. `labs/agent-lab/` — the entire directory, 90 passing tests — is
-   completely untracked by git. A clone brings none of it.
-2. 343 staged + 2 unstaged file changes (the console consolidation, Rust
-   cleanup, CI workflow, new docs) are uncommitted. `origin/main` is at
-   the same commit as this working tree's HEAD but predates all of it. A
-   clone reproduces the *old* repo, not what's on this disk.
-3. Rust toolchain is `BLOCKED: MSVC linker` on this machine — informational
-   for the Omen (install VS Build Tools first), not a blocker to the
-   *audit* itself, but `cargo check`/`test` are unverified this pass.
+Resolved since the original audit:
+1. `labs/agent-lab/` (source, tests, docs — 90 passing tests) is now
+   tracked and pushed. `.venv/`, `__pycache__/`, `.pytest_cache/`, the
+   runtime SQLite DB, and trace files remain correctly gitignored.
+2. The 343 staged + 2 unstaged changes from the original audit are now
+   one committed, pushed baseline: `60740921b4935b5aebcb296c6efb691b9dd98195`
+   on `origin/refactor/agent-identity-foundation`, tagged `agent-lab-v0.3`.
+   Local HEAD == remote branch HEAD, verified after push.
+3. Rust toolchain remains `BLOCKED: MSVC linker` on *this* machine — still
+   informational only for the Omen (install VS Build Tools + Windows SDK
+   there; the repo itself has no `openssl-sys` dependency, confirmed
+   earlier). `cargo check`/`test` are unverified on this machine, not a
+   reason to withhold the source itself.
 
-None of these are data-loss risks *today* — everything still exists on
-this machine. They become loss risks the moment this machine is retired
-without first: committing + pushing the staged/unstaged work, and
-`git add`-ing + committing `labs/agent-lab/` (or copying it to the Omen
-by hand before doing so).
+Outstanding, carried forward (not blockers to moving, but real):
+- A hardcoded dev `JWT_SECRET` predating this session is already in git
+  history on `origin/main` (`services/crypton-id/run.bat`/`start.sh`,
+  pre-existing commits). This baseline commit removes it going forward
+  (replaced by a gitignored, auto-generated `.env.local`) but does not
+  rewrite history. Rotate that value on any real deployment still using
+  it — a history purge is a separate decision, not done here.
 
-1. **Branch**: `refactor/agent-identity-foundation`
-2. **Expected HEAD commit**: `4e614750542eeb5760a8d6ec6a0c989f3cb9215f`
-3. **Push status**: HEAD matches `origin/main`; branch itself has no
-   remote ref; 343 staged + 2 modified files and all of `labs/agent-lab/`
-   are uncommitted and unpushed
-4. **Uncommitted/untracked important files**: see §1 and §4 —
-   `labs/agent-lab/` (untracked), 343 staged files, `DECISIONS.md` +
-   `labs/README.md` (further modified, unstaged)
+1. **Branch**: `refactor/agent-identity-foundation` (pushed, tracking
+   `origin/refactor/agent-identity-foundation`)
+2. **Final commit**: `60740921b4935b5aebcb296c6efb691b9dd98195` —
+   "refactor: establish agent identity foundation and Agent Lab v0.3"
+3. **Push status**: local HEAD == remote HEAD; tag `agent-lab-v0.3` pushed
+   to the same commit; working tree clean
+4. **Uncommitted/untracked important files**: none
 5. **Agent Lab current version**: v0.3 (persisted Agent Registry with
    canonical `agt_*` IDs), VERIFIED via 90/90 pytest + a fake CLI run
 6. **Exact next development chunk**: v0.4 — Delegation /
    AuthorizationDecision / resource constraints / revocation (not started)
-7. **Omen setup command sequence**: §8 above
-8. **`docs/OMEN_HANDOFF.md` status**: created this pass
+7. **Omen setup command sequence**: §8 above (now a plain `git clone` +
+   `checkout` — no manual file transfer needed)
+8. **`docs/OMEN_HANDOFF.md` status**: created in the original audit pass,
+   updated this pass with the final commit hash and tag
