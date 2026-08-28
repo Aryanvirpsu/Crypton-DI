@@ -1,4 +1,4 @@
-# Crypton Agent Lab v0.3
+# Crypton Agent Lab v0.4
 
 The smallest real AI-agent system that lets us learn — and later
 security-test — the full chain:
@@ -32,10 +32,13 @@ same JWTs crypton-id issues, it does not have its own login.
 
 ## Run it
 
-A run always uses a **registered** agent — no more hardcoded
-`"support-agent"` strings. Register once, then run against that
-`agent_id`, or use `--bootstrap-support-agent` to do both in one step for
-local dev.
+A run always uses a **registered** agent, acting under an **explicit
+Delegation** — no more hardcoded `"support-agent"` strings, and no more
+standing, name-keyed permissions (v0.3's `authz.REGISTRY` is gone; see
+[`LEARNING.md`](LEARNING.md)'s v0.4 addendum). Register once, grant a
+delegation once, then run against that `agent_id` + `delegation_id` — or
+use `--bootstrap-support-agent --bootstrap-delegation` to do all three in
+one step for local dev.
 
 **Register an agent** (prints the canonical `agent_id` you'll need next):
 
@@ -44,28 +47,39 @@ PYTHONPATH=src JWT_SECRET=any-dev-secret python -m agentlab.cli \
   --register --name support-agent --version 0.1.0 --dev-user user-alice
 ```
 
-**Run using that agent, without any LLM API key** (`FakeModelProvider`, a
-canned script — good for seeing the whole loop and trace format with
-zero setup):
+**Grant it a delegation** — explicit, finite-lived authority over
+specific tools and resources (prints the canonical `delegation_id` you'll
+need next):
 
 ```bash
 PYTHONPATH=src JWT_SECRET=any-dev-secret python -m agentlab.cli \
-  --agent-id agt_... --dev-user user-alice --task "who is cust_1?" --fake
+  --grant-delegation --agent-id agt_... --dev-user user-alice \
+  --tools get_customer,get_order,add_case_note --customer-ids cust_1 --order-ids ord_1
 ```
 
-**Local-dev shortcut** — skip the separate `--register` step; creates (or
-reuses) your own "support-agent" v0.1.0 and runs in one command:
+**Run using that agent + delegation, without any LLM API key**
+(`FakeModelProvider`, a canned script — good for seeing the whole loop
+and trace format with zero setup):
 
 ```bash
 PYTHONPATH=src JWT_SECRET=any-dev-secret python -m agentlab.cli \
-  --bootstrap-support-agent --dev-user user-alice --task "who is cust_1?" --fake
+  --agent-id agt_... --delegation-id dlg_... --dev-user user-alice --task "who is cust_1?" --fake
+```
+
+**Local-dev shortcut** — skip the separate `--register`/`--grant-delegation`
+steps; creates (or reuses) your own "support-agent" v0.1.0, grants it a
+fresh delegation scoped to the seeded demo data, and runs, in one command:
+
+```bash
+PYTHONPATH=src JWT_SECRET=any-dev-secret python -m agentlab.cli \
+  --bootstrap-support-agent --bootstrap-delegation --dev-user user-alice --task "who is cust_1?" --fake
 ```
 
 **With a real model call** (needs `ANTHROPIC_API_KEY` in `.env`):
 
 ```bash
 PYTHONPATH=src python -m agentlab.cli \
-  --agent-id agt_... --dev-user user-alice \
+  --agent-id agt_... --delegation-id dlg_... --dev-user user-alice \
   --task "Look up customer cust_1 and tell me their tier."
 ```
 
@@ -73,7 +87,7 @@ PYTHONPATH=src python -m agentlab.cli \
 
 ```bash
 PYTHONPATH=src python -m agentlab.cli \
-  --agent-id agt_... --token "$CRYPTON_JWT" --task "Look up customer cust_1."
+  --agent-id agt_... --delegation-id dlg_... --token "$CRYPTON_JWT" --task "Look up customer cust_1."
 ```
 
 **Resuming a session** — a normal run creates a new session, task, and
@@ -82,17 +96,20 @@ previous run's output) to add another task to the same session instead:
 
 ```bash
 PYTHONPATH=src python -m agentlab.cli \
-  --agent-id agt_... --dev-user user-alice --task "Now look up their last order." \
+  --agent-id agt_... --delegation-id dlg_... --dev-user user-alice --task "Now look up their last order." \
   --session-id 5879bd70-45bc-44ce-b69c-4d25b69fa7e1 --fake
 ```
 
-Each run prints a JSON summary — including `agent_id`, `agent_name`,
-`session_id`, `task_id`, `task_status`, and `instance_id` — and writes a
-full trace to `data/traces/<request_id>.jsonl` (gitignored — delete
-`data/` any time to reset the lab). See [`LEARNING.md`](LEARNING.md)'s
-v0.2/v0.3 addenda for what each of those IDs means and how they relate.
-An unknown, disabled, or someone-else's `agent_id` fails immediately,
-before anything else is created — see the v0.3 addendum.
+Each run prints a JSON summary — including `agent_id`, `delegation_id`,
+`agent_name`, `session_id`, `task_id`, `task_status`, and `instance_id`
+— and writes a full trace to `data/traces/<request_id>.jsonl` (gitignored
+— delete `data/` any time to reset the lab). See [`LEARNING.md`](LEARNING.md)'s
+v0.2/v0.3/v0.4 addenda for what each of those IDs means and how they
+relate. An unknown, disabled, or someone-else's `agent_id` fails
+immediately, before anything else is created (v0.3); a missing, expired,
+revoked, or mismatched delegation fails the specific tool call it was
+needed for, with the denial persisted as an `AuthorizationDecision`
+(v0.4).
 
 ## Run the tests
 
@@ -101,7 +118,7 @@ before anything else is created — see the v0.3 addendum.
 # .venv/bin/python -m pytest -q       # macOS/Linux
 ```
 
-90 tests, all deterministic (no network calls — see
+125 tests, all deterministic (no network calls — see
 `agentlab.model_provider.FakeModelProvider`).
 
 ## Layout
@@ -109,19 +126,20 @@ before anything else is created — see the v0.3 addendum.
 ```
 src/agentlab/
   identity.py        human / agent-app / agent-instance identity (reuses crypton-id's JWT)
-  authz.py             tool allowlist
-  lifecycle.py         TaskStatus/AgentStatus + the only valid status-transition tables
+  lifecycle.py         TaskStatus/AgentStatus/DelegationStatus + the only valid status-transition tables
   agents.py             Agent Registry — persisted AgentIdentity, ownership, active/disabled
+  delegation.py       Delegation — explicit, finite-lived authority grant (v0.4; replaces authz.py)
+  authorization.py  deterministic pre-execution authorization pipeline + AuthorizationDecision evidence (v0.4)
   sessions.py          Session persistence (continuing interaction boundary)
   tasks.py               Task persistence, lifecycle transitions, task state
   instances.py          AgentInstance persistence (one row per run)
   models.py             Pydantic argument schemas for each tool
   tools.py                get_customer, get_order, add_case_note
-  db.py                    isolated SQLite: business data + agents/sessions/tasks/instances
+  db.py                    isolated SQLite: business data + agents/delegations/authorization_decisions/sessions/tasks/instances
   tracing.py             full execution trace, JSONL per run (keyed by request_id)
   model_provider.py   ModelProvider abstraction (Anthropic + Fake)
   agent.py                 the loop itself — read this file first
-  cli.py                     entry point (register / run)
+  cli.py                     entry point (register / grant-delegation / run)
 tests/                  one test file per module above
 ```
 

@@ -94,7 +94,7 @@ def add_case_note(
 
 
 # Single source of truth: tool name -> implementation. agent.py looks up
-# by name here only *after* authz.check_authorized has passed — this dict
+# by name here only *after* authorization.authorize_tool_call has passed — this dict
 # itself is not an authorization boundary, just a dispatch table.
 TOOL_FUNCTIONS = {
     "get_customer": get_customer,

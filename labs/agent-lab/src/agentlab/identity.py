@@ -56,8 +56,9 @@ class AgentIdentity:
     v0.3: `agent_id` is now always a canonical ID minted by
     `agents.register_agent` (e.g. `agt_3f9a...`), never a hand-picked
     string like `"support-agent"` — that string now lives in `name`,
-    which is descriptive metadata, not identity (see agents.py, authz.py,
-    and LEARNING.md's "why names aren't secure identities"). This
+    which is descriptive metadata, not identity (see agents.py,
+    delegation.py/authorization.py, and LEARNING.md's "why names aren't
+    secure identities"). This
     dataclass is still just a lightweight, DB-free carrier — the actual
     source of truth is the persisted `agents.Agent` row; application code
     should only ever construct an `AgentIdentity` from one (see

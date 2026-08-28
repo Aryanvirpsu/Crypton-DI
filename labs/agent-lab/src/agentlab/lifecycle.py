@@ -87,3 +87,34 @@ def parse_agent_status(value: str) -> AgentStatus:
 def validate_agent_transition(current: AgentStatus, new: AgentStatus) -> None:
     if new not in _AGENT_VALID_TRANSITIONS.get(current, frozenset()):
         raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")
+
+
+# ── Delegation status (v0.4) ─────────────────────────────────────────────
+# Delegation is one-way: once revoked, a delegation is never reactivated —
+# granting fresh authority means issuing a new delegation, not resurrecting
+# an old one. This is what "revocation changes state; do not delete
+# record" means in practice: the row stays forever, but it can only ever
+# move active -> revoked, never back.
+
+
+class DelegationStatus(str, Enum):
+    ACTIVE = "active"
+    REVOKED = "revoked"
+
+
+_DELEGATION_VALID_TRANSITIONS: dict[DelegationStatus, frozenset[DelegationStatus]] = {
+    DelegationStatus.ACTIVE: frozenset({DelegationStatus.REVOKED}),
+    DelegationStatus.REVOKED: frozenset(),
+}
+
+
+def parse_delegation_status(value: str) -> DelegationStatus:
+    try:
+        return DelegationStatus(value)
+    except ValueError:
+        raise LifecycleError(f"unknown_status: {value}") from None
+
+
+def validate_delegation_transition(current: DelegationStatus, new: DelegationStatus) -> None:
+    if new not in _DELEGATION_VALID_TRANSITIONS.get(current, frozenset()):
+        raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")

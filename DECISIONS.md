@@ -119,6 +119,44 @@ identity or hold root/signing authority stays in `crypton-id` (Rust).
   in the current code — flagging it here so it doesn't quietly grow a
   production caller.
 
+### Agent Lab v0.4: Delegation is the reference implementation of invariants 2-4
+
+Not a new invariant — invariants 2 ("LLMs never make final authorization
+decisions"), 3 ("authorization happens deterministically immediately
+before execution"), and 4 ("every consequential action must be
+attributable...") already required this; v0.4 is the first concrete
+implementation that actually satisfies all three at once, and is worth
+recording because it replaces one that had drifted from them without
+anyone updating this file.
+
+Agent Lab v0.1-v0.3's tool authority (`authz.REGISTRY`) was a static
+Python dict keyed by agent **name**, not canonical `agent_id` — a real
+bug, not a style choice: two of the same human's own agent registrations
+sharing a name (e.g. the same "support-agent" at two different versions,
+allowed under the `(owner_user_id, name, version)` uniqueness rule) would
+silently inherit each other's authority, because the permission lookup
+couldn't tell them apart. That is a live violation of invariant 4 in
+spirit — the attributable unit for authority should be the specific
+`agent_id`, not a label two different agents can share.
+
+v0.4 (`labs/agent-lab/src/agentlab/delegation.py`,
+`labs/agent-lab/src/agentlab/authorization.py`) replaces it with
+**Delegation**: a persisted, explicit, finite-lived, revocable grant of
+authority from a human principal to one canonical `agent_id` — never a
+name — checked fresh against the live database row on every single tool
+call (`authorization.authorize_tool_call`), never cached or decided once
+per run. Every attempt, allowed or denied, is persisted as an
+`AuthorizationDecision` with a stable reason code, so a denial is
+evidence, not silence. `authz.py` is deleted; there is exactly one
+authorization system now, not two competing ones. Full rationale:
+`labs/agent-lab/LEARNING.md`'s v0.4 addendum.
+
+Known, deliberately-deferred gap this does not close: invariant 5's
+tension (§"Known tension" above, `JWT_SECRET` being symmetric) is
+unchanged by v0.4 — Agent Lab can still mint tokens it only needs to
+verify. That remains tracked, not solved, pending asymmetric signing /
+OIDC-JWKS.
+
 ---
 
 ## Decisions from the 2026-08 cleanup

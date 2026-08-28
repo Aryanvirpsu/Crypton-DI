@@ -7,10 +7,19 @@ import json
 
 import pytest
 
-from agentlab import agents, instances, tasks
+from agentlab import agents, authorization, delegation, instances, tasks
 from agentlab.agent import AgentRunner
 from agentlab.agents import AgentAccessError, AgentNotActiveError
 from agentlab.model_provider import FakeModelProvider, ModelResponse, ToolCallRequest
+
+ALL_TOOLS = frozenset({"get_customer", "get_order", "add_case_note"})
+DEMO_RESOURCES = {"customer_ids": {"cust_1", "cust_2"}, "order_ids": {"ord_1", "ord_2"}}
+
+# A syntactically valid but never-persisted delegation id — used only in
+# tests where the run is expected to fail before authorization is ever
+# reached (e.g. the agent itself doesn't resolve), so the exact value
+# never matters.
+UNUSED_DELEGATION_ID = "dlg_unused00000000000000000000000"
 
 
 def register_agent_for(db_conn, owner, name="support-agent", version="0.1.0"):
@@ -20,12 +29,37 @@ def register_agent_for(db_conn, owner, name="support-agent", version="0.1.0"):
     return agents.register_agent(db_conn, owner, name=name, version=version)
 
 
-def make_runner(owner, agent_name, db_conn, trace_dir, script, max_steps=6):
-    """Registers `agent_name` for `owner` and builds a runner for it —
-    the v0.3 replacement for constructing a bare AgentIdentity by hand."""
+def grant_delegation_for(db_conn, owner, agent, *, allowed_tools=ALL_TOOLS, resource_constraints=None, task_id=None):
+    """Test helper: grant a real Delegation (v0.4) for `agent`, owned by
+    `owner` — the replacement for the old authz.REGISTRY static lookup.
+    Defaults to full tool authority scoped to the seeded demo resources."""
+    return delegation.grant_delegation(
+        db_conn,
+        owner,
+        agent_id=agent.agent_id,
+        allowed_tools=allowed_tools,
+        resource_constraints=DEMO_RESOURCES if resource_constraints is None else resource_constraints,
+        task_id=task_id,
+        ttl_seconds=3600,
+    )
+
+
+def make_runner(owner, agent_name, db_conn, trace_dir, script, max_steps=6, allowed_tools=ALL_TOOLS):
+    """Registers `agent_name` for `owner`, grants a matching Delegation,
+    and builds a runner for it — the v0.4 replacement for constructing a
+    bare AgentIdentity (v0.2) or an unauthorized-by-name runner (v0.3) by
+    hand."""
     agent = register_agent_for(db_conn, owner, name=agent_name)
+    grant = grant_delegation_for(db_conn, owner, agent, allowed_tools=allowed_tools)
     model = FakeModelProvider(script=script)
-    runner = AgentRunner(agent_id=agent.agent_id, model=model, db_conn=db_conn, max_steps=max_steps, trace_dir=trace_dir)
+    runner = AgentRunner(
+        agent_id=agent.agent_id,
+        delegation_id=grant.delegation_id,
+        model=model,
+        db_conn=db_conn,
+        max_steps=max_steps,
+        trace_dir=trace_dir,
+    )
     return runner, model, agent
 
 
@@ -88,7 +122,7 @@ async def test_malformed_arguments_rejected(db_conn, trace_dir, alice):
 
 
 async def test_unauthorized_tool_rejected(db_conn, trace_dir, alice):
-    """read-only-agent is registered but not allowed to call add_case_note."""
+    """read-only-agent's delegation doesn't include add_case_note."""
     runner, _, _ = make_runner(
         alice,
         "read-only-agent",
@@ -98,13 +132,23 @@ async def test_unauthorized_tool_rejected(db_conn, trace_dir, alice):
             ModelResponse(tool_call=ToolCallRequest(id="c1", name="add_case_note", arguments={"customer_id": "cust_1", "note": "x"})),
             ModelResponse(text="I'm not allowed to write notes."),
         ],
+        allowed_tools=frozenset({"get_customer", "get_order"}),
     )
     result = await runner.run(human=alice, goal="add a note")
     reasons = [e.data.get("reason") for e in _trace_events(trace_dir, result.request_id) if e.event == "tool_rejected"]
-    assert "unauthorized" in reasons
+    assert "tool_not_allowed" in reasons
     # confirm nothing was actually written
     row = db_conn.execute("SELECT COUNT(*) FROM case_notes").fetchone()
     assert row[0] == 0
+
+    # every attempted denial is persisted as evidence, even though it had
+    # zero tool side effects.
+    instance_row = db_conn.execute("SELECT instance_id FROM agent_instances WHERE task_id = ?", (result.task_id,)).fetchone()
+    decisions = authorization.get_decisions_for_instance(db_conn, instance_row["instance_id"])
+    denied = [d for d in decisions if d.reason_code == authorization.TOOL_NOT_ALLOWED]
+    assert len(denied) == 1
+    assert denied[0].decision == authorization.DECISION_DENY
+    assert denied[0].tool_name == "add_case_note"
 
 
 async def test_max_step_termination(db_conn, trace_dir, alice):
@@ -140,7 +184,10 @@ async def test_model_error_marks_task_failed(db_conn, trace_dir, alice):
             raise RuntimeError("upstream exploded")
 
     agent = register_agent_for(db_conn, alice)
-    runner = AgentRunner(agent_id=agent.agent_id, model=BrokenModel(), db_conn=db_conn, trace_dir=trace_dir)
+    grant = grant_delegation_for(db_conn, alice, agent)
+    runner = AgentRunner(
+        agent_id=agent.agent_id, delegation_id=grant.delegation_id, model=BrokenModel(), db_conn=db_conn, trace_dir=trace_dir
+    )
     result = await runner.run(human=alice, goal="anything")
     assert result.stopped_reason == "error"
     assert result.task_status == "failed"
@@ -250,9 +297,12 @@ async def test_trace_events_correlate_session_task_instance(db_conn, trace_dir, 
         assert e.instance_id == result.instance_id
 
 
-async def test_agent_instance_references_task_session_human(db_conn, trace_dir, alice, support_agent):
+async def test_agent_instance_references_task_session_human(
+    db_conn, trace_dir, alice, support_agent, support_agent_delegation
+):
     runner = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=support_agent_delegation.delegation_id,
         model=FakeModelProvider(script=[ModelResponse(text="done")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -275,9 +325,10 @@ async def test_agent_instance_references_task_session_human(db_conn, trace_dir, 
     assert persisted.agent_id == support_agent.agent_id
 
 
-async def test_task_references_canonical_agent_id(db_conn, trace_dir, alice, support_agent):
+async def test_task_references_canonical_agent_id(db_conn, trace_dir, alice, support_agent, support_agent_delegation):
     runner = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=support_agent_delegation.delegation_id,
         model=FakeModelProvider(script=[ModelResponse(text="done")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -323,6 +374,7 @@ async def test_agent_name_cannot_substitute_for_agent_id(db_conn, trace_dir, ali
     agent_id fails — a name is not a valid identity handle."""
     runner = AgentRunner(
         agent_id="support-agent",  # the *name*, not support_agent.agent_id
+        delegation_id=UNUSED_DELEGATION_ID,
         model=FakeModelProvider(script=[ModelResponse(text="should never get here")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -334,6 +386,7 @@ async def test_agent_name_cannot_substitute_for_agent_id(db_conn, trace_dir, ali
 async def test_unknown_agent_cannot_run(db_conn, trace_dir, alice):
     runner = AgentRunner(
         agent_id="agt_does_not_exist",
+        delegation_id=UNUSED_DELEGATION_ID,
         model=FakeModelProvider(script=[ModelResponse(text="unreachable")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -348,6 +401,7 @@ async def test_disabled_agent_cannot_run(db_conn, trace_dir, alice, support_agen
     agents.disable_agent(db_conn, alice, support_agent.agent_id)
     runner = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=UNUSED_DELEGATION_ID,
         model=FakeModelProvider(script=[ModelResponse(text="unreachable")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -361,6 +415,7 @@ async def test_wrong_owner_cannot_launch_agent(db_conn, trace_dir, alice, bob, s
     still be rejected; ownership is checked, not just existence."""
     runner = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=UNUSED_DELEGATION_ID,
         model=FakeModelProvider(script=[ModelResponse(text="unreachable")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -371,19 +426,23 @@ async def test_wrong_owner_cannot_launch_agent(db_conn, trace_dir, alice, bob, s
     assert db_conn.execute("SELECT COUNT(*) FROM sessions WHERE human_user_id = 'user-bob'").fetchone()[0] == 0
 
 
-async def test_model_provider_metadata_is_not_agent_identity(db_conn, trace_dir, alice, support_agent):
+async def test_model_provider_metadata_is_not_agent_identity(
+    db_conn, trace_dir, alice, support_agent, support_agent_delegation
+):
     """Two runs against the exact same registered agent, using different
     FakeModelProvider scripts (standing in for "different providers"),
     still resolve to the identical agent_id/name/version — the model has
     no bearing on agent identity at all."""
     runner_a = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=support_agent_delegation.delegation_id,
         model=FakeModelProvider(script=[ModelResponse(text="answer from script A")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
     )
     runner_b = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=support_agent_delegation.delegation_id,
         model=FakeModelProvider(script=[ModelResponse(text="answer from script B")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -398,9 +457,10 @@ async def test_model_provider_metadata_is_not_agent_identity(db_conn, trace_dir,
     assert task_a.agent_id == task_b.agent_id == support_agent.agent_id
 
 
-async def test_trace_contains_canonical_agent_id(db_conn, trace_dir, alice, support_agent):
+async def test_trace_contains_canonical_agent_id(db_conn, trace_dir, alice, support_agent, support_agent_delegation):
     runner = AgentRunner(
         agent_id=support_agent.agent_id,
+        delegation_id=support_agent_delegation.delegation_id,
         model=FakeModelProvider(script=[ModelResponse(text="done")]),
         db_conn=db_conn,
         trace_dir=trace_dir,
@@ -411,6 +471,64 @@ async def test_trace_contains_canonical_agent_id(db_conn, trace_dir, alice, supp
     for line in lines:
         assert line["agent_id"] == support_agent.agent_id
         assert line["agent_id"] != "support-agent"
+
+
+async def test_same_name_different_version_does_not_inherit_authority(db_conn, trace_dir, alice):
+    """Regression test for the v0.3 authorization bug: authz.py's
+    REGISTRY was keyed by `AgentIdentity.name`, so two of alice's own
+    registrations sharing a name — "support-agent" v0.1.0 and v0.2.0,
+    different canonical agent_ids — would silently inherit the exact same
+    authority. v0.4 keys every authorization decision off `agent_id`
+    alone; a delegation granted to one agent_id must never authorize a
+    different one, even a same-named sibling owned by the same human."""
+    v1 = agents.register_agent(db_conn, alice, name="support-agent", version="0.1.0")
+    v2 = agents.register_agent(db_conn, alice, name="support-agent", version="0.2.0")
+    assert v1.agent_id != v2.agent_id
+    assert v1.name == v2.name == "support-agent"
+
+    # Delegate authority to v1 only.
+    grant = grant_delegation_for(db_conn, alice, v1)
+
+    # Run v2 (a different canonical agent_id, same name) but hand it v1's
+    # delegation_id — if the bug were still present, name-based lookup
+    # would happily authorize this. It must not.
+    runner = AgentRunner(
+        agent_id=v2.agent_id,
+        delegation_id=grant.delegation_id,
+        model=FakeModelProvider(
+            script=[
+                ModelResponse(tool_call=ToolCallRequest(id="c1", name="get_customer", arguments={"customer_id": "cust_1"})),
+                ModelResponse(text="handled"),
+            ]
+        ),
+        db_conn=db_conn,
+        trace_dir=trace_dir,
+    )
+    result = await runner.run(human=alice, goal="who is cust_1?")
+
+    reasons = [e.data.get("reason") for e in _trace_events(trace_dir, result.request_id) if e.event == "tool_rejected"]
+    assert "agent_mismatch" in reasons
+
+    instance_row = db_conn.execute("SELECT instance_id FROM agent_instances WHERE task_id = ?", (result.task_id,)).fetchone()
+    decisions = authorization.get_decisions_for_instance(db_conn, instance_row["instance_id"])
+    assert any(d.reason_code == authorization.AGENT_MISMATCH and d.decision == authorization.DECISION_DENY for d in decisions)
+
+    # v1 running with its own delegation still works fine — the fix
+    # rejects the cross-agent reuse, not agent v1's real authority.
+    runner_v1 = AgentRunner(
+        agent_id=v1.agent_id,
+        delegation_id=grant.delegation_id,
+        model=FakeModelProvider(
+            script=[
+                ModelResponse(tool_call=ToolCallRequest(id="c1", name="get_customer", arguments={"customer_id": "cust_1"})),
+                ModelResponse(text="Alice Anders is gold tier."),
+            ]
+        ),
+        db_conn=db_conn,
+        trace_dir=trace_dir,
+    )
+    result_v1 = await runner_v1.run(human=alice, goal="who is cust_1?")
+    assert result_v1.final_text == "Alice Anders is gold tier."
 
 
 def _trace_events(trace_dir, request_id):

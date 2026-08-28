@@ -14,7 +14,9 @@ Explicitly implements, in order, every step the spec calls out:
   9. parse a structured tool call out of the response, if any
  10. reject unknown tool names     (never call a function by a name the
                                      model invented that isn't registered)
- 11. check the tool call is authorized for this agent (authz.py)
+ 11. run the deterministic pre-execution authorization pipeline against
+     this agent's explicit Delegation (authorization.py / delegation.py) —
+     never a name-keyed permission map, never the model's judgment
  12. validate the tool call's arguments (models.py / Pydantic)
  13. execute the tool              (tools.py)
  14. derive + persist a task-state update from the (trusted) tool result
@@ -22,7 +24,7 @@ Explicitly implements, in order, every step the spec calls out:
  16. mark task completed/failed, end the AgentInstance, return
 
 Read this file top to bottom to see exactly what "an agent" does here —
-see LEARNING.md sections 1-5 and the v0.2/v0.3 addenda.
+see LEARNING.md sections 1-5 and the v0.2/v0.3/v0.4 addenda.
 """
 
 from __future__ import annotations
@@ -35,9 +37,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from . import agents, instances, sessions, tasks
+from . import agents, authorization, instances, sessions, tasks
 from .agents import AgentAccessError, AgentNotActiveError
-from .authz import AuthorizationError, check_authorized
 from .identity import AgentIdentity, AgentInstance, HumanIdentity
 from .lifecycle import TaskStatus
 from .model_provider import ModelProvider, ToolCallRequest
@@ -97,25 +98,36 @@ def derive_state_update(tool_name: str, result: dict[str, Any]) -> dict[str, Any
 
 class AgentRunner:
     """One instance = one *claimed* registered agent_id (e.g.
-    `"agt_3f9a..."`, never a hand-picked string — see agents.py). The id
-    is only verified inside `run()`, not at construction time, because
-    ownership/status can change between two `run()` calls on the same
-    long-lived runner — every call re-resolves and re-checks it fresh,
-    the same discipline `sessions.get_session`/`tasks.get_task` already
-    use for their IDs. Each `run()` call always creates a fresh Task and
-    a fresh AgentInstance for that (re-verified) agent, resuming at most
-    the Session."""
+    `"agt_3f9a..."`, never a hand-picked string — see agents.py), acting
+    under one *claimed* Delegation (e.g. `"dlg_7c1b..."`, see
+    delegation.py). Both ids are only verified inside `run()`
+    (agent_id/status) and inside `_handle_tool_call` (the delegation,
+    immediately before every tool execution), not at construction time —
+    ownership/status/expiry can all change between two `run()` calls on
+    the same long-lived runner, so every call re-resolves and re-checks
+    them fresh, the same discipline `sessions.get_session`/`tasks.get_task`
+    already use for their IDs. Each `run()` call always creates a fresh
+    Task and a fresh AgentInstance for that (re-verified) agent, resuming
+    at most the Session.
+
+    v0.4: `delegation_id` is required and explicit — this runner never
+    falls back to an implicit or ambient grant of authority. See
+    LEARNING.md's v0.4 addendum for why authentication (verifying the
+    human, the agent) and authorization (what this specific run is
+    allowed to do) are kept as two entirely separate questions."""
 
     def __init__(
         self,
         *,
         agent_id: str,
+        delegation_id: str,
         model: ModelProvider,
         db_conn: Any,
         max_steps: int = MAX_STEPS_DEFAULT,
         trace_dir: Path | str = DEFAULT_TRACE_DIR,
     ):
         self.agent_id = agent_id
+        self.delegation_id = delegation_id
         self.model = model
         self.db_conn = db_conn
         self.max_steps = max_steps
@@ -250,7 +262,7 @@ class AgentRunner:
             tracer.record("tool_call_requested", step=step, tool=call.name, arguments=call.arguments)
             messages.append({"role": "assistant", "content": None, "tool_call": call})
 
-            result_payload, is_error = self._handle_tool_call(call, human, instance, identity, tracer, step)
+            result_payload, is_error = self._handle_tool_call(call, human, instance, identity, task.task_id, tracer, step)
             messages.append(
                 {
                     "role": "tool_result",
@@ -346,6 +358,7 @@ class AgentRunner:
         human: HumanIdentity,
         instance: AgentInstance,
         identity: AgentIdentity,
+        task_id: str,
         tracer: Tracer,
         step: int,
     ) -> tuple[dict, bool]:
@@ -360,42 +373,77 @@ class AgentRunner:
         `run()`, never anything the model supplied."""
 
         # Boundary 1 — unknown tool: never look up a function by a name
-        # the model invented that isn't in our schema map at all.
+        # the model invented that isn't in our schema map at all. Not an
+        # authorization question (there's no delegation scope for a tool
+        # that doesn't exist), so no AuthorizationDecision is recorded for
+        # this one — see authorization.py's module docstring.
         if call.name not in TOOL_ARG_MODELS:
             tracer.record("tool_rejected", step=step, tool=call.name, reason="unknown_tool")
             return {"error": "unknown_tool", "tool": call.name}, True
 
-        # Boundary 2 — authorization: is this *agent application*
-        # allowed to call this tool at all? Checked before arguments are
-        # even validated, let alone executed. The model has no say in
-        # this decision — it is a plain, deterministic dict lookup.
-        #
-        # This looks up `identity.name`, not `identity.agent_id` —
-        # authz.REGISTRY (v0.1) is static code, written before any
-        # per-owner random agent_id exists, so it can only be keyed by a
-        # stable label. That label is `identity.name`, but it is never
-        # "supplied" by a caller/model here: it was resolved server-side,
-        # moments ago, from the canonical `agent_id`'s verified database
-        # row (agents.require_active_agent) — a caller can't reach this
-        # line at all without first presenting a real, owned, active
-        # agent_id. Name is used as a policy *label*, not as the identity
-        # check itself; the identity check already happened. See
-        # LEARNING.md's v0.3 addendum, "why names aren't secure identities."
-        try:
-            check_authorized(identity.name, call.name)
-        except AuthorizationError as e:
-            tracer.record("tool_rejected", step=step, tool=call.name, reason="unauthorized", detail=str(e))
-            return {"error": "unauthorized", "detail": str(e)}, True
+        # Boundary 2 — authorization (v0.4): the full deterministic
+        # pre-execution pipeline in authorization.py — agent identity,
+        # instance/principal match, delegation existence/ownership/
+        # agent-match/task-match/expiry/revocation, tool allowlist,
+        # resource scope. Every one of those checks is against the
+        # canonical `identity.agent_id` and the real, persisted
+        # Delegation row — never `identity.name` (that was the v0.3 bug:
+        # two agents sharing a name could inherit each other's authority
+        # through a name-keyed permission map). The model has no say in
+        # any of this; it is a deterministic function of already-verified
+        # server-side state. Every attempt — allowed or not — is
+        # persisted as an AuthorizationDecision before this function
+        # returns, so a denial always leaves evidence even though it
+        # leaves no other side effect.
+        resource_type, resource_id = authorization.resource_for_tool_call(call.name, call.arguments)
+        decision = authorization.authorize_tool_call(
+            self.db_conn,
+            principal=human,
+            agent_id=identity.agent_id,
+            instance=instance,
+            task_id=task_id,
+            delegation_id=self.delegation_id,
+            tool_name=call.name,
+            resource_type=resource_type,
+            resource_id=resource_id,
+        )
+        if not decision.allowed:
+            tracer.record(
+                "tool_rejected",
+                step=step,
+                tool=call.name,
+                reason=decision.reason_code.lower(),
+                decision_id=decision.decision_id,
+            )
+            return {"error": "unauthorized", "reason": decision.reason_code}, True
 
-        # Boundary 3 — argument validation: the model's JSON is untrusted
-        # input and is never passed straight into Python. `extra="forbid"`
-        # on every args model also means an attempt to smuggle an
-        # ownership-looking field (e.g. "human_user_id", "agent_id") is
-        # rejected here.
+        # Boundary 3 — argument validation (pipeline step 14): the
+        # model's JSON is untrusted input and is never passed straight
+        # into Python. `extra="forbid"` on every args model also means an
+        # attempt to smuggle an ownership-looking field (e.g.
+        # "human_user_id", "agent_id") is rejected here. This runs *after*
+        # authorization, not before — authority to call a tool at all is a
+        # separate question from whether this particular call's shape is
+        # well-formed — but a rejection here is still persisted as its own
+        # AuthorizationDecision (DENY, INVALID_ARGUMENTS): every attempted
+        # consequential tool call gets evidence, not just the ones that
+        # fail the delegation check.
         arg_model = TOOL_ARG_MODELS[call.name]
         try:
             validated_args = arg_model.model_validate(call.arguments)
         except ValidationError as e:
+            authorization.record_decision(
+                self.db_conn,
+                decision=authorization.DECISION_DENY,
+                reason_code=authorization.INVALID_ARGUMENTS,
+                principal_user_id=human.user_id,
+                agent_id=identity.agent_id,
+                instance_id=instance.instance_id,
+                task_id=task_id,
+                delegation_id=self.delegation_id,
+                tool_name=call.name,
+                resource=f"{resource_type}:{resource_id}" if resource_type else None,
+            )
             tracer.record("tool_rejected", step=step, tool=call.name, reason="invalid_arguments", detail=str(e))
             return {"error": "invalid_arguments", "detail": str(e)}, True
 

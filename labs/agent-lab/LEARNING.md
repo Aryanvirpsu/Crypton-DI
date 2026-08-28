@@ -1,12 +1,16 @@
-# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3)
+# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4)
 
 This is the "read this to understand exactly how it works" document the
 build was asked to produce. It assumes you've read `README.md` for setup
 but not necessarily any of the source yet. Sections 1-10 describe v0.1
 (the loop, tools, tracing, identity); the v0.2 addendum covers what
 changed when Sessions, Tasks, and persistent task state were added; the
-v0.3 addendum (at the very end) covers the Agent Registry — read those
-last two first if you already know v0.1.
+v0.3 addendum covers the Agent Registry; the v0.4 addendum (at the very
+end) covers Delegation and deterministic pre-execution authorization —
+read that one first if you already know v0.1-v0.3. Sections 8 and 9 below
+are updated in place for v0.4 (authorization no longer goes through
+`authz.py`, which is removed); everywhere else is left as originally
+written and should be read as history.
 
 ## Architecture
 
@@ -35,8 +39,8 @@ last two first if you already know v0.1.
  │                   │
  │                   ▼
  │             1. unknown tool?        -> reject
- │             2. authz.check_authorized(agent_id, tool)
- │                                     -> reject if not allowed
+ │             2. authorization.authorize_tool_call(agent_id, delegation_id, tool, resource)
+ │                                     -> reject if not allowed (v0.4; see addendum)
  │             3. Pydantic validate arguments
  │                                     -> reject if malformed
  │             4. tools.<fn>(db_conn, human, instance, args)
@@ -168,19 +172,20 @@ the v0.2 addendum's "Session vs. Task vs. AgentInstance" section below.)*
 
 ## 8. Where authorization is checked
 
-`agent.py`, `_handle_tool_call`, boundary 2 — `authz.check_authorized(
-identity.name, call.name)` — called for **every** tool call, before
-arguments are validated or the tool runs. The allowlist itself
-(`authz.REGISTRY`) is a plain Python dict keyed by agent *name* (see the
-v0.3 addendum, "why names aren't secure identities," for exactly why —
-in short: it's static code, and only a stable label can be hardcoded
-ahead of a per-owner random `agent_id`, but `identity.name` here is
-never caller/model-supplied — it's resolved server-side from the
-already-verified registered agent, moments earlier). An unregistered
-agent name and a registered-but-not-allowed tool are both rejected the
-same way (`AuthorizationError`), traced as `tool_rejected`, and reported
-back to the model as a generic `"unauthorized"` error — the model is
-told it can't do that, never *why* in enough detail to probe the
+*(Updated for v0.4 — see the addendum at the end for the full story.
+`authz.py` and its name-keyed `REGISTRY`, described in earlier versions
+of this section, are removed as of v0.4.)*
+
+`agent.py`, `_handle_tool_call`, boundary 2 — `authorization.authorize_tool_call(...)`
+— called for **every** tool call, before arguments are validated or the
+tool runs. It checks the call against a real, persisted `Delegation`
+(`delegation.py`), keyed by canonical `agent_id`, never by name. Every
+attempt — allowed or denied — is persisted as an `AuthorizationDecision`
+with a stable, machine-readable `reason_code` (`TOOL_NOT_ALLOWED`,
+`DELEGATION_EXPIRED`, `AGENT_MISMATCH`, etc. — see the v0.4 addendum for
+the full list), traced as `tool_rejected` on denial, and reported back to
+the model as a generic `"unauthorized"` error with that reason code — the
+model is told it can't do that, never enough detail to probe the
 boundary.
 
 Data-level authorization (which *rows* a human can see) is a second,
@@ -199,7 +204,9 @@ Worth stating plainly, since this lab exists to make that answerable:
   `unknown_tool`, loop continues.
 - **Model asks for a real tool it isn't allowed to call**
   (`read-only-agent` requesting `add_case_note`) → rejected by
-  `authz.check_authorized`, traced as `tool_rejected` / `unauthorized`.
+  `authorization.authorize_tool_call` (`TOOL_NOT_ALLOWED`), traced as
+  `tool_rejected` / `tool_not_allowed`, and persisted as a DENY
+  `AuthorizationDecision` — see the v0.4 addendum.
 - **Model sends malformed/extra/wrong-typed arguments** (missing
   `customer_id`, an extra field, a customer_id of the wrong type) →
   rejected by Pydantic (`extra="forbid"` catches surprise fields),
@@ -646,3 +653,264 @@ authorizing another human's agent, or an agent acting for someone other
 than its registrant) is explicitly out of scope; see the task spec's
 "do not build" list. An `Agent`'s `owner_user_id` is fixed at
 registration and nothing in v0.3 changes it after the fact.
+
+---
+
+## v0.4 addendum: Delegation and deterministic pre-execution authorization
+
+v0.3 fixed *identity* (a real, owned, canonical `agent_id`) but left
+*authorization* static: `authz.REGISTRY` was a dict written by a
+developer ahead of time, keyed by agent **name**, granting a whole named
+role standing access to a fixed set of tools forever. v0.4 replaces that
+with **Delegation** — a persisted record of one human principal
+explicitly, and temporarily, authorizing one canonical agent to use
+specific tools against specific resources — and a deterministic
+pipeline, `authorization.authorize_tool_call`, that checks every tool
+call against it immediately before execution. `authz.py` is deleted; a
+Delegation is the only source of tool authority now.
+
+```
+HumanIdentity (principal)
+      ↓ owns
+AgentIdentity
+      ↓ grants Delegation to ─────────► Delegation
+      ↓ creates                            │ agent_id, task_id?, allowed_tools,
+AgentInstance                              │ resource_constraints, expires_at,
+      ↓ performs                          │ status (active|revoked)
+    Task                                   │
+      ↓                                    ▼
+ Model asks for a tool call ──► authorization.authorize_tool_call()
+                                    │
+                          ALLOW ────┼──── DENY
+                            │       │       │
+                      tool runs     │  AuthorizationDecision persisted,
+                                    │  zero tool side effects
+                                    ▼
+                     AuthorizationDecision persisted either way
+```
+
+### What Delegation is
+
+`delegation.py`'s `Delegation`: `delegation_id` (`dlg_<uuid>`, minted
+only by `grant_delegation`, never caller-supplied — same discipline as
+`agent_id`/`session_id`/`task_id`), `principal_user_id`, `agent_id`
+(canonical, never a name), an optional `task_id` (task-binding — see
+below), `allowed_tools` (a flat set of tool names), `resource_constraints`
+(a flat dict of `resource_type -> {ids}`, e.g.
+`{"customer_ids": {"cust_1"}}`), `issued_at`/`expires_at` (a delegation
+**must** have a finite lifetime — `grant_delegation` rejects a
+non-positive or excessively long `ttl_seconds`), and `status`
+(`active`/`revoked`). Granting one requires the principal to already own
+the target `agent_id` (`agents.get_agent` enforces this) — you can only
+delegate authority over an agent you actually control.
+
+It is deliberately not a policy engine: no wildcards, no expression
+language, no resource hierarchy, just flat allow-lists checked with `in`.
+If richer policy is ever needed, that should be a new, deliberate,
+versioned decision (see `DECISIONS.md`), not something that grows here
+incrementally.
+
+### Why authentication ≠ authorization
+
+These answer two completely different questions, and v0.3 already kept
+them procedurally separate without fully naming it: **authentication**
+is "is this really human X, and is this really registered agent Y" —
+answered once, by `verify_human_identity` and `agents.require_active_agent`,
+both of which only ever confirm *identity*. **Authorization** is "is
+this specific human, through this specific agent, allowed to do this
+specific thing, right now" — a completely separate question that a
+correct identity says nothing about on its own. Before v0.4, that second
+question was answered by a static label lookup with no expiry, no
+per-grant scope, and no revocation. v0.4 makes the separation structural:
+`agents.require_active_agent` (identity) and
+`authorization.authorize_tool_call` (authorization) are two different
+functions, in two different modules, called at two different points in
+`agent.py`'s `run()` — resolving *who this is* never implies *what they
+may do*, and nothing in `delegation.py` or `authorization.py` re-verifies
+identity claims that were already established elsewhere (it takes the
+already-verified `agent_id`/`HumanIdentity`/`AgentInstance` as given and
+checks authority on top of them).
+
+### Why agent names cannot define authority (the v0.3 bug, and the fix)
+
+The bug: `agent.py`'s boundary 2 called
+`authz.check_authorized(identity.name, call.name)` — keyed by
+`AgentIdentity.name`, a descriptive label, not `agent_id`. Two of the
+same human's own registrations can legitimately share a name (e.g.
+`register_agent(..., name="support-agent", version="0.1.0")` and again
+with `version="0.2.0")` — the uniqueness constraint on `agents` is
+`(owner_user_id, name, version)`, not `(owner_user_id, name)`). Both get
+different, unrelated canonical `agent_id`s, but a name-keyed permission
+map cannot tell them apart: whatever authority "support-agent" carried,
+*both* registrations got it, automatically, with no separate grant. A
+compromised, buggy, or simply newer version of an agent would silently
+inherit whatever the original version was allowed to do, forever, just by
+sharing a label.
+
+v0.4's fix is structural, not a patched comparison: `Delegation.agent_id`
+is the only thing `authorize_tool_call` ever compares against the
+resolved, canonical `agent_id` (pipeline step 7 — "delegation canonical
+agent matches"). `identity.name` does not appear anywhere in
+`authorization.py` or `delegation.py` at all. Granting authority to
+`agt_...v1` never grants it to `agt_...v2`, even same-named, even same
+owner, even registered seconds apart — a new registration always starts
+with zero delegations and needs its own, explicit grant.
+`tests/test_agent.py::test_same_name_different_version_does_not_inherit_authority`
+is the regression test: it registers `support-agent` v0.1.0 and v0.2.0
+for the same human, delegates only to v0.1.0, and proves running v0.2.0
+with v0.1.0's `delegation_id` is denied `AGENT_MISMATCH` with zero tool
+side effects — while v0.1.0 itself, using that same delegation, still
+works.
+
+### Why tool existence ≠ permission
+
+`tools.TOOL_FUNCTIONS` and `models.TOOL_ARG_MODELS` answer "what tools
+exist in this system, and what do their arguments look like" — the Tool
+Registry, in the spec's terms. `Delegation.allowed_tools` answers a
+completely different question: "which of those tools is *this specific
+agent, right now, under this specific grant of authority* allowed to
+call." These are kept as two separate concepts on purpose (see the
+module docstrings in `tools.py`/`models.py` vs. `delegation.py`):
+registering a new tool in `TOOL_FUNCTIONS` does not grant anyone
+authority to call it — every existing Delegation's `allowed_tools` is
+still whatever it was explicitly granted, and a new tool is unreachable
+by any agent until a principal explicitly delegates it. There is
+deliberately no single global place that conflates "tools that exist"
+with "tools this agent may use" — that conflation is exactly what made
+the v0.3 bug possible (a static permission map living at the same
+"global, code-level" altitude as the tool registry itself).
+
+### Why authorization must occur immediately before execution
+
+`authorization.authorize_tool_call` is called from `_handle_tool_call`
+as the last thing to happen before `tools.TOOL_FUNCTIONS[call.name]` is
+ever invoked — after the unknown-tool check, immediately before argument
+validation, with nothing else (no caching, no earlier "pre-approval" step
+whose result might go stale) in between. This matters because every
+input to the decision — the agent's active/disabled status, the
+delegation's revoked/expired status — can change at any moment between
+two calls in the *same* run, let alone across runs. A decision made once
+at the start of a `run()` and reused for every subsequent tool call in
+that loop would be a snapshot that could be wrong by the third or fourth
+tool call if, say, a human revoked the delegation mid-run in response to
+something the agent already did. Checking fresh, every single call,
+against the live database row, is what makes "revoke a delegation" mean
+"the very next tool call fails," not "the next *run* fails."
+
+### Why DENY must be recorded
+
+An `AuthorizationDecision` is persisted for **every** attempted
+consequential tool call — `ALLOW` and `DENY` alike (`record_decision`,
+called from both branches of `authorize_tool_call`, plus a third call
+site in `agent.py` for an `INVALID_ARGUMENTS` denial after a call passes
+delegation checks but fails schema validation). A `DENY` is the
+security-relevant event, not the exception: it is evidence that
+something — a model, or whoever/whatever is driving it — attempted an
+action it wasn't authorized for. Without a persisted record, a denied
+attempt is indistinguishable from an attempt that never happened at all,
+which makes it impossible to answer "did anything ever try to use this
+expired/revoked/foreign delegation" after the fact. Every `DENY` decision
+still carries the full evidence set — `principal_user_id`, `agent_id`,
+`instance_id`, `task_id`, `delegation_id`, `tool_name`, `resource`,
+`reason_code`, `timestamp` — specifically so it stands on its own during
+an audit, without needing to cross-reference the trace file to know who
+attempted what and why it failed. And critically: a `DENY` decision is
+recorded *and nothing else happens* — `_handle_tool_call` returns before
+`tools.TOOL_FUNCTIONS` is ever reached, so the evidence exists but the
+side effect never does (`tests/test_agent.py::test_unauthorized_tool_rejected`
+and every DENY-path test in `tests/test_authorization.py` assert both
+halves of this: the decision is `DENY`, and the would-be side effect
+— a row insert, a state change — did not happen).
+
+### How revocation and expiry work
+
+Both are read live, off the database row, on every single call — never
+cached, never checked once and remembered:
+
+- **Expiry** (`delegation.expires_at`, always finite —
+  `grant_delegation` refuses a non-positive or unbounded `ttl_seconds`):
+  `authorize_tool_call` compares `time.time() > delegation.expires_at`
+  fresh, every call. There is no background sweep that "expires" a
+  delegation at the deadline — an expired-but-still-`active`-status row
+  simply starts failing every check with `DELEGATION_EXPIRED` the instant
+  the clock passes `expires_at`.
+- **Revocation** (`delegation.revoke_delegation`): the *only* function
+  that changes `delegations.status`, and the transition is one-way —
+  `active -> revoked` is valid, `revoked -> revoked` raises
+  `LifecycleError` (see `lifecycle.validate_delegation_transition`).
+  Revoking never deletes the row: it is retained forever, exactly as
+  granted, as evidence of what authority once existed and when it
+  stopped — the same "history accumulates, nothing is erased" principle
+  `TERMINAL_STATUSES` already uses for tasks. There is no "re-activate a
+  revoked delegation" path; regranting authority always means calling
+  `grant_delegation` again for a brand new `delegation_id`.
+
+Task-binding (`Delegation.task_id`) is optional, checked at step 8 only
+"when task-bound" — a delegation with `task_id=None` authorizes its agent
+for any task; one with a real `task_id` is refused (`TASK_MISMATCH`) for
+every other task, even ones run by the exact same agent for the exact
+same principal. Task-bound delegation is the tighter, preferred shape
+where a caller already has a specific task in hand (least standing
+privilege — authority that dies with the task it was meant for, not
+authority that outlives it); it is not mandatory, since not every caller
+can pre-create a task before deciding what to authorize.
+
+### Where v0.4 can still be attacked
+
+Recording these honestly, same as every prior version's addendum:
+
+- **The `JWT_SECRET` shared-secret problem is explicitly not solved
+  here.** crypton-id and Agent Lab both verify (and, in Agent Lab's dev
+  path, *mint*) tokens with the same HS256 symmetric key. Anyone who can
+  read Agent Lab's environment can mint a token claiming to be any human,
+  and from there `grant_delegation`/`revoke_delegation` are only as
+  trustworthy as that token. The intended fix — asymmetric signing with
+  Agent Lab holding only a public verification key (or full OIDC/JWKS) —
+  is deliberately out of scope for v0.4; see the task spec's "do not
+  solve" list.
+- **A principal can still over-grant.** Nothing stops a human from
+  delegating `allowed_tools={"get_customer","get_order","add_case_note"}`
+  with `resource_constraints` covering every id they own, for the maximum
+  allowed TTL, to every agent they register — v0.4 makes narrow,
+  temporary, revocable grants *possible*, it does not make broad ones
+  *impossible*. The pipeline enforces whatever was actually granted;
+  it has no opinion on whether a grant was wise.
+- **Resource constraints are a flat allow-list of ids, not a live
+  ownership check.** `RESOURCE_NOT_ALLOWED` only checks "is this id in
+  the set that was granted," not "does this id currently belong to this
+  principal" — if a `customer_id` were reassigned to a different owner
+  after a delegation was granted (nothing in this lab does that today,
+  but nothing prevents it structurally), a stale grant could still
+  authorize touching it at the delegation layer; `tools.py`'s independent
+  `owner_user_id` check is what actually catches that case today, as a
+  second, unrelated layer of defense — it is not redundant with the
+  authorization pipeline, it is the thing standing in for a "resource
+  ownership can drift" gap in this pipeline.
+- **No approval step bound to a specific call's exact arguments.** A
+  delegation authorizes *a tool against a resource id*, but nothing yet
+  asks the human, at the moment of a specific consequential call, "do you
+  approve *this exact action*" — see "Next" below (v0.5, human approval
+  bound to exact action arguments via WebAuthn step-up). v0.4 is
+  standing, revocable authority; it is not per-action confirmation.
+- **The static-permission attack surface named in v0.1's LEARNING.md
+  §10** ("the allowlist is static and coarse... standing access to
+  everything its entry lists, all the time") **is now substantially
+  narrowed but not eliminated**: delegations are per-agent-id, scoped,
+  and finite-lived rather than a permanent global grant by name — but a
+  long-TTL, broadly-scoped delegation is still standing access for its
+  lifetime. The improvement is bounding *how* standing access can be
+  granted (explicitly, scoped, expiring, revocable, evidenced), not
+  removing the concept of standing access altogether.
+- **`authorization_decisions` and `delegations` are unencrypted,
+  un-access-controlled SQLite rows**, same caveat as every other table in
+  this lab (`instances.py`'s v0.2/v0.3 note applies identically here):
+  anyone with filesystem access to `data/agentlab.db` can read every
+  delegation ever granted and every decision ever made, bypassing the
+  ownership checks entirely, since those checks are enforced in Python,
+  not by the database.
+
+None of the above is fixed in v0.4 on purpose — MCP, multi-agent
+delegation, WebAuthn-bound approval, a policy language, LLM-assisted
+authorization, and a security scanner are all explicitly out of scope;
+see the task spec's "do not add" list. They are the concrete starting
+point for v0.5 and beyond.

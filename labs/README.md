@@ -1,12 +1,14 @@
 # Crypton Agent Lab
 
-**Status: v0.3 built** (v0.1 shipped first — see git history — then
+**Status: v0.4 built** (v0.1 shipped first — see git history — then
 v0.2 added explicit Sessions, Tasks, and persistent task state, then
 v0.3 added the Agent Registry — real, owned, persisted Agent
-registrations replacing hardcoded agent-identity strings). See
+registrations replacing hardcoded agent-identity strings — then v0.4
+added Delegation and a deterministic pre-execution authorization
+pipeline, replacing v0.1-v0.3's static, name-keyed permission map). See
 [`agent-lab/README.md`](agent-lab/README.md) to run it and
 [`agent-lab/LEARNING.md`](agent-lab/LEARNING.md) for how it works. The
-plan below is what v0.1 actually built; v0.2/v0.3's additions are
+plan below is what v0.1 actually built; v0.2/v0.3/v0.4's additions are
 documented in `agent-lab/LEARNING.md`'s addenda, not re-planned here.
 
 ## What this cleanup did NOT build

@@ -99,6 +99,47 @@ CREATE TABLE IF NOT EXISTS agent_instances (
     status TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_instances_task ON agent_instances(task_id);
+
+-- v0.4: Delegation — explicit authority a human principal grants to a
+-- canonical agent_id (never a name; see delegation.py). Rows are never
+-- deleted, only transitioned active -> revoked, so a delegation remains
+-- as evidence/history after it stops being usable.
+
+CREATE TABLE IF NOT EXISTS delegations (
+    delegation_id TEXT PRIMARY KEY,
+    principal_user_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL REFERENCES agents(agent_id),
+    task_id TEXT,                          -- NULL means not task-bound
+    allowed_tools TEXT NOT NULL,           -- JSON list of tool names
+    resource_constraints TEXT NOT NULL,    -- JSON object: resource_type -> [ids]
+    issued_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    status TEXT NOT NULL,
+    revoked_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_delegations_agent ON delegations(agent_id);
+CREATE INDEX IF NOT EXISTS idx_delegations_principal ON delegations(principal_user_id);
+
+-- v0.4: AuthorizationDecision — deterministic evidence for every
+-- attempted consequential tool call, ALLOW or DENY. Append-only, never
+-- updated or deleted; see authorization.py. Not a security boundary by
+-- itself (it's a record of one), but every DENY here must correspond to
+-- zero tool side effects.
+
+CREATE TABLE IF NOT EXISTS authorization_decisions (
+    decision_id TEXT PRIMARY KEY,
+    decision TEXT NOT NULL,                -- 'ALLOW' | 'DENY'
+    reason_code TEXT NOT NULL,
+    principal_user_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    delegation_id TEXT,
+    tool_name TEXT NOT NULL,
+    resource TEXT,
+    timestamp REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_authz_decisions_instance ON authorization_decisions(instance_id);
 """
 
 _lock = threading.Lock()
