@@ -18,13 +18,17 @@ Explicitly implements, in order, every step the spec calls out:
      this agent's explicit Delegation (authorization.py / delegation.py) —
      never a name-keyed permission map, never the model's judgment
  12. validate the tool call's arguments (models.py / Pydantic)
+ 12a. for a tool that requires it, verify an approved, unexpired, unused
+     Approval whose exact argument digest matches what's about to
+     execute (approval.py) — never a substitute for step 11, and never
+     overridable by step 11 either; see LEARNING.md's v0.5 addendum
  13. execute the tool              (tools.py)
  14. derive + persist a task-state update from the (trusted) tool result
  15. feed the result back to the model, and repeat — bounded by max_steps
  16. mark task completed/failed, end the AgentInstance, return
 
 Read this file top to bottom to see exactly what "an agent" does here —
-see LEARNING.md sections 1-5 and the v0.2/v0.3/v0.4 addenda.
+see LEARNING.md sections 1-5 and the v0.2/v0.3/v0.4/v0.5 addenda.
 """
 
 from __future__ import annotations
@@ -37,12 +41,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from . import agents, authorization, instances, sessions, tasks
+from . import agents, approval as approval_module, authorization, instances, sessions, tasks
 from .agents import AgentAccessError, AgentNotActiveError
 from .identity import AgentIdentity, AgentInstance, HumanIdentity
 from .lifecycle import TaskStatus
 from .model_provider import ModelProvider, ToolCallRequest
-from .models import TOOL_ARG_MODELS, tool_specs_for_model
+from .models import TOOL_ARG_MODELS, requires_human_approval, tool_specs_for_model
 from .tools import TOOL_FUNCTIONS, ToolError
 from .tracing import DEFAULT_TRACE_DIR, Tracer
 
@@ -114,7 +118,15 @@ class AgentRunner:
     falls back to an implicit or ambient grant of authority. See
     LEARNING.md's v0.4 addendum for why authentication (verifying the
     human, the agent) and authorization (what this specific run is
-    allowed to do) are kept as two entirely separate questions."""
+    allowed to do) are kept as two entirely separate questions.
+
+    v0.5: `approval_id` is optional and, when given, is the one
+    pre-approved consequential action this run may consume — at most
+    once (see approval.py). A run with no `approval_id` can still
+    execute every tool that doesn't require approval; it will only ever
+    hit APPROVAL_REQUIRED on the ones that do. This mirrors
+    `delegation_id`'s role but for a narrower, human-confirmed, one-shot
+    grant rather than a standing one."""
 
     def __init__(
         self,
@@ -123,11 +135,13 @@ class AgentRunner:
         delegation_id: str,
         model: ModelProvider,
         db_conn: Any,
+        approval_id: str | None = None,
         max_steps: int = MAX_STEPS_DEFAULT,
         trace_dir: Path | str = DEFAULT_TRACE_DIR,
     ):
         self.agent_id = agent_id
         self.delegation_id = delegation_id
+        self.approval_id = approval_id
         self.model = model
         self.db_conn = db_conn
         self.max_steps = max_steps
@@ -451,7 +465,55 @@ class AgentRunner:
             "tool_arguments_validated", step=step, tool=call.name, arguments=validated_args.model_dump()
         )
 
-        # Boundary 4 — execute. Tool functions only ever see the
+        # Boundary 4 — human approval (v0.5): a tool flagged
+        # `requires_human_approval` (models.py — Tool Registry metadata,
+        # not authority) needs a human's exact-argument-bound
+        # confirmation on top of a valid Delegation, checked only now
+        # that both authorization *and* argument validation have already
+        # passed. A valid Delegation never bypasses this; conversely, a
+        # valid Approval could never have overridden the Delegation check
+        # above, since that already returned before this line runs.
+        # `self.approval_id` is a runner-level constant — like
+        # `delegation_id`, never something the model supplies per call.
+        if requires_human_approval(call.name):
+            if self.approval_id is None:
+                decision = authorization.record_decision(
+                    self.db_conn,
+                    decision=authorization.DECISION_DENY,
+                    reason_code=approval_module.APPROVAL_REQUIRED,
+                    principal_user_id=human.user_id,
+                    agent_id=identity.agent_id,
+                    instance_id=instance.instance_id,
+                    task_id=task_id,
+                    delegation_id=self.delegation_id,
+                    tool_name=call.name,
+                    resource=f"{resource_type}:{resource_id}" if resource_type else None,
+                )
+            else:
+                decision = approval_module.verify_and_consume_approval(
+                    self.db_conn,
+                    approval_id=self.approval_id,
+                    principal=human,
+                    agent_id=identity.agent_id,
+                    instance_id=instance.instance_id,
+                    task_id=task_id,
+                    delegation_id=self.delegation_id,
+                    tool_name=call.name,
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    validated_arguments=validated_args.model_dump(),
+                )
+            if not decision.allowed:
+                tracer.record(
+                    "tool_rejected",
+                    step=step,
+                    tool=call.name,
+                    reason=decision.reason_code.lower(),
+                    decision_id=decision.decision_id,
+                )
+                return {"error": "unauthorized", "reason": decision.reason_code}, True
+
+        # Boundary 5 — execute. Tool functions only ever see the
         # validated Pydantic object, never raw model JSON, and never
         # touch the shell/filesystem/network (see tools.py).
         tool_fn = TOOL_FUNCTIONS[call.name]

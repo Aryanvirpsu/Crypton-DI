@@ -47,6 +47,33 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+# v0.5: explicit, deterministic tool metadata — separate from both the
+# Tool Registry (this dict: what tools exist) and Delegation (what
+# authority an agent has). This one field states whether a tool is
+# consequential enough to need a human's exact-argument-bound approval
+# on top of delegated authority — it does not itself grant anything, and
+# it is never inferred from the tool's name or from model behavior. See
+# approval.py and LEARNING.md's v0.5 addendum.
+#
+# `add_case_note` is a write (it persists a note nothing can silently
+# revert); `get_customer`/`get_order` are reads. That is the whole
+# policy — a flat, hand-set dict, not a rule engine.
+REQUIRES_HUMAN_APPROVAL: dict[str, bool] = {
+    "get_customer": False,
+    "get_order": False,
+    "add_case_note": True,
+}
+
+
+def requires_human_approval(tool_name: str) -> bool:
+    """Whether `tool_name` needs an approved, exact-argument-matching
+    Approval before it may execute. A tool absent from the map (should
+    never happen for a registered tool, but never trust that) is treated
+    as requiring approval — safe default is "ask a human", not "skip
+    the check"."""
+    return REQUIRES_HUMAN_APPROVAL.get(tool_name, True)
+
+
 def tool_specs_for_model() -> list[dict]:
     """Build the tool-use schema block sent to the model provider — the
     *only* thing the model is told about what tools exist. Derived

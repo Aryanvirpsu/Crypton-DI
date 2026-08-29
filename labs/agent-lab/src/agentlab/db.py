@@ -140,6 +140,34 @@ CREATE TABLE IF NOT EXISTS authorization_decisions (
     timestamp REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_authz_decisions_instance ON authorization_decisions(instance_id);
+
+-- v0.5: Approval — a human principal's exact-argument-bound confirmation
+-- of one specific consequential tool call, on top of (never instead of)
+-- Delegation. `instance_id`/`task_id` are nullable the same way
+-- `delegations.task_id` is: NULL means "not bound to that exact one",
+-- set means an exact-match requirement — see approval.py. Never deleted,
+-- only transitioned (pending -> approved -> consumed, or -> cancelled/
+-- expired), so denied/expired/replayed attempts remain in history.
+
+CREATE TABLE IF NOT EXISTS approvals (
+    approval_id TEXT PRIMARY KEY,
+    principal_user_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL REFERENCES agents(agent_id),
+    instance_id TEXT,                      -- NULL means not instance-bound
+    task_id TEXT,                          -- NULL means not task-bound
+    delegation_id TEXT NOT NULL REFERENCES delegations(delegation_id),
+    tool_name TEXT NOT NULL,
+    resource TEXT,
+    argument_hash TEXT NOT NULL,           -- sha256 of the canonical (tool, resource, validated args)
+    issued_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    status TEXT NOT NULL,
+    approved_at REAL,
+    consumed_at REAL,
+    webauthn_reference TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_principal ON approvals(principal_user_id);
+CREATE INDEX IF NOT EXISTS idx_approvals_agent ON approvals(agent_id);
 """
 
 _lock = threading.Lock()

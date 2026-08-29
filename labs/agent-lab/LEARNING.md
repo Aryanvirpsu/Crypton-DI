@@ -1,16 +1,18 @@
-# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4)
+# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4 → v0.5)
 
 This is the "read this to understand exactly how it works" document the
 build was asked to produce. It assumes you've read `README.md` for setup
 but not necessarily any of the source yet. Sections 1-10 describe v0.1
 (the loop, tools, tracing, identity); the v0.2 addendum covers what
 changed when Sessions, Tasks, and persistent task state were added; the
-v0.3 addendum covers the Agent Registry; the v0.4 addendum (at the very
-end) covers Delegation and deterministic pre-execution authorization —
-read that one first if you already know v0.1-v0.3. Sections 8 and 9 below
-are updated in place for v0.4 (authorization no longer goes through
-`authz.py`, which is removed); everywhere else is left as originally
-written and should be read as history.
+v0.3 addendum covers the Agent Registry; the v0.4 addendum covers
+Delegation and deterministic pre-execution authorization; the v0.5
+addendum (at the very end) covers human Approval bound to the exact
+consequential action — read that one first if you already know
+v0.1-v0.4. Sections 8 and 9 below are updated in place for v0.4
+(authorization no longer goes through `authz.py`, which is removed);
+everywhere else is left as originally written and should be read as
+history.
 
 ## Architecture
 
@@ -914,3 +916,262 @@ delegation, WebAuthn-bound approval, a policy language, LLM-assisted
 authorization, and a security scanner are all explicitly out of scope;
 see the task spec's "do not add" list. They are the concrete starting
 point for v0.5 and beyond.
+
+---
+
+## v0.5 addendum: Human Approval bound to the exact consequential action
+
+v0.4 answers "does this agent possess delegated authority?" — a standing,
+revocable, but otherwise generic grant ("this agent may call
+`add_case_note` against these customer ids, until this time"). It has no
+way to ask a narrower question: *for this one specific call, right now,
+did the correct human actually agree to this exact action?* v0.5 adds
+that as a second, independent check — **Approval** (`approval.py`) — that
+some tools require on top of (never instead of) a valid Delegation.
+
+```
+HumanIdentity (principal)
+      │
+      │ WebAuthn step-up, challenge = approval_id + argument_hash
+      ▼
+Approval ──bound to──► AgentInstance? + Task? + Delegation + tool_name
+      │                + resource + sha256(canonical validated arguments)
+      │ status: pending → approved → consumed
+      │                        ↘ cancelled / expired
+      ▼
+verify_and_consume_approval() ── runs immediately before execution,
+      │                          strictly AFTER authorize_tool_call()
+      │                          has already returned ALLOW
+ ALLOW┼────DENY
+   │  │      │
+ tool │  AuthorizationDecision persisted (APPROVAL_* reason code),
+ runs │  zero tool side effects, approval untouched or left as-is
+      ▼
+ approval atomically flips approved → consumed (one use, ever)
+```
+
+### Authorization vs. approval
+
+Delegation and Approval answer different questions, and v0.5 keeps that
+difference structural, not just conceptual:
+
+| | Delegation (v0.4) | Approval (v0.5) |
+|---|---|---|
+| Question | "does this agent have standing authority?" | "did a human confirm *this* call?" |
+| Scope | a tool + a resource *type* (any id in the granted set) | one tool call with one exact, hashed argument set |
+| Lifetime | up to 30 days, reusable for every matching call | up to 15 minutes, **one use** |
+| Who acts | the principal, once, ahead of time | the principal, per consequential call, via WebAuthn |
+| Failure mode | `AGENT_MISMATCH`, `DELEGATION_EXPIRED`, etc. | `APPROVAL_*` reason codes (own vocabulary) |
+
+Both are checked by `agent.py`'s `_handle_tool_call`, in a fixed order:
+`authorization.authorize_tool_call` (delegation) first, then — only for a
+tool where `models.requires_human_approval(tool_name)` is `True` —
+`approval.verify_and_consume_approval`. Neither can substitute for the
+other: a `DENY` from either stops execution outright (see "authorization
+independence" below), and `models.REQUIRES_HUMAN_APPROVAL` is Tool
+Registry metadata (what the tool *is*), not an authority grant — setting
+it to `True` doesn't hand out any authority by itself, it only adds a gate
+that authority alone can't pass through.
+
+### Why approval must bind to exact structured arguments
+
+A "human approved this tool" checkbox is close to meaningless as a
+security control: it says nothing about *which* call. The entire point of
+Approval is `compute_argument_hash(tool_name, resource, validated_arguments)`
+— a deterministic sha256 over the tool name, the resource identity, and a
+canonically-encoded (sorted keys, no whitespace ambiguity) dump of
+**already-Pydantic-validated** arguments, never raw model JSON. This
+mirrors `authorization.py`'s existing rule that a resource id is only ever
+read from validated structured data, never trusted text — applied here to
+the entire argument set, not just one field.
+
+A human approving `add_case_note(customer_id="cust_1", note="refund
+approved")` is approving *that exact call* — the hash changes if the
+note's text changes, if the customer_id changes, or even if the identical
+arguments were pointed at a different tool. `verify_and_consume_approval`
+recomputes the digest from what's actually about to execute and compares
+it to what was approved; any mismatch is `APPROVAL_ARGUMENT_MISMATCH`
+(argument substitution) or `APPROVAL_RESOURCE_MISMATCH` (resource
+substitution, checked slightly earlier as its own explicit step since a
+resource swap is common and deserves its own reason code even though a
+changed resource would also change the hash).
+
+### TOCTOU and argument substitution risk
+
+The risk this defends against is exactly the classic time-of-check/
+time-of-use gap: a human reviews and approves one proposed action, but
+something between approval and execution — a manipulated or simply
+confused model, a bug, a replayed/edited request — causes a *different*
+action to actually run under that approval's cover. Without exact-argument
+binding, "approved" would only ever mean "approved calling this tool at
+some point," which a valid Delegation already permits on its own — making
+the approval step security theater. Binding the approval to a hash of the
+precise arguments closes that gap: the check at execution time is not
+"was something like this approved," it's "was *this exact byte-identical
+action* approved," recomputed fresh, never trusted from an earlier
+decision cached anywhere.
+
+### Why replay risk demands one-shot approvals
+
+An approval that could back more than one execution would let a single
+human confirmation get silently amplified — click "approve" once,
+somehow have it authorize the same withdrawal, note, or send twice (or
+more). `verify_and_consume_approval`'s last step is an atomic
+conditional update:
+
+```sql
+UPDATE approvals SET status = 'consumed', consumed_at = ?
+WHERE approval_id = ? AND status = 'approved'
+```
+
+If the row is not `approved` at that exact moment (already consumed by
+an earlier call, expired, cancelled), the `WHERE` clause matches zero
+rows and the caller falls back to a normal `APPROVAL_ALREADY_CONSUMED`
+denial — there is no window where two concurrent executions could both
+see `rowcount == 1` and both proceed. `tests/test_agent_approval.py::
+test_replayed_approval_denies_the_second_execution` proves this across
+two entirely separate `AgentRunner.run()` calls (separate `AgentInstance`/
+`Task`, same `approval_id`): the first consumes it, the second sees
+`APPROVAL_ALREADY_CONSUMED` and writes nothing.
+
+### Why approvals are short-lived
+
+`request_approval` caps `ttl_seconds` at `MAX_APPROVAL_TTL_SECONDS` (15
+minutes) — an order of magnitude tighter than Delegation's 30-day cap.
+The reasoning is different for each: a Delegation is *standing* authority
+a principal consciously chooses to grant for a while; an Approval is a
+confirmation of *specific intent at a specific moment*, and intent that
+old is not the same intent anymore — the resource might have changed
+state, the human might not even remember approving it, and a long-lived
+pending or approved-but-unconsumed approval is just a wider window for
+something to go wrong before it's used. Expiry, like Delegation's, is
+checked live (`_load_and_maybe_expire`, called at the top of every
+pipeline run) and lazily persisted as an explicit `expired` status the
+first time anything looks at an overdue row — never a background sweep,
+never cached.
+
+### Why WebAuthn proves human authentication but still needs action binding
+
+`approve()` requires a `WebAuthnVerifier` to succeed before a pending
+approval becomes approved — this proves *a human with the right passkey
+is present, right now*, the same guarantee crypton-id's own login flow
+already provides (`identity.verify_human_identity` trusts the same
+underlying ceremony for the JWT it verifies). But WebAuthn authenticates a
+**person**, not an **action** — a raw "user completed a passkey ceremony"
+signal says nothing about which of the user's pending approvals they
+meant to confirm. That's why `approve()` never accepts a caller-supplied
+challenge: it derives one deterministically from
+`f"{approval_id}:{argument_hash}"` and passes *that* to
+`verifier.verify_step_up`. In a real integration, the authenticator's
+signed assertion would cover this exact challenge, so completing the
+ceremony is inseparable from confirming *this* approval's exact digest —
+not "some approval or other belonging to this human." WebAuthn supplies
+the "a human is really here" half; the challenge-binding supplies the
+"and they meant this one" half. Neither half alone is the security
+property; both are required.
+
+### Real integration vs. Lab simulation (be explicit about this)
+
+`webauthn.py` defines the `WebAuthnVerifier` interface and
+`WebAuthnEvidence` — this is the real, intended integration boundary:
+what a live `CryptonIdWebAuthnVerifier` would need to satisfy to swap in
+for real ceremonies without approval.py or agent.py changing at all,
+exactly the role `model_provider.ModelProvider` already plays for LLM
+vendors. **What's actually implemented is `FakeWebAuthnVerifier`** — a
+deterministic, Lab-only stand-in that never talks to an authenticator or
+to crypton-id. It:
+
+- computes a fake `reference` (`sha256(user_id:cred_id:challenge)`,
+  prefixed `fake:`) instead of returning a real credential/assertion id,
+- sets `WebAuthnEvidence.is_simulated=True` unconditionally, so nothing
+  downstream can mistake it for real evidence without checking,
+- and supports a sentinel `FAIL_CHALLENGE` so tests can exercise
+  `WEBAUTHN_VERIFICATION_FAILED` deterministically, without a real
+  authenticator that could actually refuse.
+
+What's real about the design even though the ceremony is faked: the
+*shape* of the security property — approval requires step-up,
+immediately before the state transition, with a challenge bound to the
+exact action — is exactly what a live integration would also have to do.
+Swapping in a real verifier is a new class implementing one method
+(`verify_step_up`), not a redesign of `approval.py`. Wiring an actual
+`CryptonIdWebAuthnVerifier` (calling crypton-id's real step-up endpoint
+over HTTP, the way `identity.verify_human_identity` already trusts
+crypton-id's JWTs without re-implementing WebAuthn) is real, deliberately
+deferred integration work — not a v0.5 deliverable.
+
+### Why approval cannot increase delegated authority
+
+`_handle_tool_call`'s ordering makes this true by construction, not by
+convention: `authorization.authorize_tool_call` runs first and returns
+before the approval check is ever reached. If it denies (disabled agent,
+revoked/expired delegation, tool not in `allowed_tools`, resource out of
+scope), `_handle_tool_call` returns immediately — `approval_module` is
+never imported into the call stack for that request at all, and a fully
+valid, human-approved Approval sitting in the database is never even
+loaded. `tests/test_agent_approval.py::
+test_valid_approval_never_overrides_a_revoked_delegation` proves this
+directly: approve an action, then revoke the delegation backing it, then
+run — the result is `DELEGATION_REVOKED`, the approval is still
+`approved` (not `consumed`) afterward, and no note is written. Symmetrically,
+a valid Delegation never bypasses a *required* approval either — a tool
+with `requires_human_approval=True` and no `approval_id` on the runner
+denies with `APPROVAL_REQUIRED` regardless of how permissive the
+delegation is. Approval only ever *narrows* what a valid delegation
+already permits; it can never widen it.
+
+### Why the LLM never decides any of this
+
+Every input to every check in `verify_and_consume_approval` — `approval_id`,
+`agent_id`, `instance_id`, `task_id`, `delegation_id` — comes from the
+runner's own already-authenticated state (`AgentRunner.approval_id` is a
+constructor-level constant, exactly like `delegation_id`) or from
+already-Pydantic-validated tool arguments. The model's raw tool-call JSON
+never supplies an approval id, an instance id, or a resource id used for
+the *comparison itself* (only, indirectly, the proposed arguments that
+get validated and hashed) — the same "model proposes, deterministic code
+disposes" discipline `authorization.py` already established for
+Delegation. There is no code path where a model's output decides ALLOW or
+DENY; it can only ever cause a DENY by proposing something that doesn't
+match what a human actually approved.
+
+### Where v0.5 can still be attacked
+
+- **The `JWT_SECRET` shared-secret problem still isn't solved** — same
+  caveat as v0.4's addendum; approval doesn't make it better or worse.
+- **`FakeWebAuthnVerifier` is exactly that — fake.** Nothing in this Lab
+  today calls a real authenticator or crypton-id's step-up endpoint. Until
+  `CryptonIdWebAuthnVerifier` exists and is wired in, "approval" in a real
+  deployment of this code would be exactly as trustworthy as whatever
+  verifier is actually configured — the interface makes a real one
+  pluggable, it does not supply one.
+- **A principal can still over-request.** Nothing stops a human from
+  approving an overly broad or poorly-considered action within the rules
+  (15-minute TTL, one resource, one tool) — v0.5 makes exact-argument
+  confirmation *possible*, it has no opinion on whether a human should
+  have approved a given request in the first place.
+- **No approval-request review surface.** There is no UI/CLI flow yet
+  where a human actually *sees* the proposed action before calling
+  `approve()` — a caller could technically call `request_approval` then
+  `approve` back-to-back without a real human ever reading `note`'s text.
+  Building that review surface is integration work, not something
+  `approval.py` can enforce from the data-model side.
+- **Instance/task binding is optional, not mandatory.** Like Delegation's
+  `task_id`, `Approval.instance_id`/`task_id` are nullable — an approval
+  requested without them authorizes its exact argument-hash against *any*
+  instance/task run by the same agent/delegation/principal, not just one
+  specific run. This is a deliberate looseness (an approval usually has to
+  be requested before the instance it will be used in exists — see
+  `tests/test_agent_approval.py`'s module docstring), not an oversight,
+  but it does mean instance/task binding is defense-in-depth on top of the
+  argument hash, not a mandatory third leg of the exact-match property.
+- **Approval evidence lives in the same unencrypted, un-access-controlled
+  SQLite file as everything else** — same caveat as v0.4's `delegations`/
+  `authorization_decisions` note, now also true of `approvals` and its
+  `webauthn_reference` column (an opaque reference, never a secret, but
+  still only as protected as the file it's stored in).
+- **MCP, multi-agent delegation, a policy language, LLM-assisted
+  authorization, model training, and a security scanner remain explicitly
+  out of scope** — see the task spec's "do not add" list. The next
+  concrete step is v0.6: one minimal MCP server, with one existing tool
+  moved across that boundary.

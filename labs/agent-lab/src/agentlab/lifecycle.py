@@ -118,3 +118,46 @@ def parse_delegation_status(value: str) -> DelegationStatus:
 def validate_delegation_transition(current: DelegationStatus, new: DelegationStatus) -> None:
     if new not in _DELEGATION_VALID_TRANSITIONS.get(current, frozenset()):
         raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")
+
+
+# ── Approval status (v0.5) ───────────────────────────────────────────────
+# pending: requested, not yet human-confirmed.
+# approved: human completed WebAuthn step-up; not yet used.
+# consumed: successfully backed one (and only one) tool execution — a
+#   terminal state reached only through the pre-execution pipeline's
+#   atomic consume, never a direct status write.
+# cancelled: withdrawn before use — by the principal, or because the
+#   underlying request was abandoned.
+# expired: TTL passed before the approval was ever consumed. Set lazily
+#   (see approval.py's `_load_and_maybe_expire`) — checked live against
+#   `expires_at` every time an approval is read, the same discipline
+#   DelegationStatus/expiry uses, never a background sweep.
+
+
+class ApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
+_APPROVAL_VALID_TRANSITIONS: dict[ApprovalStatus, frozenset[ApprovalStatus]] = {
+    ApprovalStatus.PENDING: frozenset({ApprovalStatus.APPROVED, ApprovalStatus.CANCELLED, ApprovalStatus.EXPIRED}),
+    ApprovalStatus.APPROVED: frozenset({ApprovalStatus.CONSUMED, ApprovalStatus.CANCELLED, ApprovalStatus.EXPIRED}),
+    ApprovalStatus.CONSUMED: frozenset(),
+    ApprovalStatus.CANCELLED: frozenset(),
+    ApprovalStatus.EXPIRED: frozenset(),
+}
+
+
+def parse_approval_status(value: str) -> ApprovalStatus:
+    try:
+        return ApprovalStatus(value)
+    except ValueError:
+        raise LifecycleError(f"unknown_status: {value}") from None
+
+
+def validate_approval_transition(current: ApprovalStatus, new: ApprovalStatus) -> None:
+    if new not in _APPROVAL_VALID_TRANSITIONS.get(current, frozenset()):
+        raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")

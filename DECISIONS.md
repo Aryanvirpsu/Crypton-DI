@@ -157,6 +157,40 @@ unchanged by v0.4 — Agent Lab can still mint tokens it only needs to
 verify. That remains tracked, not solved, pending asymmetric signing /
 OIDC-JWKS.
 
+### Agent Lab v0.5: Approval is a second, independent check — not part of Delegation
+
+A genuinely new decision, not a reference implementation of an existing
+invariant: **authorization (does this agent have standing authority) and
+approval (did a human confirm this exact action) are two separate,
+independently-enforced checks, run in a fixed order, neither able to
+substitute for or override the other.** It would have been simpler to
+fold "requires approval" into `Delegation` itself (e.g. an
+`approved_actions` field), but that would conflate a *standing* grant
+with a *per-action* confirmation and make it impossible to express "valid
+delegation, but this one call still needs a human to look at it right
+now" — which is exactly the property v0.5 was asked to add.
+
+`labs/agent-lab/src/agentlab/approval.py` implements **Approval**: a
+persisted, human-issued confirmation of one exact tool call, bound via
+`compute_argument_hash(tool_name, resource, validated_arguments)` — not
+the tool name alone — and consumable exactly once
+(`verify_and_consume_approval`'s atomic `approved -> consumed` update).
+`agent.py`'s execution order runs `authorization.authorize_tool_call`
+first; only a tool flagged `models.requires_human_approval` then also
+requires `approval.verify_and_consume_approval` to return ALLOW before
+executing. A denial from either check is final — this is what makes "a
+valid approval never overrides a revoked delegation" and "a valid
+delegation never bypasses a required approval" true by construction
+rather than by convention. Full rationale, including the WebAuthn
+boundary and what's real vs. simulated in this Lab today:
+`labs/agent-lab/LEARNING.md`'s v0.5 addendum.
+
+Known, deliberately-deferred gaps: the `JWT_SECRET` tension is unchanged
+(same as v0.4); `webauthn.FakeWebAuthnVerifier` is a Lab-only simulation
+with no live crypton-id integration yet; `Approval.instance_id`/`task_id`
+are optional bindings, not mandatory ones (mirroring `Delegation.task_id`'s
+existing precedent).
+
 ---
 
 ## Decisions from the 2026-08 cleanup
