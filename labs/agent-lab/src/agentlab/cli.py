@@ -25,19 +25,22 @@ import argparse
 import asyncio
 import json
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import agents, delegation
+from . import agents, chain, delegation, signing_keys
 from .agent import AgentRunner
 from .agents import AgentAccessError, AgentNotActiveError, AgentValidationError, DuplicateAgentError
 from .db import connect, seed
 from .delegation import DelegationAccessError, DelegationValidationError
-from .identity import HumanIdentity, IdentityError, issue_dev_token, verify_human_identity
+from .identity import AgentInstance, HumanIdentity, IdentityError, generate_dev_keypair, issue_dev_token, verify_human_identity
 from .model_provider import AnthropicModelProvider, FakeModelProvider, ModelResponse, ToolCallRequest
+from .signing_keys import SigningKeyAccessError
 
 REGISTRY_ERRORS = (AgentAccessError, AgentNotActiveError, AgentValidationError, DuplicateAgentError)
 DELEGATION_ERRORS = (DelegationAccessError, DelegationValidationError)
+SIGNING_KEY_ERRORS = (SigningKeyAccessError,)
 
 # The seeded demo data's ids (see db.seed) — the default resource scope
 # for --bootstrap-delegation, so the --fake walkthrough works out of the
@@ -48,13 +51,18 @@ DEFAULT_DELEGATION_TOOLS = ("get_customer", "get_order", "add_case_note")
 
 def build_human_identity(args: argparse.Namespace) -> HumanIdentity:
     if args.token:
+        # A real crypton-id token — verified against JWT_PUBLIC_KEY_PEM
+        # (env), never a key this process could also sign with.
         return verify_human_identity(args.token)
     if args.dev_user:
-        # Local-dev shortcut: mints + immediately verifies a token in the
-        # exact shape crypton-id issues, so the same verification code
-        # path runs regardless. Never a substitute for real login.
-        token = issue_dev_token(args.dev_user, args.dev_user, "dev-cred")
-        return verify_human_identity(token)
+        # Local-dev shortcut: generates a fresh, ephemeral, lab-only
+        # keypair, mints a token with its private half, and immediately
+        # verifies with its public half — a self-contained round trip that
+        # never touches crypton-id's real key material (see
+        # identity.generate_dev_keypair). Never a substitute for real login.
+        private_key, public_key = generate_dev_keypair()
+        token = issue_dev_token(args.dev_user, args.dev_user, "dev-cred", private_key=private_key)
+        return verify_human_identity(token, public_key=public_key)
     raise SystemExit("Provide --token <crypton-id JWT>, or --dev-user <id> for local dev")
 
 
@@ -195,6 +203,191 @@ async def run_async(args: argparse.Namespace) -> int:
     return 0 if result.stopped_reason == "final_response" else 1
 
 
+async def create_signing_key_async(args: argparse.Namespace) -> int:
+    """v0.6: give a registered agent an Ed25519 signing identity — a
+    separate, explicit step from --register, the same way --grant-delegation
+    is separate from it (see signing_keys.py's module docstring). Prints
+    the private key exactly once, in PEM form, to stdout — this process
+    never persists it. Save it (e.g. redirect to a file) if you intend to
+    use --issue-chained-delegation with it later; there is no way to
+    recover it afterward, only to revoke the key and create a new one."""
+    human = build_human_identity(args)
+    conn = connect()
+    seed(conn)
+    if not args.agent_id:
+        raise SystemExit("--create-signing-key requires --agent-id <canonical id>")
+    key, private_key_pem = signing_keys.create_signing_key(conn, human, args.agent_id)
+    print(
+        json.dumps(
+            {
+                "key_id": key.key_id,
+                "agent_id": key.agent_id,
+                "algorithm": key.algorithm,
+                "public_key_pem": key.public_key_pem,
+                "private_key_pem": private_key_pem,
+                "warning": "private_key_pem is shown once and never stored — save it now",
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+async def issue_chained_delegation_async(args: argparse.Namespace) -> int:
+    """v0.6: issue a non-root delegation — `--issuer-agent-id` (which must
+    be the exact subject of `--parent-delegation-id`) delegates a narrowed
+    subset of its own authority to `--subject-agent-id`. See
+    delegation.grant_chained_delegation for the full validation this runs
+    at issuance time."""
+    human = build_human_identity(args)
+    conn = connect()
+    seed(conn)
+    missing = [
+        f"--{flag}"
+        for flag, val in [
+            ("issuer-agent-id", args.issuer_agent_id),
+            ("issuer-signing-key-id", args.issuer_signing_key_id),
+            ("issuer-private-key-file", args.issuer_private_key_file),
+            ("parent-delegation-id", args.parent_delegation_id),
+            ("subject-agent-id", args.subject_agent_id),
+        ]
+        if not val
+    ]
+    if missing:
+        raise SystemExit(f"--issue-chained-delegation requires: {', '.join(missing)}")
+
+    issuer_private_key_pem = Path(args.issuer_private_key_file).read_text(encoding="utf-8")
+    tools = [t.strip() for t in args.tools.split(",")] if args.tools else list(DEFAULT_DELEGATION_TOOLS)
+    resource_constraints = {}
+    if args.customer_ids:
+        resource_constraints["customer_ids"] = [c.strip() for c in args.customer_ids.split(",")]
+    if args.order_ids:
+        resource_constraints["order_ids"] = [o.strip() for o in args.order_ids.split(",")]
+
+    grant = delegation.grant_chained_delegation(
+        conn,
+        human,
+        issuer_agent_id=args.issuer_agent_id,
+        issuer_private_key_pem=issuer_private_key_pem,
+        issuer_signing_key_id=args.issuer_signing_key_id,
+        parent_delegation_id=args.parent_delegation_id,
+        subject_agent_id=args.subject_agent_id,
+        allowed_tools=tools,
+        resource_constraints=resource_constraints,
+        ttl_seconds=args.ttl_seconds,
+    )
+    print(
+        json.dumps(
+            {
+                "delegation_id": grant.delegation_id,
+                "issuer_type": grant.issuer_type,
+                "issuer_id": grant.issuer_id,
+                "subject_agent_id": grant.agent_id,
+                "parent_delegation_id": grant.parent_delegation_id,
+                "parent_hash": grant.parent_hash,
+                "allowed_tools": sorted(grant.allowed_tools),
+                "resource_constraints": {k: sorted(v) for k, v in grant.resource_constraints.items()},
+                "expires_at": grant.expires_at,
+                "signing_key_id": grant.signing_key_id,
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _chain_verify_output(result: "chain.ChainVerificationResult", *, requested_tool: str, requested_resource: str | None) -> str:
+    """Render a `ChainVerificationResult` the same way §39 of the v0.6
+    spec asks for — human-readable, and built entirely from the real
+    verifier's output, never a second, presentation-layer copy of
+    authorization logic."""
+    lines: list[str] = []
+    if result.authority_path:
+        lines.append("ROOT PRINCIPAL")
+        lines.append(f"Human {result.root_principal}")
+        lines.append("")
+        lines.append("ACTING PRINCIPAL")
+        lines.append(f"Agent {result.acting_principal}")
+        lines.append("")
+        lines.append("DELEGATION DEPTH")
+        lines.append(str(result.delegation_depth))
+        lines.append("")
+        lines.append("AUTHORITY PATH")
+        for i, (kind, pid) in enumerate(result.authority_path):
+            label = f"Human {pid}" if kind == "human" else f"Agent {pid}"
+            # Plain ASCII "->" rather than "→": stdout on a default-codepage
+            # Windows console (cp1252) can't encode U+2192 and raises
+            # UnicodeEncodeError on print() — matches this codebase's own
+            # existing "a -> b" convention in comments/docstrings anyway.
+            lines.append(label if i == 0 else f"  -> {label}")
+        lines.append("")
+    lines.append("REQUESTED TOOL")
+    lines.append(requested_tool)
+    lines.append("")
+    lines.append("REQUESTED RESOURCE")
+    lines.append(requested_resource or "(none)")
+    lines.append("")
+    lines.append("DECISION")
+    lines.append("ALLOW" if result.allowed else "DENY")
+    if not result.allowed:
+        lines.append("")
+        lines.append("FAILED HOP")
+        lines.append(result.failed_hop or "(leaf)")
+        lines.append("")
+        lines.append("REASON")
+        lines.append(result.denial_reason or result.reason_code)
+    return "\n".join(lines)
+
+
+async def chain_verify_async(args: argparse.Namespace) -> int:
+    """v0.6 developer-facing chain inspection (§39). Calls the real
+    verifier (chain.verify_delegation_chain) — this function only formats
+    its output; it does not re-implement or shortcut any check."""
+    human = build_human_identity(args)
+    conn = connect()
+    seed(conn)
+    leaf_delegation_id = args.chain_verify
+    leaf = delegation.get_delegation_unchecked(conn, leaf_delegation_id)
+    if leaf is None:
+        raise SystemExit(f"no such delegation: {leaf_delegation_id}")
+    if not args.requested_tool:
+        raise SystemExit("--chain-verify requires --requested-tool")
+
+    resource_type = args.requested_resource_type
+    resource_id = args.requested_resource_id
+    requested_resource = f"{resource_type}:{resource_id}" if resource_type else None
+
+    # A standalone inspection has no real, in-flight AgentRunner
+    # instance/task — construct the minimal AgentInstance the leaf-level
+    # check needs to compare against (agent_id/human_user_id must match
+    # what the delegation was actually issued for), the same convenience
+    # constructor identity.AgentInstance.new() already documents itself as
+    # existing for ("tests and tools that only care about instance_id").
+    instance = AgentInstance.new()
+    instance = AgentInstance(
+        instance_id=instance.instance_id,
+        started_at=instance.started_at,
+        agent_id=leaf.agent_id,
+        human_user_id=human.user_id,
+        session_id="",
+        task_id=leaf.task_id or "",
+    )
+
+    result = chain.verify_delegation_chain(
+        conn,
+        principal=human,
+        agent_id=leaf.agent_id,
+        instance=instance,
+        task_id=leaf.task_id or "",
+        delegation_id=leaf_delegation_id,
+        tool_name=args.requested_tool,
+        resource_type=resource_type,
+        resource_id=resource_id,
+    )
+    print(_chain_verify_output(result, requested_tool=args.requested_tool, requested_resource=requested_resource))
+    return 0 if result.allowed else 1
+
+
 def main() -> None:
     load_dotenv()
     parser = argparse.ArgumentParser(description="Register or run a Crypton Agent Lab agent.")
@@ -221,6 +414,31 @@ def main() -> None:
     parser.add_argument("--order-ids", help="comma-separated order_ids to grant (used with --grant-delegation)")
     parser.add_argument("--task-id", help="task-bind the delegation to this exact task_id (used with --grant-delegation)")
     parser.add_argument("--ttl-seconds", type=int, default=3600, help="delegation lifetime (used with --grant-delegation)")
+    # v0.6: signing keys + chained delegation + chain verification.
+    parser.add_argument(
+        "--create-signing-key",
+        action="store_true",
+        help="v0.6: mint an Ed25519 signing identity for --agent-id (required before that agent can issue a chained delegation)",
+    )
+    parser.add_argument(
+        "--issue-chained-delegation",
+        action="store_true",
+        help="v0.6: issue a non-root delegation from --issuer-agent-id (must be --parent-delegation-id's subject) to --subject-agent-id",
+    )
+    parser.add_argument("--issuer-agent-id", help="v0.6: the agent issuing a chained delegation (see --issue-chained-delegation)")
+    parser.add_argument("--issuer-signing-key-id", help="v0.6: the issuer's signing key id (see --create-signing-key's output)")
+    parser.add_argument(
+        "--issuer-private-key-file",
+        help="v0.6: path to the issuer's private key PEM (see --create-signing-key's output; never pass a private key inline)",
+    )
+    parser.add_argument("--parent-delegation-id", help="v0.6: the delegation this chained grant narrows from")
+    parser.add_argument("--subject-agent-id", help="v0.6: the agent the new chained delegation grants authority to")
+    parser.add_argument(
+        "--chain-verify", metavar="LEAF_DELEGATION_ID", help="v0.6: verify + print the full delegation chain for a leaf delegation_id"
+    )
+    parser.add_argument("--requested-tool", help="v0.6: the tool to check (used with --chain-verify)")
+    parser.add_argument("--requested-resource-type", help="v0.6: e.g. customer_ids (used with --chain-verify)")
+    parser.add_argument("--requested-resource-id", help="v0.6: e.g. cust_1 (used with --chain-verify)")
     parser.add_argument("--task", help="the task to hand the agent (required unless --register/--grant-delegation)")
     parser.add_argument("--token", help="crypton-id JWT (same as Authorization: Bearer <token>)")
     parser.add_argument("--dev-user", help="local-dev shortcut: user id to mint a dev token for")
@@ -229,13 +447,17 @@ def main() -> None:
     parser.add_argument("--fake", action="store_true", help="use FakeModelProvider, no LLM API key required")
     args = parser.parse_args()
 
+    v06_verb = args.create_signing_key or args.issue_chained_delegation or bool(args.chain_verify)
     if args.register and not args.name:
         raise SystemExit("--register requires --name")
     if args.grant_delegation and not args.agent_id:
         raise SystemExit("--grant-delegation requires --agent-id")
-    if not args.register and not args.grant_delegation and not args.task:
+    if args.create_signing_key and not args.agent_id:
+        raise SystemExit("--create-signing-key requires --agent-id")
+    if not args.register and not args.grant_delegation and not v06_verb and not args.task:
         raise SystemExit(
-            "--task is required for a normal run (or pass --register/--grant-delegation to do one of those instead)"
+            "--task is required for a normal run (or pass --register/--grant-delegation/--create-signing-key/"
+            "--issue-chained-delegation/--chain-verify to do one of those instead)"
         )
 
     try:
@@ -243,6 +465,12 @@ def main() -> None:
             sys.exit(asyncio.run(register_async(args)))
         elif args.grant_delegation:
             sys.exit(asyncio.run(grant_delegation_async(args)))
+        elif args.create_signing_key:
+            sys.exit(asyncio.run(create_signing_key_async(args)))
+        elif args.issue_chained_delegation:
+            sys.exit(asyncio.run(issue_chained_delegation_async(args)))
+        elif args.chain_verify:
+            sys.exit(asyncio.run(chain_verify_async(args)))
         else:
             sys.exit(asyncio.run(run_async(args)))
     except IdentityError as e:
@@ -254,6 +482,9 @@ def main() -> None:
     except DELEGATION_ERRORS as e:
         print(f"delegation error: {e}", file=sys.stderr)
         sys.exit(4)
+    except SIGNING_KEY_ERRORS as e:
+        print(f"signing key error: {e}", file=sys.stderr)
+        sys.exit(5)
 
 
 if __name__ == "__main__":

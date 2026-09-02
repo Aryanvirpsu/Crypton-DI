@@ -149,6 +149,27 @@ CREATE INDEX IF NOT EXISTS idx_authz_decisions_instance ON authorization_decisio
 -- only transitioned (pending -> approved -> consumed, or -> cancelled/
 -- expired), so denied/expired/replayed attempts remain in history.
 
+-- v0.6: Agent signing identity — one active Ed25519 keypair per agent,
+-- public half only (see signing_keys.py). This is what makes a Delegation
+-- issued *by* an agent (not a human) cryptographically attributable: the
+-- delegation's `signing_key_id` names the row here whose public key must
+-- verify its signature. Private keys are never persisted — created,
+-- returned once to the caller, and held only by the caller (CLI output,
+-- test fixtures). Revocation is one-way (active -> revoked, see
+-- lifecycle.SigningKeyStatus) and permanent for every delegation the key
+-- ever signed — see DECISIONS.md's v0.6 key-lifecycle policy.
+
+CREATE TABLE IF NOT EXISTS agent_signing_keys (
+    key_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL REFERENCES agents(agent_id),
+    public_key_pem TEXT NOT NULL,
+    algorithm TEXT NOT NULL,               -- "Ed25519" — the only algorithm v0.6 supports
+    created_at REAL NOT NULL,
+    revoked_at REAL,
+    status TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_signing_keys_agent ON agent_signing_keys(agent_id);
+
 CREATE TABLE IF NOT EXISTS approvals (
     approval_id TEXT PRIMARY KEY,
     principal_user_id TEXT NOT NULL,
@@ -172,6 +193,40 @@ CREATE INDEX IF NOT EXISTS idx_approvals_agent ON approvals(agent_id);
 
 _lock = threading.Lock()
 
+# v0.6: additive columns on the pre-existing `delegations` table, applied
+# via idempotent ALTER TABLE rather than added to `_SCHEMA`'s CREATE TABLE
+# above — one code path handles both a brand-new database and one created
+# before v0.6, instead of the schema and the migration disagreeing about
+# where these columns come from. Never a destructive drop/recreate, per
+# DECISIONS.md's migration-compatibility rule. Each entry is
+# (column, declaration); NULL-able with no default, so every pre-v0.6 row
+# reads back as a valid *root* delegation (issuer_type/issuer_id/etc. all
+# NULL) — the degenerate, backward-compatible case the v0.6 chain verifier
+# already treats a parent-less delegation as. See delegation.py's
+# `Delegation.parent_delegation_id is None` == "this is a root".
+_DELEGATION_V06_COLUMNS: list[tuple[str, str]] = [
+    ("format_version", "INTEGER"),
+    ("issuer_type", "TEXT"),  # 'human' | 'agent' — NULL on pre-v0.6 rows, treated as 'human'
+    ("issuer_id", "TEXT"),  # human_user_id or agent_id of the immediate issuer
+    ("parent_delegation_id", "TEXT REFERENCES delegations(delegation_id)"),
+    ("parent_hash", "TEXT"),  # sha256 of the parent's canonical bytes at issuance time
+    ("signing_key_id", "TEXT REFERENCES agent_signing_keys(key_id)"),
+    ("signature", "TEXT"),  # hex Ed25519 signature over this delegation's own canonical bytes
+]
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaration: str) -> None:
+    """Idempotent `ALTER TABLE ... ADD COLUMN` — SQLite raises
+    `OperationalError: duplicate column name` if it already exists, which
+    is the portable way to make this safe to run on every `connect()`
+    call, on both a fresh database (where the column already exists from
+    `_SCHEMA`'s CREATE TABLE) and an old one (where it doesn't yet)."""
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e):
+            raise
+
 
 def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     """Open (creating if needed) the lab's SQLite file and ensure schema
@@ -183,6 +238,13 @@ def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     with _lock:
         conn.executescript(_SCHEMA)
+        for column, declaration in _DELEGATION_V06_COLUMNS:
+            _ensure_column(conn, "delegations", column, declaration)
+        # Index the chain-traversal path (child -> parent) now that the
+        # column exists on every database, old or new.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_delegations_parent ON delegations(parent_delegation_id)"
+        )
         conn.commit()
     return conn
 

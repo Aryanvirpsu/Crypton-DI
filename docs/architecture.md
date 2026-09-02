@@ -68,6 +68,27 @@ that will eventually answer "is this agent allowed to call this route, on
 this human's behalf, with this delegated scope?" Nothing agent-specific is
 implemented yet; see `labs/README.md` for the planned next step.
 
+## Enforcement coverage — a deployment/threat-model limitation, not a bug
+
+Crypton's enforcement point (today: `crypton-id`'s own extractors;
+eventually: the gateway's marked extension point above) can only enforce
+traffic that actually reaches it:
+
+```
+routed through Crypton's enforcement point  →  enforceable
+bypasses Crypton entirely                   →  outside enforcement coverage
+```
+
+Any deployment where a caller can reach a protected resource by some
+other path (a direct DB connection, a different network route, a
+misconfigured second ingress) is outside what Crypton can see or decide
+on, by construction — this is true of any reverse-proxy/PEP-based
+authorization model, not specific to this codebase. It is a property to
+design deployments around (route everything security-relevant through the
+enforcement point, don't expose a bypass), not something to "solve" with
+host-level interception, kernel hooks, or endpoint agents — none of that
+is planned or in scope here.
+
 ## What's real vs. experimental
 
 | Area | Status |
@@ -77,4 +98,5 @@ implemented yet; see `labs/README.md` for the planned next step.
 | Step-up verification (`/actions/*`) | Real cryptographic proof-of-presence; carries no business logic itself |
 | OAuth authorization-code flow | Real state machine, but no PKCE, single hardcoded client — unmounted unless `ENABLE_OAUTH=true` |
 | Rate limiting / replay protection / policy engine at the gateway | Not implemented (see `DECISIONS.md`) |
-| Agent identity / delegation / agent-security testing | Not implemented (see `labs/README.md`) |
+| Agent identity / delegation (`labs/agent-lab`) | Real, working, but a separate Python lab, not wired behind the gateway — see `labs/README.md`. As of v0.6: multi-hop delegation chains (`Human -> Agent -> Agent -> ...`), Ed25519-signed, scope-attenuated (child authority can only narrow), verified by one authoritative walker (`chain.py`) — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 and `DECISIONS.md`. Root-only (single-hop) delegation remains fully supported as the degenerate case. Human-issued Approval sits on top, unchanged. |
+| Agent-security testing (adversarial/attack simulation) | Not implemented |

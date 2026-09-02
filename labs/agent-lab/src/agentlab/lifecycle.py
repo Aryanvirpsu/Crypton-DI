@@ -161,3 +161,34 @@ def parse_approval_status(value: str) -> ApprovalStatus:
 def validate_approval_transition(current: ApprovalStatus, new: ApprovalStatus) -> None:
     if new not in _APPROVAL_VALID_TRANSITIONS.get(current, frozenset()):
         raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")
+
+
+# ── Signing key status (v0.6) ────────────────────────────────────────────
+# Same one-way shape as DelegationStatus: a signing key is active until
+# revoked, and revocation is permanent — re-keying an agent means creating
+# a *new* signing key (a new key_id), never reactivating an old one. See
+# signing_keys.py and DECISIONS.md's v0.6 key-lifecycle policy: a delegation
+# signed by a now-revoked key is treated as untrusted, not grandfathered.
+
+
+class SigningKeyStatus(str, Enum):
+    ACTIVE = "active"
+    REVOKED = "revoked"
+
+
+_SIGNING_KEY_VALID_TRANSITIONS: dict[SigningKeyStatus, frozenset[SigningKeyStatus]] = {
+    SigningKeyStatus.ACTIVE: frozenset({SigningKeyStatus.REVOKED}),
+    SigningKeyStatus.REVOKED: frozenset(),
+}
+
+
+def parse_signing_key_status(value: str) -> SigningKeyStatus:
+    try:
+        return SigningKeyStatus(value)
+    except ValueError:
+        raise LifecycleError(f"unknown_status: {value}") from None
+
+
+def validate_signing_key_transition(current: SigningKeyStatus, new: SigningKeyStatus) -> None:
+    if new not in _SIGNING_KEY_VALID_TRANSITIONS.get(current, frozenset()):
+        raise LifecycleError(f"invalid_transition: {current.value} -> {new.value}")

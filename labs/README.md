@@ -1,15 +1,27 @@
 # Crypton Agent Lab
 
-**Status: v0.4 built** (v0.1 shipped first — see git history — then
+**Status: v0.6 built** (v0.1 shipped first — see git history — then
 v0.2 added explicit Sessions, Tasks, and persistent task state, then
 v0.3 added the Agent Registry — real, owned, persisted Agent
 registrations replacing hardcoded agent-identity strings — then v0.4
 added Delegation and a deterministic pre-execution authorization
-pipeline, replacing v0.1-v0.3's static, name-keyed permission map). See
-[`agent-lab/README.md`](agent-lab/README.md) to run it and
-[`agent-lab/LEARNING.md`](agent-lab/LEARNING.md) for how it works. The
-plan below is what v0.1 actually built; v0.2/v0.3/v0.4's additions are
-documented in `agent-lab/LEARNING.md`'s addenda, not re-planned here.
+pipeline, replacing v0.1-v0.3's static, name-keyed permission map, then
+v0.5 added Approval — human confirmation bound to one exact tool call via
+WebAuthn step-up, independent of and never a substitute for Delegation —
+then v0.5.1 was a reconciliation + security-hardening pass: closed the
+JWT shared-secret gap with asymmetric (Ed25519) signing, and confirmed
+the WebAuthn step-up path is not duplicated — then v0.6 is the technical
+wedge: provable multi-hop delegation with scope attenuation. A
+`Delegation` can now reference a parent (`Human -> Agent A -> Agent B ->
+Agent C`, cryptographically signed at each agent-issued hop, verified by
+one authoritative chain walker), and authority is guaranteed to narrow,
+never widen, at every hop). See [`agent-lab/README.md`](agent-lab/README.md)
+to run it, [`agent-lab/LEARNING.md`](agent-lab/LEARNING.md) for how it
+works, and `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 / `DECISIONS.md` for
+the full v0.6 design record and RAT-6 proof.
+The plan below is what v0.1 actually built; v0.2/v0.3/v0.4/v0.5/v0.5.1/v0.6's
+additions are documented in `agent-lab/LEARNING.md`'s addenda, not
+re-planned here.
 
 ## What this cleanup did NOT build
 

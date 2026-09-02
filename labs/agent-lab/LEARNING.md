@@ -1,4 +1,4 @@
-# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4 → v0.5)
+# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4 → v0.5 → v0.5.1 → v0.6)
 
 This is the "read this to understand exactly how it works" document the
 build was asked to produce. It assumes you've read `README.md` for setup
@@ -7,12 +7,18 @@ but not necessarily any of the source yet. Sections 1-10 describe v0.1
 changed when Sessions, Tasks, and persistent task state were added; the
 v0.3 addendum covers the Agent Registry; the v0.4 addendum covers
 Delegation and deterministic pre-execution authorization; the v0.5
-addendum (at the very end) covers human Approval bound to the exact
-consequential action — read that one first if you already know
-v0.1-v0.4. Sections 8 and 9 below are updated in place for v0.4
-(authorization no longer goes through `authz.py`, which is removed);
-everywhere else is left as originally written and should be read as
-history.
+addendum covers human Approval bound to the exact consequential action;
+the v0.5.1 addendum covers the ground-truth/security-baseline pass (JWT
+asymmetric-signing migration, WebAuthn-duplication investigation); the
+**v0.6 addendum (at the very end — read that one first if you already
+know v0.1-v0.5.1) covers the technical wedge itself: provable multi-hop
+delegation with scope attenuation.** Sections 8 and 9 below are updated
+in place for v0.4 (authorization no longer goes through `authz.py`, which
+is removed); everywhere else is left as originally written and should be
+read as history — including every `JWT_SECRET` mention below, which the
+v0.5.1 addendum explains is now resolved, not current, and every "single-
+hop only" framing of Delegation, which the v0.6 addendum explains is now
+the degenerate case of a chain, not the only shape.
 
 ## Architecture
 
@@ -1175,3 +1181,332 @@ match what a human actually approved.
   out of scope** — see the task spec's "do not add" list. The next
   concrete step is v0.6: one minimal MCP server, with one existing tool
   moved across that boundary.
+
+---
+
+## v0.5.1 addendum: Ground Truth + Security Baseline
+
+Not a new capability — a reconciliation-and-hardening pass across the
+whole repo (crypton-id, crypton-sdk, and Agent Lab) before v0.6's
+multi-hop delegation-chain work starts. Two things changed in Agent Lab
+specifically; everything else in this document above is otherwise still
+accurate as written.
+
+### The `JWT_SECRET` shared-secret problem is now closed
+
+Every addendum above (v0.1 §10, v0.4, v0.5) named the same tracked gap:
+`crypton-id` signed JWTs with HS256, a symmetric algorithm, so the same
+`JWT_SECRET` that let Agent Lab *verify* a token also let it *mint* one —
+`issue_dev_token` did exactly that, deliberately, for local dev. Per
+DECISIONS.md's invariant 5, a service that only needs to verify identity
+should not also be able to act as a root authority. That is now
+structurally true, not just operationally mitigated:
+
+- `crypton-id` signs with **Ed25519 (EdDSA)** — an asymmetric algorithm.
+  It holds the private key (`JWT_SIGNING_KEY_PEM`); every verifier,
+  Agent Lab included, is handed only the public key
+  (`JWT_PUBLIC_KEY_PEM`). See `services/crypton-id/src/jwt.rs` and
+  DECISIONS.md's "JWT: asymmetric signing replaces the shared HS256
+  secret."
+- `identity.verify_human_identity` now verifies with `pyjwt.decode(...,
+  algorithms=["EdDSA"])` against `JWT_PUBLIC_KEY_PEM` — there is no
+  parameter, env var, or code path anywhere in this module that reads or
+  requires crypton-id's private key.
+- `identity.issue_dev_token` still exists, for the same local-dev reason
+  it always has, but its signature changed: `private_key` is now a
+  **required** argument with no env-var fallback. The CLI's `--dev-user`
+  path (`cli.py`'s `build_human_identity`) calls
+  `identity.generate_dev_keypair()` to mint a fresh, ephemeral Ed25519
+  keypair *per invocation*, signs a dev token with its private half, and
+  verifies it with its public half in the same breath — a self-contained
+  round trip that never touches, derives from, or is interchangeable with
+  crypton-id's real key material. This is what makes the property
+  structural rather than a promise: even if every line of `cli.py` were
+  read by an attacker, there is no key material reachable from this
+  process that would let it forge a token crypton-id's real
+  `JWT_PUBLIC_KEY_PEM` would accept.
+- `tests/test_identity.py` proves this directly:
+  `test_token_signed_by_a_different_private_key_is_rejected` and
+  `test_public_key_cannot_be_used_to_mint_a_token` are the Agent-Lab-side
+  half of the property; `services/crypton-id/src/jwt.rs`'s
+  `public_key_pem_cannot_be_used_as_a_signing_key` and
+  `token_signed_by_a_different_private_key_is_rejected` are the
+  crypton-id-side half.
+
+### The WebAuthn "duplication" was investigated and found not to be one
+
+The Technical SOT (graphify-reconstructed, INFERRED edges only) flagged a
+`semantically_similar_to` connection between crypton-sdk's WebAuthn-backed
+`Actions` module and this lab's `Approval` step-up. Read from source, not
+from the graph: these are not two implementations of the same thing.
+
+- `services/crypton-id/src/routes/actions.rs` (`/actions/challenge`,
+  `/actions/execute`) is the one and only real, production WebAuthn
+  verification path for step-up in this repo — it shares the exact same
+  `AppState.webauthn` (`webauthn_rs::Webauthn`) instance that
+  `auth_webauthn.rs` uses for login/registration. There is no second
+  `Webauthn` instance anywhere in production code (the `WebauthnBuilder`
+  calls in `devices.rs`/`recovery.rs`/`admin.rs` are inside `#[cfg(test)]`
+  modules, building local test fixtures, not a second production
+  verifier).
+- `webauthn.py` in this lab defines an interface (`WebAuthnVerifier`) and
+  exactly one implementation of it: `FakeWebAuthnVerifier`, a
+  deterministic, Lab-only simulation that never calls a real
+  authenticator or crypton-id's real `/actions/*` endpoints — this was
+  already documented honestly in the v0.5 addendum above and remains
+  true.
+- crypton-id's step-up binds to a caller-supplied, audit-log-friendly
+  `intent` label (any string up to 64 chars); this lab's `Approval` binds
+  to `compute_argument_hash(tool_name, resource, validated_arguments)` — a
+  *stricter*, more specific binding than crypton-id's general-purpose
+  primitive. A real `CryptonIdWebAuthnVerifier` would pass
+  `f"{approval_id}:{argument_hash}"` as that intent string — the shapes
+  are compatible, not identical, and nothing about that integration
+  requires touching crypton-id's step-up code.
+
+**Conclusion: no unification was needed or done.** There is one canonical
+production WebAuthn implementation (crypton-id's), and Agent Lab already
+follows the correct shape for consuming it later — an interface plus a
+clearly-marked fake, the exact pattern `model_provider.ModelProvider`
+already established for LLM vendors. Wiring a real
+`CryptonIdWebAuthnVerifier` remains real, deliberately deferred
+integration work: it needs a way to get a browser-completed WebAuthn
+assertion into this synchronous, headless CLI tool, which is a genuinely
+different problem than "these two things are the same code twice." Not
+solved here — tracked as a bounded follow-up, not a v0.5.1 blocker (see
+`docs/CRYPTON_TECHNICAL_SOT_v1.1.md`).
+
+### Closure (2026-09-02): the crypton-id side is now compiled and tested
+
+The Ed25519 migration described above was written and reasoned through in
+the same pass that produced this addendum, but `services/crypton-id`
+itself could not be compiled in that session (a Windows OpenSSL dev-package
+gap — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §10). That gap is now fixed
+(a pre-existing local vcpkg install with OpenSSL already built; setting
+`VCPKG_ROOT` was sufficient — no code change). `cargo check` and
+`cargo test` both pass clean: 38/38, including every JWT test named above.
+Agent Lab's own suite (185/185) and the 9 enforcement-boundary regression
+tests were re-run against this now-compiled crypton-id and remain
+unaffected — full record in `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §10.
+**v0.5.1 is certified complete as of this closure.**
+
+---
+
+## v0.6 addendum: Provable Multi-Hop Delegation with Scope Attenuation
+
+v0.4 answered "does this agent possess delegated authority?" for exactly
+one hop: a human grants it directly. v0.6 answers the question this whole
+lab exists to eventually prove: can an action performed several hops down
+a delegation chain — `Human -> Agent A -> Agent B -> Agent C` — be traced
+back to a human, with every hop cryptographically attributable and
+authority guaranteed to only ever narrow, never widen, as it passes
+downstream? Full design record and reasoning:
+`../../DECISIONS.md`'s v0.6 section and
+`../../docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 — this addendum is the
+shorter, "how it actually works" companion to those.
+
+```
+HumanIdentity (alice)
+      |
+      | D0: root grant (exactly like v0.4 — no change)
+      v
+   Agent A ---has a signing key (signing_keys.py)---
+      |
+      | D1: grant_chained_delegation() — Agent A signs it,
+      |     narrower than D0, bound to D0 by hash
+      v
+   Agent B ---has a signing key---
+      |
+      | D2: Agent B signs it, narrower than D1, bound to D1 by hash
+      v
+   Agent C ---no signing key needed; never issues anything---
+      |
+      | requests get_customer(cust_1)
+      v
+chain.verify_delegation_chain() — walks D2 -> D1 -> D0, checking every
+hop, before authorization.py's decision is ever trusted as final
+```
+
+### Why `Agent`, not `AgentInstance`, holds the signing key
+
+The one design decision this addendum has to justify from scratch:
+`Delegation` has been `agent_id`-scoped since v0.4, reused across every
+run of that agent — it was never `instance_id`-scoped, because an
+`AgentInstance` is minted fresh every single `AgentRunner.run()` call
+(§7's original identity table). If signing lived on `AgentInstance`
+instead, a chain would need every hop re-signed on every single run,
+turning a standing grant into something re-established per execution —
+exactly the property v0.4 deliberately built Delegation *not* to have.
+Making the durable `Agent` the signing principal keeps one identity
+concept answering "who does this authority belong to" across ownership,
+delegation subject, and now signing key — not two. Concretely:
+`signing_keys.create_signing_key(conn, human, agent_id)` is a new,
+separate call (mirroring how `grant_delegation` has always been separate
+from `register_agent`) — most agents never need one; only an agent that
+will *issue* a child delegation does. Agent C in the diagram above never
+calls it.
+
+### What actually changed in `Delegation`
+
+Nothing was removed or renamed. Seven columns were added (`format_version`,
+`issuer_type`, `issuer_id`, `parent_delegation_id`, `parent_hash`,
+`signing_key_id`, `signature`), applied via idempotent `ALTER TABLE`
+(`db.py`) rather than a rewritten schema — a database that predates v0.6
+gets these columns added the next time `connect()` runs, and every
+existing row reads back as a valid *root* delegation (`Delegation.is_root`
+== `parent_delegation_id is None`). `grant_delegation` — the exact
+function every v0.4/v0.5 caller already used — is unchanged in signature
+and behavior; it now also stamps these new columns with root-shaped
+defaults (`issuer_type="human"`, `issuer_id=principal.user_id`, no
+parent, no signature). A brand-new function, `grant_chained_delegation`,
+issues the *non-root* case: an agent (never a human) delegating a
+narrowed subset of authority it itself holds.
+
+### The canonical-bytes problem, and why it matters here specifically
+
+A signature can only cover bytes, not a live Python object — the same
+problem `approval.compute_argument_hash` already solved for tool-call
+arguments (sorted keys, no whitespace, deterministic) is solved the same
+way here for an entire delegation's security-relevant fields
+(`delegation.canonical_delegation_bytes`). One deliberate choice worth
+naming: `status`/`revoked_at` are **not** part of what's signed. A
+delegation's signature attests to the terms it was issued with — tools,
+resources, expiry, parent — which must never legitimately change after
+the fact; whether it's *currently usable* is a different, time-varying
+question, checked live on every verification, the same way
+`Delegation.expires_at`/`.status` have been checked live (never cached)
+since v0.4, and the same way crypton-id's own JWTs don't encode "is this
+session still valid" — the Redis denylist answers that live, every time.
+
+### The attenuation engine, and what "safe default deny" means for it
+
+`chain.verify_attenuation(parent, child)` is called from exactly two
+places — issuance time (`grant_chained_delegation`, so an obviously
+invalid child is rejected immediately) and verification time (`chain.py`,
+which never assumes issuance-time validation actually happened) — never
+duplicated a third time anywhere. Three dimensions, all "child must be a
+subset of parent, never narrower rejected, never broader allowed":
+`allowed_tools` (frozenset subset), `resource_constraints` (subset per
+resource_type — a type the parent never scoped at all is *not* read as
+"unconstrained," it denies, mirroring the exact rule `authorization.py`'s
+own resource-scope check has used since v0.4), `expires_at` (`child <=
+parent`). No prefix/wildcard resource matching was built — the existing
+model has always been exact id sets (`{"customer_ids": {"cust_1"}}`), and
+subset-of-exact-sets is the only interpretation of "narrower" that can't
+be tricked by a string that merely *looks* like a narrowing (`"cust_1"`
+is not a prefix-match narrowing of `"cust_123"` — it's simply absent from
+that set, full stop).
+
+### The chain verifier, and the four-layer defense on `expires_at` this design turned out to have
+
+`chain.verify_delegation_chain` is the one authoritative entry point —
+it does not trust a caller-supplied chain, does not duplicate
+`authorization.authorize_tool_call`'s leaf-level checks (it calls that
+function directly, exactly as `agent.py` already did before v0.6), and
+walks upward through however many `parent_delegation_id` links exist,
+checking at each hop: signature (against the delegation's own registered,
+non-revoked signing key), issuer/subject continuity (`current.issuer_id
+== parent.agent_id` — an agent cannot mint a child off a delegation whose
+*subject* is a different agent, even knowing that delegation's ID),
+parent-hash match (`current.parent_hash == delegation_digest(parent)`,
+recomputed live — this is what makes swapping a `parent_delegation_id` to
+point at a different, otherwise-valid delegation fail: that field is
+itself part of the signed envelope, so re-pointing it without re-signing
+breaks the signature check first), and attenuation. A root-only
+delegation has nothing to walk — this is the whole reason a v0.5-shaped
+`Delegation` behaves identically before and after v0.6, proven directly
+by `tests/test_delegation_chain.py::test_root_only_delegation_verifies_identically_to_v05`.
+
+One property worth calling out because it wasn't designed in on purpose —
+it fell out of the design and the test suite caught it while proving
+ancestor-expiry: **`expires_at` ended up defended by four independent
+layers at once.** It's part of the signed envelope (tamper it, the
+signature breaks). It's part of what a child's `parent_hash` binds to
+(tamper an *ancestor's* copy after a child already captured its hash, the
+hash breaks). It's part of attenuation's ordering rule (shorten an
+ancestor's expiry out of step with children already narrower than it, and
+the ordering itself is violated). And only *then*, live against the
+clock. Writing the test for "an ancestor is expired but its descendant
+still looks locally valid" surfaced that this state is unreachable in an
+honestly-issued chain at all — attenuation's `child.expires_at <=
+parent.expires_at` rule guarantees the *leaf* always expires first, never
+an ancestor while a descendant remains valid. The live clock check exists
+as defense-in-depth for exactly the scenario where the first three layers
+have somehow already been defeated — the test suite proves it that way
+explicitly, not by accident.
+
+### Integration: one authorization system, not two running side by side
+
+`agent.py`'s boundary 2 changed from calling
+`authorization.authorize_tool_call` directly to calling
+`chain.verify_delegation_chain` — but that function's first action is
+calling `authorization.authorize_tool_call` itself, by the same
+module-attribute reference agent.py always used. This is not a second
+gate bolted beside the first; v0.6 strictly extends what "authorization"
+already meant. Approval (v0.5) is completely untouched, still strictly
+after this step, still only for tools that require it — a fully valid
+3-hop chain can still need a human's exact-argument-bound confirmation on
+top; a valid approval sitting in the database can never rescue a chain
+that fails at any hop, because the code path that would consult it is
+never reached otherwise
+(`tests/test_delegation_chain.py::test_valid_approval_cannot_rescue_an_invalid_chain`).
+
+One honest, deliberate behavior change: an *unexpected internal error*
+during authorization now becomes a persisted `CHAIN_VERIFICATION_ERROR`
+DENY instead of an uncaught crash out of `AgentRunner.run()`. The tool is
+equally unreachable either way — only the shape of the failure changed,
+and the new shape (graceful, evidenced DENY) is what this milestone's own
+fail-closed requirement actually asks for.
+
+### RAT-6, proven
+
+`tests/test_delegation_chain.py`'s `three_hop_chain` fixture builds
+exactly the scenario above with real tools (`get_customer`/`get_order`/
+`add_case_note` — not invented `customer.read`-style names) and real
+Ed25519 signatures. Agent C requesting `get_customer(cust_1)`: **ALLOW**,
+depth 3, full `Human -> A -> B -> C` authority path — proven both at the
+verifier level and by driving the real `AgentRunner.run()` loop with a
+call-count spy proving the tool executed exactly once. Every attack case
+the milestone asked for is a separate, passing test: permission
+amplification, an undelegated tool, resource escape, ancestor revocation,
+ancestor expiry, a tampered child, parent substitution, an unauthorized
+issuer (rejected both at issuance and, defensively, again at
+verification against a forged row), a retroactively revoked signing key,
+a cycle, and depth overflow — all denied, all with zero tool execution.
+Reproducible live, outside pytest, via the CLI:
+
+```bash
+python -m agentlab.cli --chain-verify <D2> --requested-tool get_customer \
+    --requested-resource-type customer_ids --requested-resource-id cust_1 --dev-user user-alice
+```
+
+prints the same ROOT PRINCIPAL / ACTING PRINCIPAL / DELEGATION DEPTH /
+AUTHORITY PATH / DECISION report the milestone's spec asked for, calling
+the real verifier — the CLI formats a `ChainVerificationResult`, it does
+not reimplement any check.
+
+### Where v0.6 is honest about what it didn't build
+
+- **The human root isn't cryptographically signed.** `HumanIdentity`
+  doesn't hold an Ed25519 keypair in this milestone — a root delegation is
+  attributed by the same "an authenticated JWT-verified human made this
+  call" mechanism every write in this lab has always used, not a new,
+  second signing identity invented for humans. crypton-id's real WebAuthn
+  already proves human presence for that JWT; duplicating it here would
+  add nothing RAT-6 needs.
+- **Agent-key custody is prototype-grade, deliberately.** Private keys
+  are generated in-process and handed back once; there is no KMS/HSM, no
+  hardware attestation, no certificate infrastructure. Real Ed25519, not
+  fake — just not production custody.
+- **`CryptonIdWebAuthnVerifier` still doesn't exist** (unchanged from
+  v0.5/v0.5.1) — Approval's ceremony remains simulated. Orthogonal to the
+  delegation-chain proof above, which doesn't depend on it.
+- **`crypton-gateway` still does not enforce anything agent-related.**
+  The RAT-6 proof lives entirely inside Agent Lab — deliberately; the
+  research question was chain correctness, not deployment topology.
+- **No key rotation-with-overlap, no JWKS-style discovery.**
+  Create/resolve/revoke only, same as `DelegationStatus`'s shape.
+
+None of the above are solved by RAT-6's proof, and this addendum does not
+claim they are — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11.17 for the
+same list recorded as the source of truth.

@@ -41,7 +41,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from . import agents, approval as approval_module, authorization, instances, sessions, tasks
+from . import agents, approval as approval_module, authorization, chain as chain_module, instances, sessions, tasks
 from .agents import AgentAccessError, AgentNotActiveError
 from .identity import AgentIdentity, AgentInstance, HumanIdentity
 from .lifecycle import TaskStatus
@@ -395,22 +395,28 @@ class AgentRunner:
             tracer.record("tool_rejected", step=step, tool=call.name, reason="unknown_tool")
             return {"error": "unknown_tool", "tool": call.name}, True
 
-        # Boundary 2 — authorization (v0.4): the full deterministic
-        # pre-execution pipeline in authorization.py — agent identity,
-        # instance/principal match, delegation existence/ownership/
-        # agent-match/task-match/expiry/revocation, tool allowlist,
-        # resource scope. Every one of those checks is against the
-        # canonical `identity.agent_id` and the real, persisted
-        # Delegation row — never `identity.name` (that was the v0.3 bug:
-        # two agents sharing a name could inherit each other's authority
-        # through a name-keyed permission map). The model has no say in
-        # any of this; it is a deterministic function of already-verified
-        # server-side state. Every attempt — allowed or not — is
-        # persisted as an AuthorizationDecision before this function
-        # returns, so a denial always leaves evidence even though it
-        # leaves no other side effect.
+        # Boundary 2 — authorization (v0.4, strengthened to full
+        # delegation-chain verification in v0.6): chain.verify_delegation_chain
+        # calls authorization.authorize_tool_call as its first, mandatory
+        # step (agent identity, instance/principal match, delegation
+        # existence/ownership/agent-match/task-match/expiry/revocation,
+        # tool allowlist, resource scope — completely unchanged from v0.4),
+        # then, only if the leaf delegation has a parent, walks every
+        # ancestor: signature validity, signing-key liveness, parent-hash
+        # continuity, issuer/subject continuity, and scope attenuation at
+        # each hop, up to and including the root. A root-only (single-hop)
+        # delegation has no ancestors to walk, so this is exactly v0.4's
+        # behavior for every pre-v0.6 delegation — see chain.py's module
+        # docstring and DECISIONS.md's v0.6 section. Every one of these
+        # checks is against the canonical `identity.agent_id` and real,
+        # persisted rows — never `identity.name`, never a caller-supplied
+        # chain. The model has no say in any of this. Every attempt —
+        # allowed or not, at any hop — is persisted as an
+        # AuthorizationDecision before this function returns, so a denial
+        # always leaves evidence even though it leaves no other side
+        # effect.
         resource_type, resource_id = authorization.resource_for_tool_call(call.name, call.arguments)
-        decision = authorization.authorize_tool_call(
+        chain_result = chain_module.verify_delegation_chain(
             self.db_conn,
             principal=human,
             agent_id=identity.agent_id,
@@ -421,6 +427,20 @@ class AgentRunner:
             resource_type=resource_type,
             resource_id=resource_id,
         )
+        tracer.record(
+            "chain_verified",
+            step=step,
+            tool=call.name,
+            allowed=chain_result.allowed,
+            root_principal=chain_result.root_principal,
+            acting_principal=chain_result.acting_principal,
+            delegation_depth=chain_result.delegation_depth,
+            authority_path=[f"{kind}:{pid}" for kind, pid in chain_result.authority_path],
+            chain_hash=chain_result.chain_hash,
+            failed_hop=chain_result.failed_hop,
+            denial_reason=chain_result.denial_reason,
+        )
+        decision = chain_result.decision
         if not decision.allowed:
             tracer.record(
                 "tool_rejected",
