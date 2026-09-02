@@ -37,7 +37,10 @@ jobs:
       # uses REDIS_URL directly. Values below are CI-only, never real secrets.
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/crypton
       REDIS_URL: redis://127.0.0.1:6379
-      JWT_SECRET: ci-only-secret-never-used-outside-this-workflow
+      # Asymmetric (Ed25519/EdDSA) since v0.5.1 — see DECISIONS.md. Generated
+      # fresh below into CI-only files; never used outside this workflow.
+      JWT_SIGNING_KEY_PEM_FILE: /tmp/jwt_signing_key.ci.pem
+      JWT_PUBLIC_KEY_PEM_FILE: /tmp/jwt_public_key.ci.pem
       WEBAUTHN_RP_ID: localhost
       WEBAUTHN_ORIGIN: http://localhost:8080
       WEBAUTHN_RP_NAME: Crypton CI
@@ -53,6 +56,11 @@ jobs:
           workspaces: |
             services/crypton-id
             services/crypton-gateway
+
+      - name: Generate CI-only JWT keypair
+        run: |
+          openssl genpkey -algorithm ed25519 -out "$JWT_SIGNING_KEY_PEM_FILE"
+          openssl pkey -in "$JWT_SIGNING_KEY_PEM_FILE" -pubout -out "$JWT_PUBLIC_KEY_PEM_FILE"
 
       - name: crypton-id — fmt check
         working-directory: services/crypton-id

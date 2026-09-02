@@ -7,7 +7,7 @@ use webauthn_rs::prelude::*;
 use crate::{
     audit,
     error::{ApiResponse, AppError, AppJson},
-    jwt::{Claims, issue_jwt, verify_device_active},
+    jwt::{issue_jwt, verify_device_active},
     redis::challenges::{challenge_key, login_key, recovery_enrollment_key},
     state::{AppState, AuthChallenge, CHALLENGE_TTL_SECS, RegChallenge},
 };
@@ -201,13 +201,7 @@ async fn authenticated_user_id_from_headers(
         return Ok(None);
     };
 
-    let claims = jsonwebtoken::decode::<Claims>(
-        token,
-        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    )
-    .ok()
-    .map(|d| d.claims);
+    let claims = crate::jwt::verify_token(state, token).ok();
 
     let Some(claims) = claims else {
         return Ok(None);
@@ -402,7 +396,12 @@ async fn register_finish(
             .map_err(|e| AppError::internal(e.to_string()))?;
 
     // Issue JWT for auto-login
-    let token = issue_jwt(user_id, &challenge.username, cred_uuid, &state.jwt_secret)?;
+    let token = issue_jwt(
+        user_id,
+        &challenge.username,
+        cred_uuid,
+        &state.jwt_encoding_key,
+    )?;
 
     // Audit
     audit::log_event(
@@ -651,7 +650,7 @@ async fn login_finish(
         challenge.user_id,
         &challenge.username,
         cred_uuid,
-        &state.jwt_secret,
+        &state.jwt_encoding_key,
     )?;
 
     // Audit
@@ -695,13 +694,7 @@ async fn logout(
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::unauthorized("missing_token"))?;
 
-    let claims = jsonwebtoken::decode::<crate::jwt::Claims>(
-        auth_header,
-        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    )
-    .map_err(|e| AppError::unauthorized(format!("invalid_token: {e}")))?
-    .claims;
+    let claims = crate::jwt::verify_token(&state, auth_header)?;
 
     // Denylist the token in Redis
     let mut conn = state

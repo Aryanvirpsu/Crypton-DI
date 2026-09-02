@@ -246,13 +246,30 @@ $devEnvPath = Join-Path $Root "dev.env"
 if (-not (Test-Path $devEnvPath)) {
     $examplePath = Join-Path $Root "dev.env.example"
     if (-not (Test-Path $examplePath)) { FAIL "Neither dev.env nor dev.env.example found at $Root" }
-    WARN "dev.env not found - bootstrapping one from dev.env.example with a fresh random JWT_SECRET"
-    $secretBytes = 1..32 | ForEach-Object { Get-Random -Maximum 256 }
-    $secretHex   = ($secretBytes | ForEach-Object { '{0:x2}' -f $_ }) -join ''
-    (Get-Content $examplePath -Raw) -replace '<your-64-char-hex-secret>', $secretHex |
-        Set-Content -Path $devEnvPath -Encoding UTF8
-    OK "Generated dev.env with a local-only random JWT_SECRET (never commit this file - it's gitignored)"
+    WARN "dev.env not found - bootstrapping one from dev.env.example"
+    Copy-Item $examplePath $devEnvPath
+    OK "Generated dev.env (never commit this file - it's gitignored)"
 }
+
+# JWT — asymmetric (Ed25519/EdDSA) since v0.5.1, see DECISIONS.md. Not
+# stored in dev.env (multi-line PEM doesn't fit its single-line format) —
+# generate a local dev keypair on first run and point crypton-id at it via
+# the *_FILE env-var convention (config.rs's read_pem_env).
+$jwtSigningKeyPath = Join-Path $Root "jwt_signing_key.local.pem"
+$jwtPublicKeyPath  = Join-Path $Root "jwt_public_key.local.pem"
+if (-not (Test-Path $jwtSigningKeyPath)) {
+    $opensslCmd = Get-Command openssl -ErrorAction SilentlyContinue
+    if (-not $opensslCmd) {
+        FAIL "openssl not found on PATH - required to generate the local dev JWT keypair (jwt_signing_key.local.pem / jwt_public_key.local.pem). Install it, or generate the pair manually and re-run."
+    }
+    WARN "No local dev JWT keypair found - generating a fresh Ed25519 pair"
+    & openssl genpkey -algorithm ed25519 -out $jwtSigningKeyPath | Out-Null
+    & openssl pkey -in $jwtSigningKeyPath -pubout -out $jwtPublicKeyPath | Out-Null
+    OK "Generated jwt_signing_key.local.pem / jwt_public_key.local.pem (never commit these - *.pem is gitignored)"
+}
+[System.Environment]::SetEnvironmentVariable('JWT_SIGNING_KEY_PEM_FILE', $jwtSigningKeyPath, 'Process')
+[System.Environment]::SetEnvironmentVariable('JWT_PUBLIC_KEY_PEM_FILE', $jwtPublicKeyPath, 'Process')
+
 $loadedVars = @()
 Get-Content $devEnvPath | ForEach-Object {
     $line = $_.Trim()

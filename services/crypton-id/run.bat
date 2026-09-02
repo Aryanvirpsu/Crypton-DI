@@ -6,12 +6,22 @@ REM run - nothing secret is ever committed. Everything else has a plain-text
 REM dev default here since none of it is sensitive.
 cd /d "%~dp0"
 
-if not exist ".env.local" (
-    echo [crypton-id] No .env.local found - generating a local-only dev JWT secret.
-    powershell -NoProfile -Command "$b=(1..32|ForEach-Object{Get-Random -Maximum 256}); 'JWT_SECRET=' + (($b | ForEach-Object { '{0:x2}' -f $_ }) -join '')" > .env.local
+if not exist "jwt_signing_key.local.pem" (
+    echo [crypton-id] No local dev JWT keypair found - generating a fresh Ed25519 pair.
+    where openssl >nul 2>nul
+    if errorlevel 1 (
+        echo [crypton-id] openssl not found on PATH - install it, or set JWT_SIGNING_KEY_PEM_FILE / JWT_PUBLIC_KEY_PEM_FILE manually.
+    ) else (
+        openssl genpkey -algorithm ed25519 -out jwt_signing_key.local.pem
+        openssl pkey -in jwt_signing_key.local.pem -pubout -out jwt_public_key.local.pem
+    )
 )
+if not defined JWT_SIGNING_KEY_PEM_FILE set JWT_SIGNING_KEY_PEM_FILE=%~dp0jwt_signing_key.local.pem
+if not defined JWT_PUBLIC_KEY_PEM_FILE set JWT_PUBLIC_KEY_PEM_FILE=%~dp0jwt_public_key.local.pem
 
-for /f "usebackq tokens=1,2 delims==" %%A in (".env.local") do set "%%A=%%B"
+if exist ".env.local" (
+    for /f "usebackq tokens=1,2 delims==" %%A in (".env.local") do set "%%A=%%B"
+)
 
 if not defined APP_PORT set APP_PORT=8080
 if not defined DATABASE_URL set DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/crypton

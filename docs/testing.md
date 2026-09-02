@@ -46,9 +46,34 @@ cd services/crypton-console && npm test -- --watchAll=false
 CI (`.github/workflows/ci.yml`) runs all of the above against real
 Postgres/Redis service containers on every push/PR.
 
-**Caveat on this being verified:** the Rust tests above were written and
-statically reviewed but could not be run in the environment this cleanup
-was done in (no local Rust toolchain was available). They're expected to
-compile and pass against the schema in `migrations/`, but the first real
-`cargo test` run against them is the actual proof — treat that run, not
-this document, as the source of truth.
+Also needed for `services/crypton-id`'s Rust tests (unrelated to
+Postgres/Redis): each `cargo test` run generates a fresh Ed25519 keypair
+into `JWT_SIGNING_KEY_PEM_FILE`/`JWT_PUBLIC_KEY_PEM_FILE` — `start.sh`/
+`run.bat` do this automatically for local dev; CI does it explicitly as a
+workflow step. See `services/crypton-id/.env.example` for the exact env
+vars if running `cargo test` directly without either script.
+
+### Windows note: `openssl-sys` needs an OpenSSL *development* install
+
+`services/crypton-id` depends on `webauthn-rs`, which depends on the
+`openssl` crate (for WebAuthn attestation-certificate verification) — a
+genuine, load-bearing dependency, not something to remove. On Windows,
+Git for Windows' bundled `openssl.exe` is a **runtime binary only**: no
+headers, no `.lib` import libraries, so `openssl-sys`'s build script can't
+find anything to link against and `cargo check`/`cargo test` fail with
+*"Could not find directory of OpenSSL installation."* `cargo fmt --check`
+is unaffected (it doesn't run `build.rs`).
+
+Fix: install [vcpkg](https://github.com/microsoft/vcpkg) if you don't
+already have it, then:
+
+```sh
+vcpkg install openssl:x64-windows-static-md
+```
+
+and set `VCPKG_ROOT` to your vcpkg clone directory in your shell profile
+(not committed anywhere — it's a per-machine env var like `JAVA_HOME`).
+`openssl-sys` auto-detects vcpkg via `VCPKG_ROOT` with no further
+configuration. Linux/macOS CI and most Linux dev machines resolve
+`openssl-sys` against the system package manager's OpenSSL automatically
+and don't need any of this.

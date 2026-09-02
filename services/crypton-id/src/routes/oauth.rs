@@ -129,14 +129,10 @@ pub async fn oauth_complete(
     AppJson(body): AppJson<CompleteBody>,
 ) -> Response {
     // Verify JWT signature + expiry
-    let claims = match jsonwebtoken::decode::<crate::jwt::Claims>(
-        &body.token,
-        &jsonwebtoken::DecodingKey::from_secret(st.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    ) {
-        Ok(d) => d.claims,
+    let claims = match crate::jwt::verify_token(&st, &body.token) {
+        Ok(c) => c,
         Err(e) => {
-            tracing::warn!("oauth/complete: invalid JWT: {}", e);
+            tracing::warn!("oauth/complete: invalid JWT: {:?}", e);
             return (StatusCode::UNAUTHORIZED, "invalid_token").into_response();
         }
     };

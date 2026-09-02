@@ -4,11 +4,14 @@ Identity boundary for Agent Lab.
 Reuses Crypton's existing identity foundation instead of inventing a new
 one:
 
-  - Human identity            — the same JWT crypton-id issues (HS256,
-    secret from JWT_SECRET, claims: sub, username, cred_id, iat, exp).
-    See services/crypton-id/src/jwt.rs for the source of truth this
-    mirrors. Verification here is local (same trust boundary crypton-id's
-    own `AuthUser` extractor uses), not a network call to crypton-id.
+  - Human identity            — the same JWT crypton-id issues. Since
+    v0.5.1, asymmetric (Ed25519/EdDSA) — see
+    services/crypton-id/src/jwt.rs and DECISIONS.md's "JWT: asymmetric
+    signing replaces the shared HS256 secret." Verification here is local
+    (same trust boundary crypton-id's own `AuthUser` extractor uses), not
+    a network call to crypton-id, and needs only crypton-id's PUBLIC key
+    (`JWT_PUBLIC_KEY_PEM`) — this module has no code path that reads or
+    requires crypton-id's private signing key.
   - Agent application identity — which *registered* agent app is running
     (e.g. "support-agent"). Fixed at deploy time, analogous to an OAuth
     client_id — not something that changes per request.
@@ -30,6 +33,15 @@ import uuid
 from dataclasses import dataclass
 
 import jwt as pyjwt
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    PublicFormat,
+)
+
+JWT_ALGORITHM = "EdDSA"
 
 
 class IdentityError(Exception):
@@ -103,21 +115,24 @@ class AgentInstance:
         return cls(instance_id=str(uuid.uuid4()), started_at=time.time())
 
 
-def verify_human_identity(token: str, *, secret: str | None = None) -> HumanIdentity:
+def verify_human_identity(token: str, *, public_key: str | None = None) -> HumanIdentity:
     """Verify a crypton-id JWT and extract the human identity.
 
-    Same algorithm, claims, and secret crypton-id itself uses
-    (services/crypton-id/src/jwt.rs: HS256, JWT_SECRET, claims
-    {sub, username, cred_id, iat, exp}). A tampered or expired token, or
-    one signed with a different secret, raises IdentityError — the agent
-    never runs without a verified human behind it.
+    Same claims crypton-id itself issues (services/crypton-id/src/jwt.rs:
+    {sub, username, cred_id, iat, exp}), signed with Ed25519 (EdDSA) since
+    v0.5.1. Verification needs only crypton-id's PUBLIC key
+    (`public_key`, defaulting to the `JWT_PUBLIC_KEY_PEM` env var) — this
+    function has no parameter, code path, or env var that could supply a
+    private key. A tampered or expired token, or one signed with any key
+    other than crypton-id's real signing key, raises IdentityError — the
+    agent never runs without a verified human behind it.
     """
-    secret = secret or os.environ.get("JWT_SECRET")
-    if not secret:
-        raise IdentityError("JWT_SECRET is not configured")
+    public_key = public_key or os.environ.get("JWT_PUBLIC_KEY_PEM")
+    if not public_key:
+        raise IdentityError("JWT_PUBLIC_KEY_PEM is not configured")
 
     try:
-        claims = pyjwt.decode(token, secret, algorithms=["HS256"])
+        claims = pyjwt.decode(token, public_key, algorithms=[JWT_ALGORITHM])
     except pyjwt.PyJWTError as e:
         raise IdentityError(f"invalid_token: {e}") from e
 
@@ -132,24 +147,51 @@ def verify_human_identity(token: str, *, secret: str | None = None) -> HumanIden
     )
 
 
+def generate_dev_keypair() -> tuple[str, str]:
+    """Generate a fresh, ephemeral Ed25519 keypair (PEM-encoded) for local
+    dev/test token minting only.
+
+    Returns `(private_key_pem, public_key_pem)`. Never derived from, equal
+    to, read from an env var, or in any way interchangeable with
+    crypton-id's real signing key — this is what makes `issue_dev_token`
+    safe to keep in this module: it can only ever mint a token that
+    verifies against a throwaway public key generated in the same
+    breath, never against crypton-id's real `JWT_PUBLIC_KEY_PEM`."""
+    private_key = Ed25519PrivateKey.generate()
+    private_pem = private_key.private_bytes(
+        encoding=Encoding.PEM,
+        format=PrivateFormat.PKCS8,
+        encryption_algorithm=NoEncryption(),
+    ).decode("utf-8")
+    public_pem = private_key.public_key().public_bytes(
+        encoding=Encoding.PEM,
+        format=PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+    return private_pem, public_pem
+
+
 def issue_dev_token(
     user_id: str,
     username: str,
     cred_id: str,
     *,
-    secret: str | None = None,
+    private_key: str,
     ttl_seconds: int = 3600,
 ) -> str:
-    """Local-dev helper: mints a token in the exact shape crypton-id
+    """Local-dev helper: mints a token in the exact claim shape crypton-id
     issues, so `verify_human_identity` runs the identical code path
     whether the token came from a real login or this shortcut.
 
-    NOT a second auth system — just a way to exercise the lab without a
-    live crypton-id + WebAuthn ceremony. Never used against production.
-    """
-    secret = secret or os.environ.get("JWT_SECRET")
-    if not secret:
-        raise IdentityError("JWT_SECRET is not configured")
+    `private_key` is REQUIRED and has no env-var fallback, deliberately:
+    unlike the pre-v0.5.1 version of this function, Agent Lab must never
+    be able to mint a token by reading a shared secret out of its own
+    environment. Callers (the CLI's `--dev-user` path) are expected to
+    pass a key from `generate_dev_keypair()` — a fresh, ephemeral,
+    lab-only keypair, never crypton-id's real signing key. This is NOT a
+    second auth system — just a way to exercise the lab without a live
+    crypton-id + WebAuthn ceremony. Never used against production, and
+    structurally incapable of forging a token crypton-id's real public
+    key would accept."""
     now = int(time.time())
     claims = {
         "sub": user_id,
@@ -158,4 +200,4 @@ def issue_dev_token(
         "iat": now,
         "exp": now + ttl_seconds,
     }
-    return pyjwt.encode(claims, secret, algorithm="HS256")
+    return pyjwt.encode(claims, private_key, algorithm=JWT_ALGORITHM)

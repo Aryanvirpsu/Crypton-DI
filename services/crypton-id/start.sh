@@ -9,10 +9,17 @@ cd "$(dirname "$0")"
 
 ENV_LOCAL=".env.local"
 if [ ! -f "$ENV_LOCAL" ]; then
-    echo "[crypton-id] No $ENV_LOCAL found — generating a local-only dev JWT secret."
-    SECRET=$(openssl rand -hex 32 2>/dev/null || head -c32 /dev/urandom | xxd -p -c256)
-    echo "JWT_SECRET=$SECRET" > "$ENV_LOCAL"
+    touch "$ENV_LOCAL"
 fi
+
+if [ ! -f "jwt_signing_key.local.pem" ]; then
+    echo "[crypton-id] No local dev JWT keypair found — generating a fresh Ed25519 pair."
+    openssl genpkey -algorithm ed25519 -out jwt_signing_key.local.pem
+    openssl pkey -in jwt_signing_key.local.pem -pubout -out jwt_public_key.local.pem
+fi
+export JWT_SIGNING_KEY_PEM_FILE=${JWT_SIGNING_KEY_PEM_FILE:-"$(pwd)/jwt_signing_key.local.pem"}
+export JWT_PUBLIC_KEY_PEM_FILE=${JWT_PUBLIC_KEY_PEM_FILE:-"$(pwd)/jwt_public_key.local.pem"}
+
 set -a
 source "$ENV_LOCAL"
 set +a

@@ -20,9 +20,9 @@ two events recorded before the task exists (session_created /
 session_resumed) legitimately carry `task_id: null`; every event from
 `task_created` onward carries a real one.
 
-Never logs: JWTs, JWT_SECRET, API keys, or raw Authorization headers —
-only the identity fields already meant to be visible and tool call/
-result payloads.
+Never logs: JWTs, JWT signing/public key material, API keys, or raw
+Authorization headers — only the identity fields already meant to be
+visible and tool call/result payloads.
 """
 
 from __future__ import annotations

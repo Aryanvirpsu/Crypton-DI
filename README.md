@@ -29,9 +29,9 @@ docs/              Architecture, recovery flow, testing notes
 - **WebAuthn passkey registration + login**, real cryptographic
   verification via `webauthn-rs`, credentials persisted to Postgres
   (`crypton-id/src/routes/auth_webauthn.rs`)
-- **JWT issuance/verification** (HS256, 1h expiry) with a Redis-backed
-  logout denylist and live device-active check on every request
-  (`crypton-id/src/jwt.rs`)
+- **JWT issuance/verification** (Ed25519/EdDSA — asymmetric since v0.5.1,
+  see `DECISIONS.md`; 1h expiry) with a Redis-backed logout denylist and
+  live device-active check on every request (`crypton-id/src/jwt.rs`)
 - **Device management** — list / revoke / mark-lost, all real Postgres
   state (`crypton-id/src/routes/devices.rs`)
 - **Audit log** — write and (admin-gated) read, real Postgres
@@ -109,7 +109,9 @@ against real service containers on every push/PR.
 
 ## Secrets
 
-Never commit a real `JWT_SECRET`. Local dev: `services/crypton-id/start.sh`
-and `run.bat` generate a random one into a gitignored `.env.local` on first
-run. `start-all.ps1` does the same for the root `dev.env`. Copy
+Never commit a real JWT signing key. JWTs are asymmetric (Ed25519/EdDSA)
+since v0.5.1 — see `DECISIONS.md`. Local dev: `services/crypton-id/start.sh`
+and `run.bat` generate a fresh Ed25519 keypair into gitignored
+`jwt_signing_key.local.pem` / `jwt_public_key.local.pem` files on first
+run. `start-all.ps1` does the same for the root dev workflow. Copy
 `*.env.example` files for every other value.

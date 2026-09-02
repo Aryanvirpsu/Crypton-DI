@@ -648,7 +648,14 @@ mod tests {
             db: Some(pool),
             redis: None,
             webauthn,
-            jwt_secret: "test-secret".into(),
+            jwt_encoding_key: jsonwebtoken::EncodingKey::from_ed_pem(
+                crate::jwt::test_keys::SIGNING_KEY_PEM.as_bytes(),
+            )
+            .unwrap(),
+            jwt_decoding_key: jsonwebtoken::DecodingKey::from_ed_pem(
+                crate::jwt::test_keys::PUBLIC_KEY_PEM.as_bytes(),
+            )
+            .unwrap(),
             cors_origin: "http://localhost:3001".into(),
         }
     }
