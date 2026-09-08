@@ -124,8 +124,9 @@ needed for, with the denial persisted as an `AuthorizationDecision`
 # .venv/bin/python -m pytest -q       # macOS/Linux
 ```
 
-263 tests, all deterministic (no network calls — see
-`agentlab.model_provider.FakeModelProvider`).
+All tests are deterministic (no network calls — see
+`agentlab.model_provider.FakeModelProvider`). Verified passing in full as
+of this cleanup (2026-09-08).
 
 ## v0.6: verify a multi-hop delegation chain
 
