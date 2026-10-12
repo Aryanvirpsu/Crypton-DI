@@ -1,0 +1,166 @@
+warning: fields `cred_id` and `role` are never read
+   --> src\jwt.rs:120:9
+    |
+117 | pub struct AdminUser {
+    |            --------- fields in this struct
+...
+120 |     pub cred_id: Uuid,
+    |         ^^^^^^^
+121 |     pub role: String,
+    |         ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `crypton-identity` (bin "crypton-identity" test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.15s
+warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src\main.rs (target\debug\deps\crypton_identity-598d6633a7992338.exe)
+
+running 38 tests
+test routes::admin::tests::map_login_success ... ok
+test routes::admin::tests::map_login_failure ... ok
+test jwt::tests::public_key_pem_cannot_be_used_as_a_signing_key ... ok
+test routes::admin::tests::map_register ... ok
+test routes::admin::tests::map_unknown_action ... ok
+test routes::admin::tests::map_recovery_started ... ok
+test redis::sessions::tests::deny_token_makes_is_denied_true_until_it_would_have_expired ... ok
+test jwt::tests::issue_jwt_roundtrips_claims ... ok
+test jwt::tests::tampered_claims_are_rejected ... ok
+test jwt::tests::token_signed_by_a_different_private_key_is_rejected ... ok
+test routes::admin::tests::relative_time_hours ... ok
+test routes::admin::tests::relative_time_minutes ... ok
+test routes::admin::tests::relative_time_days ... ok
+test routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists ... FAILED
+test jwt::tests::decode_rejects_expired_token ... ok
+test routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment ... FAILED
+test routes::admin::tests::patch_user_role_updates_the_role ... FAILED
+test routes::admin::tests::relative_time_seconds ... ok
+test routes::admin::tests::list_users_returns_real_rows_from_the_database ... FAILED
+test jwt::tests::decode_accepts_token_at_the_expiry_boundary ... ok
+test routes::admin::tests::patch_user_role_rejects_invalid_role_strings ... FAILED
+test routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin ... FAILED
+test jwt::tests::decode_fails_with_wrong_public_key ... ok
+test routes::admin::tests::security_score_clamps_at_zero ... ok
+test routes::admin::tests::security_score_combined ... ok
+test routes::admin::tests::security_score_failures_only ... ok
+test routes::admin::tests::security_score_one_lost_device ... ok
+test routes::admin::tests::security_score_perfect ... ok
+test routes::devices::tests::list_devices_returns_only_the_caller_own_devices ... FAILED
+test routes::devices::tests::mark_lost_succeeds_from_active ... FAILED
+test routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe ... FAILED
+test routes::devices::tests::mark_lost_refuses_when_not_currently_active ... FAILED
+test routes::recovery::tests::complete_recovery_refuses_when_not_approved ... FAILED
+test routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id ... FAILED
+test routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call ... FAILED
+test routes::recovery::tests::public_start_recovery_rejects_unknown_username ... FAILED
+test routes::recovery::tests::full_authenticated_recovery_state_machine ... FAILED
+test routes::recovery::tests::reject_recovery_cancels_a_pending_request ... FAILED
+
+failures:
+
+---- routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists stdout ----
+
+thread 'routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists' (8436) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment stdout ----
+
+thread 'routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment' (42396) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- routes::admin::tests::patch_user_role_updates_the_role stdout ----
+
+thread 'routes::admin::tests::patch_user_role_updates_the_role' (64712) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::list_users_returns_real_rows_from_the_database stdout ----
+
+thread 'routes::admin::tests::list_users_returns_real_rows_from_the_database' (60132) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::patch_user_role_rejects_invalid_role_strings stdout ----
+
+thread 'routes::admin::tests::patch_user_role_rejects_invalid_role_strings' (52576) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin stdout ----
+
+thread 'routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin' (64316) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::list_devices_returns_only_the_caller_own_devices stdout ----
+
+thread 'routes::devices::tests::list_devices_returns_only_the_caller_own_devices' (49404) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::mark_lost_succeeds_from_active stdout ----
+
+thread 'routes::devices::tests::mark_lost_succeeds_from_active' (36072) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe stdout ----
+
+thread 'routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe' (33304) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::mark_lost_refuses_when_not_currently_active stdout ----
+
+thread 'routes::devices::tests::mark_lost_refuses_when_not_currently_active' (36236) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::complete_recovery_refuses_when_not_approved stdout ----
+
+thread 'routes::recovery::tests::complete_recovery_refuses_when_not_approved' (8912) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id stdout ----
+
+thread 'routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id' (2184) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call stdout ----
+
+thread 'routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call' (59704) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_start_recovery_rejects_unknown_username stdout ----
+
+thread 'routes::recovery::tests::public_start_recovery_rejects_unknown_username' (54356) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::full_authenticated_recovery_state_machine stdout ----
+
+thread 'routes::recovery::tests::full_authenticated_recovery_state_machine' (43440) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::reject_recovery_cancels_a_pending_request stdout ----
+
+thread 'routes::recovery::tests::reject_recovery_cancels_a_pending_request' (23048) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+
+failures:
+    routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment
+    routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists
+    routes::admin::tests::list_users_returns_real_rows_from_the_database
+    routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin
+    routes::admin::tests::patch_user_role_rejects_invalid_role_strings
+    routes::admin::tests::patch_user_role_updates_the_role
+    routes::devices::tests::list_devices_returns_only_the_caller_own_devices
+    routes::devices::tests::mark_lost_refuses_when_not_currently_active
+    routes::devices::tests::mark_lost_succeeds_from_active
+    routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe
+    routes::recovery::tests::complete_recovery_refuses_when_not_approved
+    routes::recovery::tests::full_authenticated_recovery_state_machine
+    routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id
+    routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call
+    routes::recovery::tests::public_start_recovery_rejects_unknown_username
+    routes::recovery::tests::reject_recovery_cancels_a_pending_request
+
+test result: FAILED. 22 passed; 16 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--bin crypton-identity`
+error: 1 target failed:
+    `--bin crypton-identity`

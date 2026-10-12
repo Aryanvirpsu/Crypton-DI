@@ -1,0 +1,31 @@
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in C:/Users/aryan vir/Aryan vir/projectsnstuff/Crypton-DI/libs/crypton-sdk/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+PASS src/__tests__/sdk.test.ts
+  @crypton/sdk
+    auth.register / auth.login happy path
+      √ registers with a real WebAuthn create() call and the right request shapes (5 ms)
+      √ sends enrollment_token when re-enrolling on an existing account (1 ms)
+      √ logs in with a real WebAuthn get() call against the right endpoint (1 ms)
+    error mapping
+      √ maps NotAllowedError → webauthn_cancelled (1 ms)
+      √ maps HTTP 401 → session_expired and clears the stored token
+      √ passes through a non-401 backend error code+message unchanged (1 ms)
+    devices
+      √ revokes via POST /devices/:id/revoke (not the removed DELETE /devices/:id)
+    recovery — public flow request shapes
+      √ claimRecovery sends {username, recovery_token}, not {request_id}
+      √ requestRecovery surfaces the one-time recovery_token from the response (1 ms)
+    admin
+      √ updateUserRole PATCHes /admin/users/:id/role with the role in the body
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        2.089 s
+Ran all test suites.
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

@@ -1,0 +1,77 @@
+CRYPTON-DEMO-001 driver (demo/run_demo.py) then EXP-007A runner. Unedited. Regenerated 2026-10-12 at code revision 1b93abe887c9e28f3217cb67e0e707a5a9f618f6
+
+DELEGATION CHAIN (as issued)
+  D0 alice -> A : tools={get_customer,get_order,add_case_note} customers={cust_1,cust_2} T+3h
+  D1 A -> B     : tools={get_customer,get_order}               customers={cust_1,cust_2} T+2h
+  D2 B -> C     : tools={get_customer}                         customers={cust_1}        T+1h
+
+[OK ] C get_customer cust_1 (inside D2)
+      expected: ALLOW
+      observed: ALLOW
+      authority_path: [('human', 'user-alice'), ('agent', 'agt_2708ba028a544476a7417ebef4ef1332'), ('agent', 'agt_f49bf8d4b31842748028009f56a0fab1'), ('agent', 'agt_806b111007dc4b4a9c1ddfa45ba7287c')]
+      depth=3 chain_hash=986d54ab702150d4825ba028cf9acefd50c2456ce01a7cf407757dd9df69c6d4
+[OK ] C add_case_note cust_1 (dropped at D0->D1; amplification attempt)
+      expected: DENY (TOOL_NOT_ALLOWED)
+      observed: DENY (TOOL_NOT_ALLOWED)
+[OK ] C get_order cust_1 (dropped at D1->D2; amplification attempt)
+      expected: DENY (TOOL_NOT_ALLOWED)
+      observed: DENY (TOOL_NOT_ALLOWED)
+[OK ] C get_customer cust_2 (in D0/D1 scope, narrowed out at D2; resource escape)
+      expected: DENY (RESOURCE_NOT_ALLOWED)
+      observed: DENY (RESOURCE_NOT_ALLOWED)
+[OK ] issuance of broadened child D2' refused: DelegationAttenuationError: attenuation_violation: child allowed_tools is not a subset of parent allowed_tools
+[OK ] after revoking D1 (ancestor), C get_customer cust_1
+      expected: DENY (CHAIN_ANCESTOR_REVOKED)
+      observed: DENY (CHAIN_ANCESTOR_REVOKED)
+      failed_hop: agt_f49bf8d4b31842748028009f56a0fab1 (agent-b = agt_f49bf8d4b31842748028009f56a0fab1)
+
+RESULT: ALL OBSERVATIONS MATCH EXPECTED
+
+======================================================================
+EXP-007A runner (python -m exp007.scenario_007a)
+======================================================================
+EXP-007 / 007-A  Controller Substitution (principal continuity)
+
+== policy: vulnerable_policy ==
+  leg a [U signed, in-session]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> OK: legitimate action executed
+  leg b [B unsigned, spoofing U]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  leg c [B forged signature]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  leg d [B authenticated as B, no U->B delegation]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  probe cal-no-capability [U signed, agent lacks capability (ordinary authz failure)]
+      decision : DENY:NO_CAPABILITY:capability absent, expired or revoked
+  VERDICT (vulnerable_policy): FAIL
+
+== policy: secure_policy ==
+  leg a [U signed, in-session]
+      decision : ALLOW:CONTINUITY_VERIFIED:authenticated controller in authority chain, session bound
+      executed : True   -> OK: legitimate action executed
+  leg b [B unsigned, spoofing U]
+      decision : STEP_UP:CONTINUITY_UNVERIFIED:UNSIGNED
+      executed : False   -> OK: blocked on CONTINUITY_UNVERIFIED (UNSIGNED)
+  leg c [B forged signature]
+      decision : STEP_UP:CONTINUITY_UNVERIFIED:BAD_SIGNATURE
+      executed : False   -> OK: blocked on CONTINUITY_UNVERIFIED (BAD_SIGNATURE)
+  leg d [B authenticated as B, no U->B delegation]
+      decision : STEP_UP:CONTROLLER_NOT_AUTHORIZED:pid:B authenticated but not in authority chain of pid:U
+      executed : False   -> OK: blocked on CONTROLLER_NOT_AUTHORIZED (pid:B authenticated but not in authority chain of pid:U)
+  probe cal-no-capability [U signed, agent lacks capability (ordinary authz failure)]
+      decision : DENY:NO_CAPABILITY:capability absent, expired or revoked
+  VERDICT (secure_policy): PASS
+
+== semantic result matrix ==
+  case               ctrl auth  capab  ctrl authority  vulnerable  secure    reason
+  a                  valid      valid  valid           ALLOW       ALLOW     CONTINUITY_VERIFIED
+  b                  invalid    valid  absent          ALLOW       STEP_UP   CONTINUITY_UNVERIFIED
+  c                  invalid    valid  absent          ALLOW       STEP_UP   CONTINUITY_UNVERIFIED
+  d                  valid      valid  absent          ALLOW       STEP_UP   CONTROLLER_NOT_AUTHORIZED
+  cal-no-capability  valid (U)  absent valid           DENY        DENY      NO_CAPABILITY
+
+DISTINCTION CHECK: OK - continuity failure (CONTINUITY_UNVERIFIED), authenticated-substitute failure (CONTROLLER_NOT_AUTHORIZED) and ordinary authz failure (NO_CAPABILITY) are separately reported; vulnerable policy cannot separate them.

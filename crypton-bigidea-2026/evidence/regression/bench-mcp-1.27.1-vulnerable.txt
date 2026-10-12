@@ -1,0 +1,6 @@
+Crypton Validation Benchmark v0.1 -- Case 01: Principal / Session Binding
+Installed mcp version: 1.27.1
+Baseline status (creator re-requests own session): 400
+Negative control (baseline is not itself a 404): ok
+Cross-principal request status: 400
+VERDICT: FAIL -- VULNERABLE (a different, independently-authenticated principal reached the transport exactly as the session's own creator did; the manager never checked who was asking)

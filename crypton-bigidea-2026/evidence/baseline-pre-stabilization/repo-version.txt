@@ -1,0 +1,42 @@
+CRYPTON BIG IDEA 2026 — VERIFIED REPOSITORY STATE
+
+Verification date:  2026-10-12 (local time 16:47 -04:00)
+Repository:         Crypton-DI (local checkout; no remote consulted)
+Branch:             refactor/agent-identity-foundation
+Commit SHA:         ca2f52f0f5e10fc9c809cfd04bf3bd2d9890476d
+Commit date:        2026-09-11 04:32 -0400
+Commit subject:     feat(experiments): action-integrity exp-001 series - LangGraph approval drift
+Release/tag:        none on HEAD. Nearest tag: agent-lab-v0.5 (HEAD is 4 commits past it;
+                    git describe = agent-lab-v0.5-4-gca2f52f). Tags present: agent-lab-v0.3, v0.4, v0.5.
+Working tree:       DIRTY. Everything below was run against the working tree, NOT the bare commit.
+                      - 45 tracked files modified/added/deleted vs HEAD (+7,874 / -386 lines)
+                      - 22 untracked top-level paths, including entire directories that the
+                        evidence below depends on:
+                          labs/exp-007-principal-continuity/   (EXP-007A principal continuity)
+                          labs/exp-003-*/, labs/exp-003c-langgraph/, labs/exp-005-openhands-sdk/
+                          labs/validation-benchmark/, pilot-pack/, assessment-kit/, docs/methodology/
+                          labs/agent-lab/src/agentlab/assessment/authority_model/ (+ 6 test files)
+                    Full `git status --short` is saved in evidence/git-status-at-verification.txt.
+                    Consequence: the verified state is "HEAD + uncommitted work". It is NOT
+                    reproducible from the commit SHA alone. Commit (or tag) before submission.
+                    I did not stage, commit, or alter any file in the repository.
+
+Runtime
+  Operating system: Windows 11 Home Single Language 10.0.26200
+  Python:           3.14.7 (system); agent-lab venv also 3.14.7
+  Node:             v24.19.0       npm: npm 11.17 (notice shown)
+  Rust:             rustc 1.97.1 (8bab26f4f 2026-07-14), cargo 1.97.1
+
+Key dependency versions (from each suite's own venv)
+  labs/agent-lab:                 pydantic 2.13.5, PyJWT 2.13.0, cryptography 50.0.1,
+                                  pytest 9.1.1, pytest-asyncio 1.4.0, anthropic 1.2.0
+  labs/exp-003c-langgraph:        langgraph 1.2.11, langgraph-checkpoint-sqlite 3.1.1,
+                                  langchain 1.4.0, pytest 9.1.1
+  labs/exp-003-openai-agents-sdk: openai-agents 0.22.2, openai 3.14.1
+  labs/exp-003-microsoft-agent-framework: agent-framework 1.18.0 (core 1.18.0)
+  libs/crypton-sdk:               jest ^29.5.0, typescript ^5.0.0 (as declared in package.json)
+  services/crypton-id:            Cargo.lock-resolved (sqlx-postgres 0.7.4 observed in test output)
+
+Purpose:
+This record identifies the exact Crypton implementation used to produce
+the accompanying BIG IDEA technical evidence.

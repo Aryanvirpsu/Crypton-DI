@@ -1,0 +1,27 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\agent-lab\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-007-principal-continuity
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 16 items
+
+tests/test_scenario_007a.py::test_vulnerable_policy_fails_and_executes_every_substitution_leg PASSED [  6%]
+tests/test_scenario_007a.py::test_secure_policy_passes_and_blocks_every_substitution_leg PASSED [ 12%]
+tests/test_scenario_007a.py::test_authenticated_substitute_precondition_everything_valid_except_continuity PASSED [ 18%]
+tests/test_scenario_007a.py::test_authenticated_substitute_reason_is_continuity_specific PASSED [ 25%]
+tests/test_scenario_007a.py::test_four_reason_codes_are_distinct PASSED  [ 31%]
+tests/test_scenario_007a.py::test_vulnerable_trace_does_not_claim_b_is_u_and_shows_unchecked_authority PASSED [ 37%]
+tests/test_scenario_007a.py::test_unauthenticated_substitution_vulnerable_trace_misattributes_to_u PASSED [ 43%]
+tests/test_scenario_007a.py::test_gate_passes_for_reference_policies PASSED [ 50%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[vulnerable_policy] PASSED [ 56%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[authenticated_only_policy] PASSED [ 62%]
+tests/test_scenario_007a.py::test_authenticated_only_mutant_fails_specifically_on_authenticated_substitute PASSED [ 68%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_for_broken_secure_policy PASSED [ 75%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_if_secure_policy_never_evaluated_authority_chain PASSED [ 81%]
+tests/test_scenario_007a.py::test_evidence_has_all_fields PASSED         [ 87%]
+tests/test_scenario_007a.py::test_deterministic_across_repeated_in_process_runs PASSED [ 93%]
+tests/test_scenario_007a.py::test_deterministic_across_processes_and_hash_seeds PASSED [100%]
+
+============================= 16 passed in 0.75s ==============================

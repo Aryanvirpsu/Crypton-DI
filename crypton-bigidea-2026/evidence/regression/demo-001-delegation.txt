@@ -1,0 +1,26 @@
+DELEGATION CHAIN (as issued)
+  D0 alice -> A : tools={get_customer,get_order,add_case_note} customers={cust_1,cust_2} T+3h
+  D1 A -> B     : tools={get_customer,get_order}               customers={cust_1,cust_2} T+2h
+  D2 B -> C     : tools={get_customer}                         customers={cust_1}        T+1h
+
+[OK ] C get_customer cust_1 (inside D2)
+      expected: ALLOW
+      observed: ALLOW
+      authority_path: [('human', 'user-alice'), ('agent', 'agt_2708ba028a544476a7417ebef4ef1332'), ('agent', 'agt_f49bf8d4b31842748028009f56a0fab1'), ('agent', 'agt_806b111007dc4b4a9c1ddfa45ba7287c')]
+      depth=3 chain_hash=986d54ab702150d4825ba028cf9acefd50c2456ce01a7cf407757dd9df69c6d4
+[OK ] C add_case_note cust_1 (dropped at D0->D1; amplification attempt)
+      expected: DENY (TOOL_NOT_ALLOWED)
+      observed: DENY (TOOL_NOT_ALLOWED)
+[OK ] C get_order cust_1 (dropped at D1->D2; amplification attempt)
+      expected: DENY (TOOL_NOT_ALLOWED)
+      observed: DENY (TOOL_NOT_ALLOWED)
+[OK ] C get_customer cust_2 (in D0/D1 scope, narrowed out at D2; resource escape)
+      expected: DENY (RESOURCE_NOT_ALLOWED)
+      observed: DENY (RESOURCE_NOT_ALLOWED)
+[OK ] issuance of broadened child D2' refused: DelegationAttenuationError: attenuation_violation: child allowed_tools is not a subset of parent allowed_tools
+[OK ] after revoking D1 (ancestor), C get_customer cust_1
+      expected: DENY (CHAIN_ANCESTOR_REVOKED)
+      observed: DENY (CHAIN_ANCESTOR_REVOKED)
+      failed_hop: agt_f49bf8d4b31842748028009f56a0fab1 (agent-b = agt_f49bf8d4b31842748028009f56a0fab1)
+
+RESULT: ALL OBSERVATIONS MATCH EXPECTED
