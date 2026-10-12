@@ -147,10 +147,15 @@ partial/missing state), not a framework authorization defect.
 
 ```bash
 cd labs/exp-003c-langgraph
-python -m pytest tests/ -v
+python -m venv .venv
+.venv\Scripts\pip install -r requirements-lock.txt     # exact versions the evidence was produced with
+.venv\Scripts\python -m pytest tests/ -v
 ```
 
-12 tests, no network, no API key, <1s runtime.
+12 tests, no network, no API key, <1s runtime. Run it inside this lab's own `.venv`: under a different
+environment, `langgraph.checkpoint.sqlite` may be unavailable and collection fails (this happened on
+2026-09-24; see `labs/exp-007-principal-continuity/FROZEN.md`). Last verified 2026-10-12: 12 passed
+(Python 3.14.7, langgraph 1.2.11, langgraph-checkpoint-sqlite 3.1.1).
 
 ## Cross-framework comparison (not a ranking)
 

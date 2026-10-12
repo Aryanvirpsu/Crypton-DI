@@ -17,3 +17,7 @@ Changes to frozen files require a new dated entry here.
 ## 2026-09-24 (later): regression-status caveat (docs only; source fingerprint unchanged)
 
 EXP-007A freeze criteria passed. Repository-wide regression status is **not established**: unrelated suites could not execute cleanly in this environment (`agent-lab`: `pytest-asyncio` unavailable, 38 failed / 284 passed; `exp-003c`: `langgraph.checkpoint.sqlite` unavailable, collection error). These failures were not shown to predate EXP-007A and are not claimed to.
+
+## 2026-10-12: regression-status caveat resolved (docs only; source fingerprint unchanged)
+
+The 2026-09-24 caveat above is superseded. In an environment with `pytest-asyncio` installed, `labs/agent-lab` runs **453 passed, 0 failed**, and `labs/exp-003c-langgraph` run inside its own `.venv` runs **12 passed**. The earlier failures were environmental (missing `pytest-asyncio`, and the wrong venv for `langgraph.checkpoint.sqlite`), as that note suspected. No EXP-007A source file changed.

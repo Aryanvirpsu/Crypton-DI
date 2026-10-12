@@ -28,6 +28,10 @@ python -m venv .venv
 .venv\Scripts\python -m pytest -v
 ```
 
+Run the tests inside this lab's own `.venv`. Under any other environment (e.g. another lab's venv)
+collection fails with `ModuleNotFoundError: No module named 'agents'`. Last verified 2026-10-12: 17 passed
+(Python 3.14.7, openai-agents 0.22.2).
+
 No `OPENAI_API_KEY` needed. Every agent is built with
 `agents.set_tracing_disabled(True)` and every model is
 `agents.testing.ScriptedModel` — deterministic, no network call.

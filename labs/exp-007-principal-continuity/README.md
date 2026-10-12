@@ -9,6 +9,8 @@ python -m pytest
 
 Exit code is non-zero if the distinction collapses.
 
+Environment: the scenario itself is stdlib-only (no venv or install needed); `python -m pytest` needs `pytest` installed in whatever interpreter you use. Run from `labs/exp-007-principal-continuity`. Last verified 2026-10-12: 16 passed (Python 3.14.7, pytest 9.1.1).
+
 ## What it measures
 
 Principal continuity: whether a grant held by Agent A stays valid when the party *controlling* A is no longer inside the authority chain rooted at the grant's owner U. The core invariant:

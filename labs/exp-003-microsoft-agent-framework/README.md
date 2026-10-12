@@ -104,6 +104,10 @@ python -m venv .venv
 .venv\Scripts\python -m pytest -v
 ```
 
+Run the tests inside this lab's own `.venv`. Under any other environment collection fails with
+`ModuleNotFoundError` for `agent_framework`. Last verified 2026-10-12: 12 passed
+(Python 3.14.7, agent-framework 1.18.0).
+
 No API key, no network, no hosted model - every scenario uses
 `ScriptedChatClient`.
 
