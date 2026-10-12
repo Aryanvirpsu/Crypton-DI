@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from .enums import DivergenceType
-from .fact import Fact
 from .ledger import AuthorityLedger
 from .envelope import AuthorityEnvelope
 

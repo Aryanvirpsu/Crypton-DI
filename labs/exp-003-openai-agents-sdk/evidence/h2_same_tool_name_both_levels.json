@@ -49,7 +49,7 @@
       "root_agent_name": null,
       "scenario_id": "h2_same_tool_name_both_levels",
       "sequence": 1,
-      "timestamp": 1791837959.8844001,
+      "timestamp": 1791838886.3678913,
       "tool_name": "delete_record",
       "tool_namespace": null
     },
@@ -65,7 +65,7 @@
       "root_agent_name": null,
       "scenario_id": "h2_same_tool_name_both_levels",
       "sequence": 2,
-      "timestamp": 1791837959.8945756,
+      "timestamp": 1791838886.386703,
       "tool_name": "delete_record",
       "tool_namespace": null
     }

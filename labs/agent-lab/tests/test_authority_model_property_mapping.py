@@ -19,7 +19,7 @@ import pytest
 from agentlab.assessment.authority_model import fixtures
 from agentlab.assessment.authority_model.diff import DivergenceType
 from agentlab.assessment.authority_model.property_mapping import resolve_property
-from agentlab.assessment.authority_model.render_text import render_authority_diff, render_evidence_strip
+from agentlab.assessment.authority_model.render_text import render_authority_diff
 
 
 def _mastra_available() -> bool:

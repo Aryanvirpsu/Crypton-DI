@@ -17,8 +17,8 @@ import json
 import pytest
 
 from agentlab.assessment.authority_model import fixtures
-from agentlab.assessment.authority_model.diff import AuthorityDiff, compute_diff
-from agentlab.assessment.authority_model.enums import DivergenceType, Provenance
+from agentlab.assessment.authority_model.diff import compute_diff
+from agentlab.assessment.authority_model.enums import DivergenceType
 from agentlab.assessment.authority_model.envelope import AuthorityEnvelope, derive_envelope
 from agentlab.assessment.authority_model.fact import Fact
 from agentlab.assessment.authority_model.ledger import AuthorityLedger

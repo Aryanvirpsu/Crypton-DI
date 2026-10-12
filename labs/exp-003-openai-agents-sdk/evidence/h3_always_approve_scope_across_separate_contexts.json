@@ -30,7 +30,7 @@
       "root_agent_name": null,
       "scenario_id": "h3_nested",
       "sequence": 1,
-      "timestamp": 1791837959.9848566,
+      "timestamp": 1791838886.4969332,
       "tool_name": "send_message",
       "tool_namespace": null
     }

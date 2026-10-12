@@ -6,8 +6,8 @@
     "submitted_against": "thread_id=h6a_thread_b only"
   },
   "approval_request": {
-    "thread_a_interrupt_id": "54f8bdab34ebbb2b35ecb98aa511a3ca",
-    "thread_b_interrupt_id": "23d1ad8aa4b3855c7ed344d8ea55ad37"
+    "thread_a_interrupt_id": "1eef87b3c60410577772941d812ae3df",
+    "thread_b_interrupt_id": "e2d3f547bcde190a564d96537ab06abc"
   },
   "authorization_binding": {
     "argument_match": true,
@@ -31,7 +31,7 @@
       "scenario_id": "h6a",
       "sequence": 8,
       "thread_id": null,
-      "timestamp": 1791837942.04621,
+      "timestamp": 1791838890.252505,
       "tool_name": "transfer_funds"
     }
   ],

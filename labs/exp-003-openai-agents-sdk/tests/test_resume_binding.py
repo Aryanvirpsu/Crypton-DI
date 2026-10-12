@@ -16,7 +16,6 @@ import pytest
 
 from crypton_exp003.evidence import AuthorizationBinding, build_evidence, write_evidence
 from scenarios.resume_state import (
-    DELETE_ARGS,
     TRANSFER_ARGS,
     run_h4_multiple_outstanding_partial_resolution,
     run_h4_reconstructed_agent,

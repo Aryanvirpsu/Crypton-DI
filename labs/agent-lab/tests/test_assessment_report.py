@@ -11,7 +11,7 @@ item 11 of the remediation spec.
 
 import pytest
 
-from agentlab.assessment.engagement import Engagement, EngagementLoadError
+from agentlab.assessment.engagement import Engagement
 from agentlab.assessment.evidence import EvidenceManifest
 from agentlab.assessment.models import (
     AssessmentArea,

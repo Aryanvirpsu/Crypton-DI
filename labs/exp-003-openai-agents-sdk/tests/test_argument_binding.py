@@ -31,7 +31,6 @@ import pytest
 from crypton_exp003.evidence import AuthorizationBinding, build_evidence, write_evidence
 from scenarios.approval_binding import (
     APPROVED_ARGS,
-    DRIFTED_ARGS,
     run_h1_post_approval_mutation,
     run_h1_reload_then_mutate,
 )

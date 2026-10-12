@@ -590,8 +590,7 @@ def build_fixture_view(name: str):
 
 
 def write_fixture_outputs(name: str, out_dir: Path) -> None:
-    from .render import render_authority_map as render_authority_map_legacy
-    from .render_text import render_authority_diff, render_authority_map_structural, render_full_text_report
+    from .render_text import render_authority_map_structural, render_full_text_report
 
     ledger, envelope, diff, view = build_fixture_view(name)
     out_dir.mkdir(parents=True, exist_ok=True)

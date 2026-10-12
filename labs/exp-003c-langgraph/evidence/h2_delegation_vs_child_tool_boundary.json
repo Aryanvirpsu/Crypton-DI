@@ -4,8 +4,8 @@
     "round_2": "approve child tool separately"
   },
   "approval_request": {
-    "child_interrupt_id": "c13d922cae8ca2add393e7971be03f74",
-    "parent_interrupt_id": "83226674605c5546dc610d5b01061b62"
+    "child_interrupt_id": "a9bbabbb4b672efd0a08222f2cd941c0",
+    "parent_interrupt_id": "0ef54e9d9a3b5f6befa2b1d617ff777d"
   },
   "authorization_binding": {
     "argument_match": true,
@@ -33,7 +33,7 @@
       "scenario_id": "h2",
       "sequence": 6,
       "thread_id": null,
-      "timestamp": 1791837941.799839,
+      "timestamp": 1791838890.0828452,
       "tool_name": "issue_refund"
     }
   ],

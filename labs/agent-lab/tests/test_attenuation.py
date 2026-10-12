@@ -8,9 +8,7 @@ required boundary cases from the v0.6 test matrix (§37): equal authority,
 narrows, broadens.
 """
 
-from dataclasses import replace
 
-import pytest
 
 from agentlab.chain import verify_attenuation
 from agentlab.delegation import Delegation

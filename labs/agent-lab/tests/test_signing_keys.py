@@ -10,7 +10,6 @@ test_delegation_chain.py, where the full chain context exists.
 import pytest
 
 from agentlab import agents, signing_keys
-from agentlab.identity import HumanIdentity
 from agentlab.lifecycle import LifecycleError, SigningKeyStatus
 
 
