@@ -1,0 +1,47 @@
+{
+  "approval_decision": {
+    "call_id": "h1b_1",
+    "decision": "attempted_approve_of_mutated_item",
+    "note": "reloaded item's raw_item.arguments was mutated to a materially different value before calling reloaded_state.approve()"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "h1b_1",
+    "tool_name": "transfer_funds"
+  },
+  "authorization_binding": {
+    "argument_match": false,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [
+      "SDK raised agents.exceptions.ModelBehaviorError('Model reused a tool call ID for a different invocation.') from RunContextWrapper._tool_invocation_status, confirmed by reading agents/run_context.py and agents/_tool_invocation.py source: a per-call-id fingerprint over {approval_scope, arguments, ...semantic fields} is registered at first sight and re-checked on every subsequent registration attempt for that call_id; a mismatch is treated as a hard error, not a silent pass-through."
+    ],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": null,
+  "experiment": "EXP-003A",
+  "notes": [
+    "APPROVAL_BINDING = PASS: the SDK actively detects and blocks (via a hard exception) an attempt to approve a reloaded item whose arguments were altered after serialization/reload, rather than executing the drifted content."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "h1b_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h1b_reload_then_mutate_before_approval",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

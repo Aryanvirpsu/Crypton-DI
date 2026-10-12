@@ -1,0 +1,30 @@
+{
+  "experiment_id": "EXP-003A",
+  "target": {
+    "package": "openai-agents",
+    "import_name": "agents",
+    "version": "0.22.2",
+    "source": "PyPI (pip install openai-agents==0.22.2)",
+    "upstream_repo": "https://github.com/openai/openai-agents-python",
+    "release_tag_guess": "v0.22.2 (not independently verified against a specific git commit hash - PyPI sdist/wheel only; see notes)"
+  },
+  "environment": {
+    "python_version": "3.14.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "venv": "labs/exp-003-openai-agents-sdk/.venv (isolated, not shared with any other lab)",
+    "api_key_required": false,
+    "network_required": false,
+    "tracing": "disabled via agents.set_tracing_disabled(True) in every scenario/test"
+  },
+  "test_timestamp_utc": "2026-09-16T03:33:00Z",
+  "relevant_upstream_documentation": [
+    "https://openai.github.io/openai-agents-python/",
+    "https://openai.github.io/openai-agents-python/tools/",
+    "https://openai.github.io/openai-agents-python/running_agents/",
+    "https://openai.github.io/openai-agents-python/ref/run_state/"
+  ],
+  "notes": [
+    "The exact upstream git commit for the 0.22.2 PyPI release was not independently fetched/verified in this pass (no network fetch of the GitHub repo was performed) - the version pin above is what pip actually installed and what every test in this lab runs against; that is the operative ground truth regardless of the upstream commit hash.",
+    "API surface used here (agents.testing.ScriptedModel/assistant_message/function_call, agents.RunState.approve/reject with always_approve/always_reject, agents.Agent.as_tool(needs_approval=...), agents.tool_context.ToolContext) was confirmed by live introspection (inspect.signature, dataclasses.fields) against the installed 0.22.2 package, not assumed from memory or documentation alone."
+  ]
+}

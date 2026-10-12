@@ -1,0 +1,12 @@
+{
+  "installed_version": "0.22.6",
+  "negative_control_ok": true,
+  "negative_control_value_after": "control-mutated",
+  "readonly_attempt_threw": true,
+  "readonly_value_before": "original-a",
+  "readonly_value_after": "original-a",
+  "verdict": "PASS -- SECURE (the write under { readonly: true } was rejected by the database itself, and the row is unchanged)",
+  "notes": [
+    "readonly write attempt raised: attempt to write a readonly database"
+  ]
+}

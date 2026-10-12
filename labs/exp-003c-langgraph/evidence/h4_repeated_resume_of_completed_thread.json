@@ -1,0 +1,57 @@
+{
+  "approval_decision": {
+    "first": "approve",
+    "second": "same resume value, re-delivered against the same, already-completed thread_id"
+  },
+  "approval_request": {
+    "note": "one interrupt, approved once"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "h4",
+      "sequence": 7,
+      "thread_id": null,
+      "timestamp": 1791837942.0203025,
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "Resuming an already-completed thread a second time did not re-execute the tool - exactly-once held."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h4_repeated_resume_of_completed_thread",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h4"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

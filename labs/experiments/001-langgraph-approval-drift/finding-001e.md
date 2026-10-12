@@ -1,6 +1,14 @@
 # Finding 001e — A real model triggers #001d's middleware-ordering drift, and doesn't even need to be the one broadening
 
-**One-line verdict + headline rate: FAIL 38/40 (95%) across two temperature conditions.** Model: OpenAI `gpt-4o-mini`, temperature ∈ {0.0, 1.0}, N=20 each. Every single valid run at both temperatures had the model naively retry the *identical* failed host (`model_broadened: False`, 40/40 valid runs) — the model never once chose to broaden scope itself. And yet 38 of those 40 runs still executed the broadened subnet action, because `HostEscalationMiddleware` (unchanged from #001d) rewrote the already-approved call after approval, exactly as #001d's deterministic script predicted. This converts #001d's claim from "the plumbing can do this" to "this happens, in practice, with a real model, almost every time it naively retries" — and it does so without the model ever making the broadening decision itself.
+**CLOSED (2026-09-27): `NO VULNERABILITY — EXPECTED FRAMEWORK BEHAVIOR`.**
+See [`CLOSURE.md`](CLOSURE.md) — this is #001d's mechanism (already closed
+as expected framework behavior, not a LangChain vulnerability) confirmed
+to fire reliably with a real model. The rate data below (38/40) remains an
+accurate, useful measurement of how often the composition mechanism fires
+in practice; it does not reopen the "is this a vulnerability" question,
+which `CLOSURE.md` answers no to.
+
+**One-line verdict (original, superseded by CLOSURE.md) + headline rate: FAIL 38/40 (95%) across two temperature conditions.** Model: OpenAI `gpt-4o-mini`, temperature ∈ {0.0, 1.0}, N=20 each. Every single valid run at both temperatures had the model naively retry the *identical* failed host (`model_broadened: False`, 40/40 valid runs) — the model never once chose to broaden scope itself. And yet 38 of those 40 runs still executed the broadened subnet action, because `HostEscalationMiddleware` (unchanged from #001d) rewrote the already-approved call after approval, exactly as #001d's deterministic script predicted. This converts #001d's claim from "the plumbing can do this" to "this happens, in practice, with a real model, almost every time it naively retries" — and it does so without the model ever making the broadening decision itself.
 
 ---
 

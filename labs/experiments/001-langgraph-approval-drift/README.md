@@ -1,5 +1,19 @@
 # Experiment #001 — LangGraph approval/execution drift
 
+**CLOSED (2026-09-27): `NO VULNERABILITY — EXPECTED FRAMEWORK BEHAVIOR`.**
+The #001d/#001e mechanism below is not a LangChain vulnerability —
+`after_model` middleware composition order is intentional, documented
+behavior; the middleware involved is trusted, developer-supplied
+application code that the framework already permits to alter tool calls;
+no untrusted principal crossed any framework-claimed boundary. Maintainer
+triage is accepted; no further disclosure work is planned. Full reasoning:
+[`CLOSURE.md`](CLOSURE.md). The record below is preserved unedited as a
+negative/calibration result — see `CLOSURE.md` for what it does and does
+not establish. `FL-01` in the Finding Library has been retired
+accordingly.
+
+---
+
 Crypton's first action-integrity experiment (see `docs/strategy/2026-09-10-action-integrity-thesis.md`
 §6/§9/§10): does a real, third-party agent framework's own
 reasoning/retry/delegation layer let a privileged action drift from

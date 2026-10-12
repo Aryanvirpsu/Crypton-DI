@@ -1,4 +1,4 @@
-# Crypton Agent Lab v0.6
+# Crypton Agent Lab v0.6.1
 
 The smallest real AI-agent system that lets us learn — and later
 security-test — the full chain:
@@ -163,9 +163,42 @@ Prints ROOT PRINCIPAL / ACTING PRINCIPAL / DELEGATION DEPTH / AUTHORITY
 PATH / DECISION — `ALLOW` for the request above; try `--requested-tool
 add_case_note` (never re-granted past D0) or `--requested-resource-id
 cust_2` (narrowed away by D2) to see a `DENY` with its `FAILED HOP` and
-`REASON`. See `DECISIONS.md`'s v0.6 section and
-`docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 for the full design record and
-attack-case matrix.
+`REASON`. Add `--format json` for a machine-readable version of the same
+result (a thin serialization of the real `ChainVerificationResult`, useful
+as evidence in an assessment engagement's manifest — see below). See
+`DECISIONS.md`'s v0.6 section and `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11
+for the full design record and attack-case matrix.
+
+## v0.6.1: the Agent Authorization & Delegation Assessment delivery kit
+
+This lab's security primitives (delegation, attenuation, approval,
+enforcement) are the *evidence source* an assessment cites — they are not
+themselves a customer-assessment tool. See
+[`docs/ASSESSMENT_METHODOLOGY.md`](../../docs/ASSESSMENT_METHODOLOGY.md)
+for the actual eight-area procedure, and
+[`agentlab.assessment`](src/agentlab/assessment/__init__.py) for the small
+Finding/Evidence/Report package that turns a completed assessment into a
+client-deliverable Markdown report:
+
+```bash
+# Render an already-built engagement (a directory of scope/workflow/
+# evidence/findings files — see docs/ASSESSMENT_METHODOLOGY.md and
+# assessment-engagement/TEMPLATE/) to a Markdown report:
+python -m agentlab.cli --render-assessment ../../assessment-engagement/reference-agentlab-dryrun --out report.md
+```
+
+`--render-assessment` renders data that already exists — it does not
+inspect, connect to, or assess anything itself. See
+[`assessment-engagement/reference-agentlab-dryrun/`](../../assessment-engagement/reference-agentlab-dryrun/)
+for a fully worked, explicitly-labeled **synthetic** example
+("Crypton Reference Agent Lab — Methodology Dry Run") — built from this
+lab's own real primitive calls, never from a real customer engagement —
+demonstrating all four outcome states (PASS/FAIL/INCONCLUSIVE/NOT_APPLICABLE)
+across all eight assessment areas. Regenerate it with:
+
+```bash
+python -m agentlab.assessment.reference_dryrun
+```
 
 ## Layout
 
@@ -189,7 +222,9 @@ src/agentlab/
   tracing.py             full execution trace, JSONL per run (keyed by request_id)
   model_provider.py   ModelProvider abstraction (Anthropic + Fake)
   agent.py                 the loop itself — read this file first
-  cli.py                     entry point (register / grant-delegation / create-signing-key / issue-chained-delegation / chain-verify / run)
+  cli.py                     entry point (register / grant-delegation / create-signing-key / issue-chained-delegation / chain-verify / render-assessment / run)
+  assessment/            Assessment Delivery Kit (v0.6.1) — Finding/Evidence/Report models + report
+                                 renderer; no security logic of its own — see docs/ASSESSMENT_METHODOLOGY.md
 tests/                  one test file per module above
 ```
 

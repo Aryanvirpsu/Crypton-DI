@@ -1,11 +1,16 @@
 # Crypton — Technical Source of Truth (v1.2)
 
-**RAT-6 PROVEN — v0.6 (Provable Multi-Hop Delegation with Scope
+**RAT-6A PROVEN — v0.6 (Provable Multi-Hop Delegation with Scope
 Attenuation) is built and tested** (2026-09-02). See §11 for the full
 record: signing-principal decision, key model, canonicalization,
-attenuation semantics, the chain-verification algorithm, and the RAT-6
+attenuation semantics, the chain-verification algorithm, and the RAT-6A
 acceptance scenario (Human -> Agent A -> Agent B -> Agent C) with its
-allowed case and every attack case proven denied.
+allowed case and every attack case proven denied. **This proof is inside
+Crypton's own trust/data environment — RAT-6B (a portable proof an
+independent third-party server could verify with no prior integration and
+no access to Crypton's own database) remains HOLD, not built, and is not
+implied by RAT-6A. See §12 for why RAT-6B should not be built reflexively:
+it is close to what the IETF AAT draft already specifies.**
 
 v1.2 supersedes v1.1 in place (same file — see the note at the top of §11
 for why it wasn't renamed) — v1.1's own content (§1-10, the v0.5.1
@@ -470,7 +475,9 @@ marker, not the filename.*
 The technical wedge itself: can Crypton prove that an action performed by
 Agent C was authorized through `Human -> Agent A -> Agent B -> Agent C`,
 where every hop is cryptographically attributable and authority can only
-narrow downstream? **Yes — proven below, RAT-6.**
+narrow downstream? **Yes — proven below, RAT-6A.** (RAT-6B — the same
+proof verifiable by a party with no prior integration with Crypton — is a
+different, harder claim, not proven here and not attempted; see §12.)
 
 ### 11.1 Signing-principal decision
 
@@ -633,7 +640,7 @@ consult it is never entered otherwise. Proven directly:
 underlying delegation is then revoked; execution count stays 0) and the
 positive mirror, `test_valid_chain_plus_required_approval_executes_once`.
 
-### 11.11 RAT-6 proof
+### 11.11 RAT-6A proof
 
 Scenario (`tests/test_delegation_chain.py::three_hop_chain`), using
 Agent Lab's existing tools/resource-constraint shapes rather than invented
@@ -743,4 +750,100 @@ in `DECISIONS.md` on the internal-error-to-DENY strengthening.
 
 None of the above are v0.6 failures — they are the milestone's own
 explicit scope boundary (`DECISIONS.md`), carried forward honestly rather
-than implied-solved by RAT-6's proof.
+than implied-solved by RAT-6A's proof.
+
+---
+
+## 12. Standards Convergence (AAT / WIMSE) — corrects §7's original framing
+
+**This section exists because market research (2026-09-02, `docs/business/MARKET_SCAN.md`)
+found something that changes how §7's "enforcement coverage" and the
+delegation primitive generally should be described going forward.**
+Nothing in code changed because of this section — it is a positioning
+correction, not an engineering one.
+
+**The finding:** the multi-hop-delegation-with-attenuation primitive v0.6
+built (RAT-6A) is not an unclaimed technical gap. It is actively
+converging into a standard:
+
+- **IETF Internet-Draft `draft-niyikiza-oauth-attenuating-agent-tokens`**
+  (Attenuating Authorization Tokens / AAT, v01, Jun 2026) — asymmetric
+  proof-of-possession, structured tool-level capability claims, typed
+  constraints, offline attenuation, independent chain verification without
+  a network call, signed-JWT encoding. This is, in substance, a
+  specification for what `chain.py`/`delegation.py` already implement.
+- **WIMSE** (IETF working group, workload/agent identity across systems —
+  SPIFFE/SVID-adjacent, actor chains) is the broader architectural
+  umbrella this sits under.
+- Related prior art the draft itself builds on: Macaroons (2014), Biscuit,
+  UCAN, SPKI/SDSI (RFC 2693, 1999) — attenuated-capability-token lineage
+  is not new; AAT is this lineage's current OAuth-flavored, agent-specific
+  formalization.
+- Also active: Google DeepMind's 2026 Delegation Capability Tokens
+  (macaroon-based); academic Invocation-Bound Capability Tokens with
+  Rust/Python reference implementations; CSA/Okta's published
+  append-only-attenuated-caveat-chain best practice.
+
+**What this corrects:** `CLAUDE.md` §7 previously described recursive
+delegation-chain proof and scope attenuation as things "no deployed
+protocol" solves, framing the primitive as Crypton's structural
+differentiator. That framing is now known to be wrong going forward — a
+real standards draft describes very close to the same mechanism. `CLAUDE.md`
+has been corrected (§7, §8b, §11 RAT-7) — see its Decision Log,
+2026-09-02 entries. This document's own RAT-6A/RAT-6B distinction (§11 and
+the header note) was already precise about *scope* (in-environment vs.
+portable); this section adds the *competitive* correction: even RAT-6A's
+scope is not an ownable technical edge, because the underlying mechanism
+is what a standards body is independently converging on.
+
+**What does NOT change:** RAT-6A's correctness. Every claim in §11 —
+signature validity, attenuation semantics, chain-walk algorithm, the
+attack-case matrix, the test counts — remains true and unaffected. A
+primitive can be simultaneously *correct* and *not a moat*; those are
+different questions, and this section only answers the second one.
+
+**Engineering implication, stated plainly so it isn't relearned the hard
+way:** treat v0.6 as a reference implementation of a converging standard,
+not as proprietary technology to protect or extend defensively. If RAT-6B
+(portable, no-prior-coordination verification) is ever built — and per
+`DECISIONS.md` it should not be built reflexively, only if customer
+evidence or a Path B decision requires it — the correct move is to align
+the wire format and verification semantics to AAT/WIMSE, not invent a
+rival encoding. Building a proprietary "Crypton Delegation Passport"
+format when AAT already specifies this would be redundant work with no
+defensibility payoff.
+
+---
+
+## 13. v0.6 Freeze Checkpoint (deliverables — track to completion)
+
+A concrete, closeable checklist for formally freezing the v0.6 milestone
+as a citable checkpoint (distinct from v0.6.1's assessment-delivery work,
+which sits on top of this checkpoint without reopening it):
+
+- [ ] Git tag `crypton-agent-lab-v0.6` (or equivalent) cut at a specific
+  commit hash, with that hash recorded here once tagged — baseline
+  protected against silent drift.
+- [ ] Reproducible RAT-6A demo, runnable from `labs/agent-lab/README.md`
+  alone by someone who has not read this document: `Human -> Agent A ->
+  Agent B -> Agent C` showing **ALLOW** for the permitted action, then
+  **DENY** for each of: unauthorized tool, resource escape, revoked
+  ancestor, tampered delegation. (`--chain-verify` plus the CLI walkthrough
+  in `labs/agent-lab/README.md`'s "v0.6: verify a multi-hop delegation
+  chain" section already provides this; confirm it still runs clean from a
+  fresh clone before checking this box.)
+- [ ] One clean technical architecture diagram: Human -> delegation ->
+  agent -> delegation -> agent -> verifier -> approval -> tool. (§4's
+  ASCII control-flow diagram in the external Tech-SOT-v1.2 draft is a
+  reasonable source to redraw from; not yet produced as a standalone image
+  asset in this repo.)
+- [ ] Evidence packet assembled: exact command(s), expected output, test
+  counts (263 Agent Lab / 38 crypton-id, per §11.16), the implementation
+  commit hash, the diagram, and the limitations list (§8) — bundled
+  together (a single Markdown or PDF a design partner could be handed
+  directly), not scattered across multiple docs.
+
+None of these are blocking for v0.6.1 (the assessment-delivery kit) or for
+running a real customer engagement using `docs/ASSESSMENT_METHODOLOGY.md` —
+they are closure hygiene for the v0.6 milestone itself, worth finishing
+opportunistically rather than urgently.

@@ -26,6 +26,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -339,6 +340,30 @@ def _chain_verify_output(result: "chain.ChainVerificationResult", *, requested_t
     return "\n".join(lines)
 
 
+def _chain_result_to_dict(result: "chain.ChainVerificationResult") -> dict:
+    """v0.6.1: a thin, direct serialization of a real ChainVerificationResult
+    — no re-derivation, no reformatting of the underlying decision. Used by
+    `--chain-verify --format json`, for embedding a chain-verification
+    result as evidence in an assessment engagement (see
+    docs/ASSESSMENT_METHODOLOGY.md's "controlled staging test" evidence
+    category)."""
+    return {
+        "allowed": result.allowed,
+        "reason_code": result.reason_code,
+        "root_principal": result.root_principal,
+        "acting_principal": result.acting_principal,
+        "delegation_depth": result.delegation_depth,
+        "authority_path": [f"{kind}:{pid}" for kind, pid in result.authority_path],
+        "effective_tools": sorted(result.effective_tools),
+        "effective_resources": {k: sorted(v) for k, v in result.effective_resources.items()},
+        "effective_expiry": result.effective_expiry,
+        "chain_hash": result.chain_hash,
+        "failed_hop": result.failed_hop,
+        "denial_reason": result.denial_reason,
+        "decision_id": result.decision.decision_id,
+    }
+
+
 async def chain_verify_async(args: argparse.Namespace) -> int:
     """v0.6 developer-facing chain inspection (§39). Calls the real
     verifier (chain.verify_delegation_chain) — this function only formats
@@ -384,8 +409,64 @@ async def chain_verify_async(args: argparse.Namespace) -> int:
         resource_type=resource_type,
         resource_id=resource_id,
     )
-    print(_chain_verify_output(result, requested_tool=args.requested_tool, requested_resource=requested_resource))
+    if args.format == "json":
+        print(json.dumps(_chain_result_to_dict(result), indent=2))
+    else:
+        print(_chain_verify_output(result, requested_tool=args.requested_tool, requested_resource=requested_resource))
     return 0 if result.allowed else 1
+
+
+def _reconfigure_stdout_utf8_best_effort(stream: Any = None) -> None:
+    """v0.6.1: `--render-assessment` prints Markdown that legitimately
+    contains em-dashes and other non-ASCII punctuation (report prose, not
+    code — unlike the `--chain-verify` text formatter, which sidesteps this
+    entirely by never using "→"; see test_cli_chain_verify_output.py). A
+    legacy Windows console codepage raises `UnicodeEncodeError` on
+    `print()` for those characters — specifically the OEM codepages
+    (cp437/cp850) `cmd.exe`'s console traditionally defaults to, which lack
+    an em-dash glyph entirely (not to be confused with the cp1252 *ANSI*
+    codepage referenced elsewhere in this file for "→", which is a
+    different, narrower failure — cp1252 does encode an em-dash). Called
+    only immediately before that one print, not globally in `main()`, so
+    every other command's stdout (register/run/grant-delegation/chain-
+    verify) is left untouched — this is the only path that actually needs
+    it. Best-effort and non-fatal: some stream types don't expose
+    `.reconfigure` at all (`AttributeError`) or reject it in their current
+    state (`ValueError`) — in either case we fall back to the stream's
+    existing encoding rather than crash a command whose whole point is to
+    hand someone a readable report; writing to a file via `--out` is
+    unaffected either way, since that path always uses an explicit
+    `encoding="utf-8"` file write, never this function."""
+    target = stream if stream is not None else sys.stdout
+    try:
+        target.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
+async def render_assessment_async(args: argparse.Namespace) -> int:
+    """v0.6.1: render an existing, already-built assessment engagement
+    (a directory of scope/workflow/evidence/findings files — see
+    docs/ASSESSMENT_METHODOLOGY.md and assessment/engagement.py) to a
+    Markdown report. This renders data that already exists; it does not
+    assess anything itself, and it does not accept an arbitrary customer
+    system as input — only a pre-built Engagement directory."""
+    from .assessment.engagement import Engagement, EngagementLoadError
+    from .assessment.report import render_report
+
+    try:
+        engagement = Engagement.load(args.render_assessment)
+    except EngagementLoadError as e:
+        raise SystemExit(f"could not load engagement: {e}")
+
+    report = render_report(engagement)
+    if args.out:
+        Path(args.out).write_text(report, encoding="utf-8")
+        print(f"Wrote report to {args.out}")
+    else:
+        _reconfigure_stdout_utf8_best_effort()
+        print(report)
+    return 0
 
 
 def main() -> None:
@@ -439,6 +520,15 @@ def main() -> None:
     parser.add_argument("--requested-tool", help="v0.6: the tool to check (used with --chain-verify)")
     parser.add_argument("--requested-resource-type", help="v0.6: e.g. customer_ids (used with --chain-verify)")
     parser.add_argument("--requested-resource-id", help="v0.6: e.g. cust_1 (used with --chain-verify)")
+    parser.add_argument(
+        "--format", choices=["text", "json"], default="text", help="v0.6.1: output format for --chain-verify (default: text)"
+    )
+    parser.add_argument(
+        "--render-assessment",
+        metavar="ENGAGEMENT_DIR",
+        help="v0.6.1: render an existing assessment engagement directory to a Markdown report (see docs/ASSESSMENT_METHODOLOGY.md)",
+    )
+    parser.add_argument("--out", help="v0.6.1: write --render-assessment's report to this file instead of stdout")
     parser.add_argument("--task", help="the task to hand the agent (required unless --register/--grant-delegation)")
     parser.add_argument("--token", help="crypton-id JWT (same as Authorization: Bearer <token>)")
     parser.add_argument("--dev-user", help="local-dev shortcut: user id to mint a dev token for")
@@ -448,16 +538,17 @@ def main() -> None:
     args = parser.parse_args()
 
     v06_verb = args.create_signing_key or args.issue_chained_delegation or bool(args.chain_verify)
+    v061_verb = bool(args.render_assessment)
     if args.register and not args.name:
         raise SystemExit("--register requires --name")
     if args.grant_delegation and not args.agent_id:
         raise SystemExit("--grant-delegation requires --agent-id")
     if args.create_signing_key and not args.agent_id:
         raise SystemExit("--create-signing-key requires --agent-id")
-    if not args.register and not args.grant_delegation and not v06_verb and not args.task:
+    if not args.register and not args.grant_delegation and not v06_verb and not v061_verb and not args.task:
         raise SystemExit(
             "--task is required for a normal run (or pass --register/--grant-delegation/--create-signing-key/"
-            "--issue-chained-delegation/--chain-verify to do one of those instead)"
+            "--issue-chained-delegation/--chain-verify/--render-assessment to do one of those instead)"
         )
 
     try:
@@ -471,6 +562,8 @@ def main() -> None:
             sys.exit(asyncio.run(issue_chained_delegation_async(args)))
         elif args.chain_verify:
             sys.exit(asyncio.run(chain_verify_async(args)))
+        elif args.render_assessment:
+            sys.exit(asyncio.run(render_assessment_async(args)))
         else:
             sys.exit(asyncio.run(run_async(args)))
     except IdentityError as e:

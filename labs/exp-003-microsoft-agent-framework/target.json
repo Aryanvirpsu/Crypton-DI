@@ -1,0 +1,31 @@
+{
+  "experiment_id": "EXP-003B",
+  "target": {
+    "package": "agent-framework",
+    "import_name": "agent_framework",
+    "version": "1.18.0",
+    "core_package_version": "agent-framework-core==1.18.0",
+    "orchestrations_package_version": "agent-framework-orchestrations==1.1.1",
+    "source": "PyPI (pip install agent-framework==1.18.0)",
+    "upstream_repo": "https://github.com/microsoft/agent-framework",
+    "version_verification_note": "The task prompt assumed agent-framework==1.17.0. Verified via `pip index versions agent-framework` before installing anything: the actual latest stable release at test time was 1.18.0, one minor version ahead of the prompt's assumption. Tested against the real current release (1.18.0), not the stale assumption, per instructions not to trust the prompt blindly."
+  },
+  "environment": {
+    "python_version": "3.14.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "venv": "labs/exp-003-microsoft-agent-framework/.venv (isolated, not shared with any other lab)",
+    "api_key_required": false,
+    "network_required": false,
+    "model_dependence": "None for any scenario actually implemented in this pass - every agent uses a locally-implemented deterministic ScriptedChatClient (see crypton_exp003b/fixtures.py), never a hosted model provider."
+  },
+  "test_timestamp_utc": "2026-09-16T05:00:00Z",
+  "relevant_upstream_documentation": [
+    "https://github.com/microsoft/agent-framework",
+    "https://learn.microsoft.com/en-us/agent-framework/",
+    "https://github.com/microsoft/agent-framework/tree/main/python/packages/orchestrations"
+  ],
+  "notes": [
+    "No official 'ScriptedModel'-equivalent test utility was found exported by the package (unlike openai-agents' agents.testing.ScriptedModel). A deterministic BaseChatClient subclass was implemented locally in crypton_exp003b/fixtures.py, composed with the framework's own agent_framework._tools.FunctionInvocationLayer mixin (required for automatic function-invocation/approval handling - confirmed empirically: without this mixin, BaseChatClient.as_agent()-built agents log 'does not support function invoking' and never process tool calls or approval_mode at all). This is a deterministic MODEL substitute, not a re-implementation of the framework's authorization/workflow logic - all approval, checkpoint, and workflow behavior under test is the framework's real, unmodified code.",
+    "API surface used here (agent_framework.tool(approval_mode=...), Content.from_function_call/from_function_approval_request/to_function_approval_response, WorkflowBuilder, InMemoryCheckpointStorage, ToolApprovalRule/ToolApprovalMiddleware, agent_framework.orchestrations.HandoffBuilder) was confirmed by live introspection (inspect.signature, dataclasses.fields) and empirical probing against the installed 1.18.0 package, not assumed from memory."
+  ]
+}

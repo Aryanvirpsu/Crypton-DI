@@ -295,6 +295,19 @@ for the exact scenario and results. Explicitly *not* built this pass:
 gateway enforcement, real Agent Lab WebAuthn wiring, MCP, production key
 custody — see "What v0.6 deliberately did not build" below.
 
+> **Positioning note, added 2026-09-02 (does not change anything built
+> here):** what this section proves is now called **RAT-6A** specifically
+> — proof inside Crypton's own trust/data environment. A separate,
+> harder, not-attempted claim (**RAT-6B**: the same proof independently
+> verifiable by a third party with no prior integration) remains HOLD.
+> Market research the same day also found this primitive converging with
+> a real IETF draft (`draft-niyikiza-oauth-attenuating-agent-tokens`,
+> AAT, under WIMSE) — meaning this section's technical result is a
+> credibility asset and a possible Path B (standards-contributor) seed,
+> **not** a standalone moat. See `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §12
+> and `docs/business/MARKET_SCAN.md`, and `CLAUDE.md` §7/§11 (RAT-6A/6B,
+> RAT-7).
+
 ### Signing principal: `Agent`, not `AgentInstance`
 
 **Decision:** the cryptographic principal that signs a delegation is the
@@ -584,6 +597,74 @@ for whoever picks up the next piece:
   itself; explicitly out of scope per this milestone's own instructions.
 - **Key rotation with overlap, JWKS-style key discovery.** Create/resolve/revoke
   only — see the key model above.
+
+---
+
+## Strategy correction (2026-09): competitive framing (supersedes prior language)
+
+**Decision:** Crypton does not claim the agent-authorization-assessment
+market is white space, and does not claim its delegation-chain primitive
+is something no competitor has. Named competitors — **iC Consult** and
+**Article 11** — already operate in this lane. Differentiation is **open
+and unproven**, earned through delivered engagements, not asserted from
+architecture. This corrects an earlier session's conversational (never
+committed) framing of the primitive as "the one thing incumbents don't
+have." `docs/ASSESSMENT_METHODOLOGY.md` and `CLAUDE.md` §6/§7/§15 carry
+this forward; the market analysis itself lives in
+`docs/business/MARKET_SCAN.md` — this entry is the append-only record of
+the correction, not a restatement of that analysis.
+
+**RAT-6, restated for clarity:** RAT-6A (single-workflow, cryptographically-
+attributable multi-hop chain — v0.6 section above) is **GREEN and
+CLOSED**. RAT-6B (portable, no-prior-coordination verification) remains
+**HOLD**. v0.6.1 (below) does not touch, extend, or make progress on
+either.
+
+---
+
+## v0.6.1: Assessment Delivery Kit (2026-09)
+
+**Objective:** make the Agent Authorization & Delegation Assessment
+(`CLAUDE.md` §8a) repeatable, evidence-backed, and client-deliverable —
+a delivery/reporting layer only. `chain.py`, `delegation.py`,
+`authorization.py`, `approval.py`, `signing_keys.py` were not modified.
+
+**Governing rule (why `assessment/checks.py` does not exist):** Crypton's
+own test suite (`test_delegation_chain.py` et al.) proves Crypton's
+reference implementation handles known failure modes — it is not, and
+must never be represented as, an automated check against a customer's
+system. A PASS in Crypton's own tests says nothing about a customer's
+workflow. Full reasoning: `docs/ASSESSMENT_METHODOLOGY.md`'s "A note on
+Crypton's own test suite."
+
+**What was built** (`labs/agent-lab/src/agentlab/assessment/`): `models.py`
+(Finding/Evidence/Severity/Status types — PASS/FAIL structurally require
+at least one evidence reference), `evidence.py` (manifest — rejects
+duplicate evidence IDs and dangling references), `engagement.py`
+(file-based load/save, no database), `report.py` (pure/deterministic
+Markdown renderer), `reference_dryrun.py` (one synthetic, explicitly-
+labeled reference engagement driving real primitives end to end — see its
+own module docstring for exactly what it does and does not prove).
+Severity is contextual per the methodology's rubric, never a hardcoded
+category→severity table.
+
+**CLI additions:** `--render-assessment <engagement_dir>` (renders
+existing engagement data only — never assesses anything itself) and
+`--chain-verify --format json`.
+
+**Not built, deliberately, and evidence-gated:** `assessment/checks.py`
+(see above); any customer-specific data adapter; gateway
+enforcement/runtime interception; a dashboard; new authorization
+primitives; RAT-6B work. Build any of these only once a real engagement's
+evidence shows it's needed — not speculatively.
+
+**Dependency correction:** an earlier session's conversational output
+claimed "no CVEs of concern" in Agent Lab's runtime manifest based on the
+manifest being short — not a supported claim without an actual
+`pip-audit`/`safety` run, which was not performed. What is established:
+the 261 Dependabot findings trace to `crypton-console`'s/`crypton-main`'s
+`react-scripts`-era dev dependencies, not Agent Lab's runtime. No
+dependency audit or upgrade was performed this milestone.
 
 ---
 

@@ -1,0 +1,27 @@
+{
+  "experiment_id": "EXP-003C",
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11",
+    "companion_package": "langchain",
+    "companion_version": "1.4.0",
+    "source": "PyPI, both verified as LATEST via `pip index versions` before installing",
+    "upstream_repo": "https://github.com/langchain-ai/langgraph",
+    "selection_rationale": "Chosen over alternatives per instructions to maximize architectural diversity: graph/node/edge execution model with a generic interrupt()/Command(resume=) primitive and pluggable checkpointer, structurally unlike both OpenAI Agents SDK's agent-loop+ToolApprovalItem model (EXP-003A) and Microsoft Agent Framework's Workflow+function_approval_request model (EXP-003B)."
+  },
+  "environment": {
+    "python_version": "3.14.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "venv": "labs/exp-003c-langgraph/.venv (isolated)",
+    "api_key_required": false,
+    "network_required": false,
+    "model_dependence": "None - every scenario uses plain deterministic Python graph node functions, no LLM/chat model in the loop. Unlike EXP-003A/B, LangGraph's low-level interrupt()/Command primitive does not require a model at all to exercise the authorization-relevant mechanics."
+  },
+  "test_timestamp_utc": "2026-09-16T09:00:00Z",
+  "relevant_prior_evidence": [
+    "labs/experiments/001-langgraph-approval-drift/ (this repo, pre-dates EXP-003C) - a real, already-confirmed finding against langchain==1.4.0's HumanInTheLoopMiddleware: approval bound to proposed arguments is not re-verified against executed arguments when a second, benign middleware reorders/mutates the call between approval and execution. Referenced, not repeated, per the operating rule not to redo closed work - see this report's H1 section for how it relates to (and is distinct from) what EXP-003C tests directly against raw langgraph.types.interrupt()."
+  ],
+  "notes": [
+    "API surface used (langgraph.types.interrupt/Command/Interrupt, langgraph.checkpoint.memory.InMemorySaver, langgraph.checkpoint.sqlite.SqliteSaver, langgraph.graph.StateGraph, langchain.agents.middleware.HumanInTheLoopMiddleware/InterruptOnConfig) confirmed by live introspection against the installed versions, not assumed from memory."
+  ]
+}

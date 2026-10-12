@@ -1,5 +1,18 @@
 # Approval doesn't bind to what actually executes — a composition bug in LangChain agent middleware
 
+**CLOSED (2026-09-27): `NO VULNERABILITY — EXPECTED FRAMEWORK BEHAVIOR`.**
+LangChain's `after_model` middleware execution order is intentional and
+documented; the middleware doing the rewriting below is trusted,
+developer-supplied application code that the framework already permits to
+alter tool calls; no untrusted principal, model, tool, or input crossed
+any framework-claimed authorization boundary. This is not a security
+weakness, an authorization bypass, or a latent LangChain vulnerability —
+maintainer triage on this point is accepted and no further disclosure
+work is planned. Full reasoning: [`CLOSURE.md`](CLOSURE.md). The
+narrative below is preserved unedited as a negative/calibration
+result — read its "bug"/"gap"/"drift" language as the original
+investigation's framing, superseded by the closure above.
+
 ## TL;DR
 
 Composing two individually-safe, real LangChain middlewares — the framework's own `HumanInTheLoopMiddleware` (approval) and a small, benign custom hook that widens containment scope after a failed action — in the order a developer would naturally write them produces an agent that executes an action a human never approved. This is not a bug in either middleware; it's an undocumented property of how `after_model` middleware compose (list order runs in *reverse*). **Scope condition, up front: this only shows up when the agent has an autonomous, persistent mandate** — told to resolve incidents end-to-end and keep working after a failure. Under a passive "report back and stop" framing, the bug never fires: there's no retry, so nothing to drift. Within that scope condition, with a real model (`gpt-4o-mini`, two temperatures, N=20 each), it fired **38/40 times (95%)** — and the model never once chose to widen scope itself (0/40). It only ever retried the identical failed action; the middleware ordering did the rest.

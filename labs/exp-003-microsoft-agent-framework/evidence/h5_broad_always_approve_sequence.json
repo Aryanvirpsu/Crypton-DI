@@ -1,0 +1,81 @@
+{
+  "approval_decision": {
+    "decision": "create_always_approve_tool_response (broad, tool-scope)"
+  },
+  "approval_request": {
+    "call_id": "s1"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": null,
+    "checkpoint_match": null,
+    "delegation_match": true,
+    "notes": [
+      "argument_match null by design: this scenario specifically tests whether DIFFERENT arguments are still authorized."
+    ],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 50,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 999999,
+        "destination": "ZZZ"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "AUTHORITY_EXPANSION: initial approved authority = one transfer_funds call with {'account': 'checking', 'amount': 100, 'destination': 'A'}. Subsequent automatically authorized authority = ALL further transfer_funds calls in this session, including a materially higher-impact one ({'account': 'checking', 'amount': 999999, 'destination': 'ZZZ'}), with zero additional human decisions.",
+    "Classification: EXPECTED_BY_DESIGN. Confirmed via source (agent_framework/_harness/_tool_approval.py): ToolApprovalRule(tool_name, arguments=None) is documented to apply to the tool itself, matching ANY arguments - this is not a hidden mechanism, it is the framework's own explicit 'tool' scope tier, distinct from its 'tool_with_arguments' tier (see the narrow-scope test)."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "initial_call": {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "call_id": "s1",
+      "tool_name": "transfer_funds"
+    }
+  },
+  "scenario": "h5_broad_always_approve_sequence",
+  "state_boundary": {
+    "checkpoint": null,
+    "session": "shared AgentSession across all 4 calls",
+    "workflow": null
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

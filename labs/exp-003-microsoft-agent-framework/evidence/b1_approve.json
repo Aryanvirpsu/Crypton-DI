@@ -1,0 +1,60 @@
+{
+  "approval_decision": {
+    "decision": "approve",
+    "request_id": "af-call-0981ad26de36479192166655bcbb0e0f"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b1_1",
+    "id": "af-call-0981ad26de36479192166655bcbb0e0f",
+    "tool_name": "transfer_funds"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": true,
+    "delegation_match": true,
+    "notes": [],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "Baseline: no execution before approval; exactly one execution; executed arguments match approved arguments."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b1_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "b1_approve",
+  "state_boundary": {
+    "checkpoint": "restored via latest_checkpoint_id",
+    "session": null,
+    "workflow": "b1_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

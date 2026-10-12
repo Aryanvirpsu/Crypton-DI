@@ -1,0 +1,74 @@
+{
+  "approval_decision": {
+    "run_a": "approve, always_approve=True",
+    "run_b": "not decided - still required"
+  },
+  "approval_request": {
+    "run_a": "rA_1",
+    "run_b": "rB_1 (still pending after run A's always_approve)"
+  },
+  "authorization_binding": {
+    "argument_match": null,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [
+      "argument_match is null: RUN B never executed, so there is nothing to compare its arguments against."
+    ],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root_A",
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "call_id": "rA_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "a2_shared_context",
+      "sequence": 1,
+      "timestamp": 1791837959.9491343,
+      "tool_name": "transfer_funds",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "Classification: EXPECTED_BY_DESIGN / ISOLATED PER RUN. Even the literal same `context=` object (confirmed via `is` identity check, not just equality) passed to a second, independent Runner.run() call did NOT carry RUN A's always_approve grant into RUN B, despite RUN B targeting the identical tool identity.",
+    "Mechanism (confirmed via source inspection of agents/run_context.py, not just observed behavior): RunContextWrapper's `_approvals` and `_tool_invocations` fields are declared `default_factory=dict` on the WRAPPER, which Runner.run() constructs fresh on every call - the user-supplied `context` payload object is stored inside the wrapper but never itself carries approval bookkeeping. The hypothesized leak path does not exist via the public `context=` parameter.",
+    "This is reported as 'impossible to reproduce via context= sharing', not INCONCLUSIVE - the test executed cleanly and the mechanism was directly observed (RUN B's context_wrapper.context is confirmed identical-by-identity to RUN A's, yet still required fresh approval).",
+    "Not tested (out of scope for this surgical pass): continuing the SAME RunState across what an application treats as 'separate' logical work items - that scenario is already covered by EXP-003A Phase 1's H4 (resume binding) and is a different question from context= sharing."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "run_a": {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "call_id": "rA_1",
+      "tool_name": "transfer_funds"
+    },
+    "run_b": {
+      "arguments": {
+        "account": "checking",
+        "amount": 10000,
+        "destination": "B"
+      },
+      "call_id": "rB_1",
+      "tool_name": "transfer_funds"
+    }
+  },
+  "scenario": "a2_shared_context_always_approve_isolation",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

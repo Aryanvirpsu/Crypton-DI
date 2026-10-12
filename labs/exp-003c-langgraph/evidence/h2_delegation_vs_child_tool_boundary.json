@@ -1,0 +1,58 @@
+{
+  "approval_decision": {
+    "round_1": "approve parent delegation only",
+    "round_2": "approve child tool separately"
+  },
+  "approval_request": {
+    "child_interrupt_id": "c13d922cae8ca2add393e7971be03f74",
+    "parent_interrupt_id": "83226674605c5546dc610d5b01061b62"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [
+    {
+      "invokes_subgraph": "child",
+      "node": "parent"
+    }
+  ],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "amount": 50,
+        "customer": "alice"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "h2",
+      "sequence": 6,
+      "thread_id": null,
+      "timestamp": 1791837941.799839,
+      "tool_name": "issue_refund"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "Approving the parent delegation's interrupt did not execute or auto-approve the child subgraph's own, independently-interrupted sensitive tool - two distinct interrupt ids, two distinct decisions required."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "child_tool": "issue_refund",
+    "delegation": "delegate_to_refund_agent"
+  },
+  "scenario": "h2_delegation_vs_child_tool_boundary",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h2"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

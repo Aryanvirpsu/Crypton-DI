@@ -1,0 +1,54 @@
+{
+  "approval_decision": {
+    "decision": "create_always_approve_tool_with_arguments_response (narrow, tool+arguments scope)"
+  },
+  "approval_request": {
+    "call_id": "n1"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": null,
+    "delegation_match": true,
+    "notes": [],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "The complementary, narrower standing-approval helper behaves exactly as documented: a materially different (higher-impact) call to the SAME tool, in the SAME session, under a tool_with_arguments-scoped grant, remained pending and did NOT auto-execute. This is the clean control confirming the framework's two-tier scope design is real and both tiers work as named."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "initial_call": {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "call_id": "n1",
+      "tool_name": "transfer_funds"
+    }
+  },
+  "scenario": "h5_narrow_always_approve_arguments_scoped",
+  "state_boundary": {
+    "checkpoint": null,
+    "session": "shared AgentSession across both calls",
+    "workflow": null
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

@@ -1,0 +1,18 @@
+# EXP-003C target, pinned exactly - see target.json.
+# Added 2026-09-30 as part of the evidence-readiness remediation pass:
+# this experiment previously had no dependency manifest at all (the only
+# place its exact versions were recorded was target.json/README.md prose).
+# These are the two direct, deliberately-chosen target packages.
+langgraph==1.2.11
+langchain==1.4.0
+
+# Minimum test tooling. No real model provider / API key needed - every
+# scenario uses plain deterministic Python graph node functions, no LLM in
+# the loop (see target.json's "model_dependence" note).
+pytest
+pytest-asyncio
+
+# For a byte-for-byte reproduction of the exact environment this
+# experiment's evidence/*.json files were produced against (including
+# every transitive dependency's exact resolved version), use
+# requirements-lock.txt instead of this file.

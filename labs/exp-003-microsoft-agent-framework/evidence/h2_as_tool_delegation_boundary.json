@@ -1,0 +1,53 @@
+{
+  "approval_decision": {
+    "round_1": "not yet decided in this test - isolation confirmed before any decision"
+  },
+  "approval_request": {
+    "round_1_pending": [
+      [
+        "refund_agent",
+        "delegate_1"
+      ]
+    ]
+  },
+  "authorization_binding": {
+    "agent_match": null,
+    "argument_match": null,
+    "checkpoint_match": true,
+    "delegation_match": null,
+    "notes": [
+      "agent_match/delegation_match null: the full cycle (confirming the nested issue_refund call also independently requires approval after the delegation is approved) could not be completed in this pass - see module docstring and README's H2 notes. Only the pre-decision isolation fact is asserted here."
+    ],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [
+    {
+      "agent": "root_agent",
+      "call_id": "delegate_1",
+      "calls": "refund_agent"
+    }
+  ],
+  "execution": [],
+  "experiment": "EXP-003B",
+  "notes": [
+    "PARTIAL RESULT: round 1 correctly shows only the delegation call pending, not the nested sensitive tool - so at minimum, proposing a delegation does not itself expose or pre-authorize the nested tool call.",
+    "NOT CONFIRMED: whether approving the delegation subsequently requires a SEPARATE approval for the nested issue_refund call, because completing round 2 hit a streaming-invocation incompatibility in this lab's ScriptedChatClient test double when Agent.as_tool() invokes the nested agent (TypeError: \"'async for' requires an object with __aiter__ method, got coroutine\"). This is a test-harness gap, not an observed framework authorization behavior - recorded as INCONCLUSIVE, not PASS.",
+    "Top Phase-2 priority for EXP-003B: fix ScriptedChatClient's streaming path for Agent.as_tool()-invoked nested agents (and/or investigate whether agent_framework.orchestrations.HandoffBuilder cleanly surfaces a downstream agent's function_approval_request as a workflow-level request_info event - also not resolved in this pass; see README)."
+  ],
+  "outcome": "INCONCLUSIVE",
+  "proposal": {
+    "call_id": "delegate_1",
+    "tool_name": "refund_agent (delegation)"
+  },
+  "scenario": "h2_as_tool_delegation_boundary",
+  "state_boundary": {
+    "checkpoint": "checkpoint_1",
+    "session": null,
+    "workflow": "h2_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

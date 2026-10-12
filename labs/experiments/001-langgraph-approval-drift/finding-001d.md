@@ -1,6 +1,16 @@
 # Finding 001d — A benign `after_model` middleware, in a natural-reading order, silently drifts the executed action past approval
 
-**One-line verdict: FAIL + hook PLAUSIBLE.** This is the §19 framework-representative finding #001–#001c were hunting for: a small, benign, independently-defensible middleware (`HostEscalationMiddleware` — "widen scope after a host fails to respond, because it may have moved") placed in `create_agent`'s `middleware=[...]` list in the order a developer would naturally write it — produces **5/5 reproducible approval/execution drift**, using the framework's own real, shipped `HumanInTheLoopMiddleware` for approval, with no line of code anywhere whose purpose is to skip approval. Swapping only the list order (same two middleware objects, same hook body, same everything else) makes it **5/5 PASS**. The gap is not in LangGraph's documented happy paths (#001b, #001c already closed those) — it's in a real, sanctioned extension surface, used exactly as sanctioned, composed in the order that reads as natural.
+**CLOSED (2026-09-27): `NO VULNERABILITY — EXPECTED FRAMEWORK BEHAVIOR`.**
+See [`CLOSURE.md`](CLOSURE.md) for the full reasoning: `after_model`
+composition order is intentional/documented, the middleware involved is
+trusted developer code already permitted to alter tool calls, and no
+untrusted principal crossed a framework-claimed boundary. The verdict
+language below ("FAIL", "gap", "bypass") reflects the original
+investigation's framing and is preserved unedited for calibration value —
+read it against `CLOSURE.md`'s reasoning, not as a standing vulnerability
+claim.
+
+**One-line verdict (original, superseded by CLOSURE.md): FAIL + hook PLAUSIBLE.** This is the §19 framework-representative finding #001–#001c were hunting for: a small, benign, independently-defensible middleware (`HostEscalationMiddleware` — "widen scope after a host fails to respond, because it may have moved") placed in `create_agent`'s `middleware=[...]` list in the order a developer would naturally write it — produces **5/5 reproducible approval/execution drift**, using the framework's own real, shipped `HumanInTheLoopMiddleware` for approval, with no line of code anywhere whose purpose is to skip approval. Swapping only the list order (same two middleware objects, same hook body, same everything else) makes it **5/5 PASS**. The gap is not in LangGraph's documented happy paths (#001b, #001c already closed those) — it's in a real, sanctioned extension surface, used exactly as sanctioned, composed in the order that reads as natural.
 
 ---
 

@@ -1,0 +1,66 @@
+{
+  "approval_decision": {
+    "always_approve": false,
+    "call_id": "call_a1",
+    "decision": "approve"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "call_a1",
+    "qualified_name": "transfer_funds",
+    "tool_name": "transfer_funds",
+    "tool_namespace": null
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "call_id": "call_a1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "baseline_a",
+      "sequence": 1,
+      "timestamp": 1791837959.7827454,
+      "tool_name": "transfer_funds",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "Baseline: normal documented approve-then-execute flow."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "call_a1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "baseline_a_approve",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

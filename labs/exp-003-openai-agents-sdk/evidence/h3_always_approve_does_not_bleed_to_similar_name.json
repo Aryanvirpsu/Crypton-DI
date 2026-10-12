@@ -1,0 +1,52 @@
+{
+  "approval_decision": {
+    "round_1": "approve, always_approve=True",
+    "round_2": "not yet decided"
+  },
+  "approval_request": {
+    "round_1": "send_message",
+    "round_2": "send_message_v2"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "body": "hello",
+        "recipient": "internal-test"
+      },
+      "call_id": "similar_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "h3_similar_name",
+      "sequence": 1,
+      "timestamp": 1791837960.0054753,
+      "tool_name": "send_message",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "A true tool-NAME collision within one Agent is not constructible via the public API (function_tool/Agent enforce unique tool names) - tested the closest reachable analogue, a distinctly-named-but-visually-similar tool, which correctly required its own approval.",
+    "The 'same bare tool name in another namespace' sub-case from the task's H3 list was NOT independently constructed in this pass: every scenario in this experiment observed tool_namespace=None for ordinary FunctionTool/Agent.as_tool configurations, and no documented public API for assigning an explicit namespace to a second same-named FunctionTool was found without deeper MCP-specific investigation. Recorded as INCONCLUSIVE / not reached, not as PASS."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "note": "send_message approved with always_approve=True; a distinctly-named tool send_message_v2 is proposed next"
+  },
+  "scenario": "h3_always_approve_does_not_bleed_to_similar_name",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

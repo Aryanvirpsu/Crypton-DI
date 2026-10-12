@@ -1,0 +1,8 @@
+{
+  "installed_mcp_version": "1.27.2",
+  "control_status": 400,
+  "cross_principal_status": 404,
+  "negative_control_ok": true,
+  "verdict": "PASS -- SECURE (manager rejected the mismatched principal as an unknown session, before ever reaching the transport)",
+  "notes": []
+}

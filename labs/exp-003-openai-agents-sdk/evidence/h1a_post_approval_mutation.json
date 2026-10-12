@@ -1,0 +1,66 @@
+{
+  "approval_decision": {
+    "call_id": "h1a_1",
+    "decision": "approve",
+    "note": "approved BEFORE the raw_item.arguments mutation"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "h1a_1",
+    "tool_name": "transfer_funds"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [
+      "Mutated the approval item's public raw_item.arguments field AFTER state.approve() but before resume. Executed arguments matched the ORIGINALLY PRESENTED/APPROVED values, not the post-approval mutation - the SDK does not re-read raw_item live at execution time for a call_id it has already registered an invocation record for."
+    ],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "call_id": "h1a_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "h1_post_approval_mutation",
+      "sequence": 1,
+      "timestamp": 1791837959.745418,
+      "tool_name": "transfer_funds",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "APPROVAL_BINDING = PASS for this transition: materially changed arguments after approval did not reach execution."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "h1a_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h1a_post_approval_mutation",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}
