@@ -1,41 +1,87 @@
 # Crypton Gateway
 
 Rust/Axum gateway in front of `crypton-id`. On `dev` it is a reverse proxy with a
-middleware stack wired in front of the proxy. **"Wired" is not "proven":** see
-[Verification status](#verification-status) for what the tests actually demonstrate
-and the known defects that stop it being production-ready.
+security middleware stack. It verifies the tokens `crypton-id` issues, applies replay,
+rate-limit and risk-policy controls, and records every allow/deny decision.
+[Verification status](#verification-status) states exactly what is and is not proven.
+
+## Token contract (trust boundary)
+
+`crypton-id` is the only issuer. Tokens are **EdDSA (Ed25519)**, header `kid = "v1"`,
+claims `{sub: user UUID, username, cred_id: credential UUID, iat, exp}`
+(`services/crypton-id/src/jwt.rs`). The gateway holds only the **public** key
+(`JWT_PUBLIC_KEY_PEM` or `JWT_PUBLIC_KEY_PEM_FILE`, the same key identity is configured
+with) and can verify but never mint.
+
+- Rejected: any algorithm other than EdDSA (HS256, `none`, RS*), unknown/missing `kid`,
+  bad signature, expired, missing claims, non-UUID `sub`/`cred_id`. There is no HS256 or
+  shared-secret fallback.
+- No `iss`/`aud` claim exists in the contract, so none is checked; trust rests on the
+  signature under the dedicated identity key.
+- Revocation mirrors identity, but fails **closed** (503 if Redis/Postgres cannot
+  answer): Redis logout denylist `jwt:deny:{sub}:{iat}`, and the credential `cred_id`
+  must still be `active` for `sub` in Postgres.
+- Tokens carry no role: the admin check for internal diagnostics reads `users.role`.
+- Key rotation is not implemented: only `kid = v1` is accepted.
 
 ## Request path
 
-Two listeners:
-
-- External `0.0.0.0:$PORT` (falls back to `$APP_PORT`, default `8090`): `/health`
-  (open) and everything else proxied to `IDENTITY_URL` through the stack below.
+- External `0.0.0.0:$PORT` (falls back to `$APP_PORT`, default `8090`): `/health` (open)
+  and everything else proxied to `IDENTITY_URL` through the stack below.
 - Internal `127.0.0.1:$INTERNAL_PORT` (default `9090`): `/internal/metrics`,
-  `/internal/diagnostics/*` (admin JWT), `/internal/audit/ingest` (`x-internal-token`).
+  `/internal/diagnostics/*` (admin), `/internal/audit/ingest` (`x-internal-token`).
   Never expose this listener publicly.
 
-External middleware order (outermost first):
-
-`request-id -> trace -> CORS -> validate_jwt -> enforce_nonce -> rate_limit -> device_context -> step_up_context -> enforce_policy -> proxy`
+External stack (outermost first): `request-id -> trace -> CORS -> deny-recorder ->
+validate_jwt -> nonce -> rate_limit -> device_context -> step_up_context -> policy ->
+allow-recorder -> proxy`.
 
 | Layer | What it does |
 |---|---|
-| request-id | Assigns a UUID `x-request-id` (keeps a caller-supplied one), logs it on the request span, forwards it upstream, echoes it on the response. Applied outermost so rejected requests carry one too. |
-| `validate_jwt` | Requires `Authorization: Bearer`. Decodes **HS256** with `JWT_SECRET`; on failure falls back to `POST {IDENTITY_URL}/verify`. Rejects tokens on the Redis logout denylist / role-invalidation cutoff. |
-| `enforce_nonce` | Requires `x-timestamp` (±60 s) and `x-nonce`; a nonce is single-use for 300 s (`SET NX`); replay -> 409; Redis down -> 503. |
-| `rate_limit` | Sensitive paths only (`/auth/`, `/recovery/`, `/devices/revoke`): per IP 100/min, per user 60/min, per `x-device-id` 50/min -> 429. |
-| `device_context` | Looks up the `x-device-id` credential status in Postgres, bound to the authenticated user. |
-| `step_up_context` | Reads `stepup:completed:{jti or sub}` from Redis. |
-| `enforce_policy` | Builds a `risk_engine::RiskContext` from signals the gateway can observe (velocity counters, lock, device status, nonce) and enforces the verdict: Deny 403, Challenge 401, Hold 202. `POLICY_ENFORCE=false` is dry-run. |
-| proxy | Forwards to identity; strips hop-by-hop and client-supplied IP headers (`x-forwarded-for`, `x-real-ip`, ...) and sets `x-forwarded-for` from the TCP peer. |
+| `validate_jwt` | Token contract above. Only the explicit public allowlist may omit a token. |
+| `nonce` | Requires `x-timestamp` (±60 s) and a well-formed `x-nonce` (≤128 chars of `[A-Za-z0-9._:-]`). Single use for 300 s via atomic `SET NX EX`. Scope below. Redis down -> 503. |
+| `rate_limit` | Sensitive paths (`/auth/`, `/recovery/`, `/devices/revoke`): per IP 100/min, per user 60/min, per `x-device-id` 50/min -> 429. |
+| `device_context` / `step_up_context` | Credential status (from `x-device-id`, bound to the user) and `stepup:completed:{sub}` for the policy engine. |
+| `policy` | `risk_engine` verdict: Deny 403, Challenge 401, Hold 202; `POLICY_ENFORCE=false` is dry run. |
+| decision recorders | One durable row per request (see Audit). |
+| proxy | Strips hop-by-hop and client-supplied IP headers, sets `x-forwarded-for` from the TCP peer. |
 
-The gateway is a coarse pre-filter. It does no GeoIP/breach enrichment and has **no
-agent-delegation checks**; `crypton-id` stays authoritative.
+### Public authentication routes
+
+Exact method + exact raw path, nothing else (no prefixes, normalisation, trailing slash
+or percent-decoding): `POST /auth/register/start|finish`, `POST /auth/login/start|finish`,
+`POST /recovery/public/start`, `GET /recovery/public/status`, `POST /recovery/public/complete`.
+They still require nonce/timestamp, are rate limited, and identity enforces WebAuthn on
+them. A bearer token presented on one must still be valid. Everything else without a
+token is 401.
+
+### Nonce scope
+
+Authenticated: unique per user (`nonce:u:{sub}:{nonce}`). Another user may use the same
+value (a different request by a different principal), but replaying a captured request
+always lands in the victim's scope and is rejected, so switching identity does not enable
+replay. Anonymous public routes: unique per `(client IP, method, path)`. A client must
+send a fresh nonce on every request; `@crypton/sdk` does.
+
+### Audit
+
+Everything is written to `audit_logs`, the table `crypton-id`'s migrations create (no
+second audit table).
+
+- **Decision trail** (`actor='gateway'`, `action='gateway.decision'`, `outcome='allow'|'deny'`):
+  reason, method, path (no query), request id, client IP, user/credential. Never tokens,
+  headers, bodies or nonces. Denials are recorded by the outermost layer (a failed write is
+  logged and counted, the denial still holds). An allow is recorded **before** forwarding;
+  if it cannot be stored the request is refused (503), so nothing executes unaudited.
+- **`/internal/audit/ingest`**: row insert + Redis signal change are consistent. The row is
+  written in a transaction, the Redis effect is one atomic operation, and the transaction
+  commits only if it succeeded (Redis failure -> 503, row rolled back; Postgres failure ->
+  500, no Redis change). Residual window: a commit failure after a successful Redis write.
 
 ## Environment
 
-See `.env.example`. Required at startup: `DATABASE_URL`, `JWT_SECRET`, `INTERNAL_TOKEN`.
+See `.env.example`. Required at startup: `DATABASE_URL`, `INTERNAL_TOKEN`, and the identity
+public key.
 
 ## Running
 
@@ -46,9 +92,8 @@ cargo run
 
 ## Verification status
 
-`cargo test` runs 28 tests with no infrastructure. The 18 router-level tests in
-`src/gateway_tests.rs` drive the real routers against a throwaway Redis + Postgres and a
-stub upstream. They are `#[ignore]`d unless you provide infrastructure:
+`cargo test` runs 30 tests with no infrastructure. The 34 router-level and end-to-end tests
+in `src/gateway_tests.rs` are `#[ignore]`d unless you provide throwaway infrastructure:
 
 ```sh
 docker run -d --rm --name gw-test-redis -p 127.0.0.1:16379:6379 redis:7-alpine
@@ -59,28 +104,35 @@ export GATEWAY_TEST_DATABASE_URL=postgres://postgres:<throwaway>@127.0.0.1:15432
 cargo test -- --ignored
 ```
 
-Never point these at shared or production services; the tests write keys and tables.
+Never point these at shared or production services: they write keys, create/drop
+databases, and apply the identity migrations.
 
-**Demonstrated by tests** (the nonce, rate-limit and JWT layers, and policy enforcement,
-were each also disabled in turn to confirm the relevant tests fail): unauthenticated /
-forged / expired / revoked tokens rejected; admin-only diagnostics; locked accounts and
-revoked credentials blocked by policy (another user's revoked credential is not applied);
-nonce and timestamp required, replay rejected; per-IP / per-user / per-device rate limits;
-request IDs generated, propagated upstream and present on rejections; spoofed client-IP
-headers not forwarded; upstream failure does not bypass controls.
+**Demonstrated**: token contract rejections (11 forged/invalid shapes, each with its
+recorded reason); credential revocation/loss/foreign/deleted; logout denylist; public-route
+allowlist and 20 near-miss bypass attempts; nonce single use, principal scope, 24-way
+concurrent reuse admits one; Redis outage fails closed for auth, replay protection and
+ingest; rate limits; decision trail with accurate reasons and no secrets; allow fails
+closed when the trail cannot be written; ingest atomicity (both failure directions);
+request ids; upstream failure does not bypass controls. Each of: public-route widening,
+removing the credential check, global nonces, failing open on audit, ignoring Redis
+errors in ingest, and accepting non-EdDSA tokens makes the matching tests fail.
 
-**Known defects and gaps** (pinned by `known_*` tests, not fixed here):
+**End to end with crypton-id's real token code** (`e2e_*`): tokens come from crypton-id's
+production `issue_jwt`; the upstream authenticates with crypton-id's real `AuthUser`,
+`/me`, Redis denylist and credential check. These are compiled verbatim from
+`services/crypton-id/src` by `tests-support/identity-src`. **Not** the full crypton-id
+binary: it cannot be built on every host (`webauthn-rs` needs OpenSSL dev libraries), so
+the passkey ceremony, register/login handlers and identity's own audit writes are not
+exercised.
 
-- **Identity-issued tokens do not match what the gateway verifies.** `crypton-id` signs
-  EdDSA and exposes no `/verify` route; the gateway verifies HS256 with a shared secret.
-  Established by source inspection, not a runtime test against a live identity service.
-- **Public auth routes are unreachable**: `validate_jwt` wraps the whole proxy, so
-  `/auth/login` and `/auth/register` return 401 without a bearer token.
-- **Audit ingest cannot persist**: it inserts into `audit_events`, which `crypton-id`
-  never creates (it creates `audit_logs`), so the endpoint returns 500 after applying
-  its Redis side effects.
-- **The gateway keeps no audit record of its own allow/deny decisions**; only
-  in-memory counters at `/internal/metrics`. Every policy block increments
-  `gateway_policy_blocked_locked_total` regardless of reason.
-- Nonces are global, not bound to the caller.
-- Not tested: Redis outage behaviour, step-up completion, org/tenant policy overrides.
+**Remaining gaps**
+- Identity must not be reachable except through the gateway; nothing here enforces or
+  verifies that (`known_gap_identity_is_reachable_directly...`). Gateway-only controls are
+  bypassed by direct access.
+- `crypton-id` does not call `/internal/audit/ingest` and nothing writes
+  `stepup:completed:*`, so the lockout/recovery/velocity signals and step-up Challenge
+  satisfaction have no producer outside tests.
+- Every policy block increments `gateway_policy_blocked_locked_total` regardless of reason
+  (the decision trail has the accurate reason).
+- No key rotation; no `iss`/`aud`; no gateway-side agent-delegation checks.
+- Not tested: step-up completion, org/tenant policy overrides, Postgres outage during auth.

@@ -5,6 +5,7 @@ use axum::{
     response::Response,
 };
 
+use crate::middleware::reject::Reject;
 use crate::state::{AppState, Metrics};
 
 // Atomic INCR + conditional EXPIRE via Lua script.
@@ -47,7 +48,7 @@ pub async fn limit(
     State(state): State<AppState>,
     req: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, Reject> {
     let path = req.uri().path();
     if !is_sensitive_path(path) {
         return Ok(next.run(req).await);
@@ -63,7 +64,7 @@ pub async fn limit(
         {
             tracing::warn!(%ip, "rate limit exceeded for ip");
             Metrics::inc(&state.metrics.rate_limit_block_ip);
-            return Err(StatusCode::TOO_MANY_REQUESTS);
+            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_ip"));
         }
     }
 
@@ -75,7 +76,7 @@ pub async fn limit(
         {
             tracing::warn!(user = %claims.sub, "rate limit exceeded for user");
             Metrics::inc(&state.metrics.rate_limit_block_user);
-            return Err(StatusCode::TOO_MANY_REQUESTS);
+            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_user"));
         }
     }
 
@@ -91,7 +92,7 @@ pub async fn limit(
         {
             tracing::warn!(device = %device, "rate limit exceeded for device");
             Metrics::inc(&state.metrics.rate_limit_block_device);
-            return Err(StatusCode::TOO_MANY_REQUESTS);
+            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_device"));
         }
     }
 

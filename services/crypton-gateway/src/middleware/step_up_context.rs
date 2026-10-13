@@ -19,12 +19,11 @@ pub async fn inject_step_up_context(
     mut req: Request,
     next: Next,
 ) -> Response {
-    // Prefer jti (token-scoped) over sub (user-scoped) so step-up on one
-    // session does not propagate to all concurrent sessions for the user.
+    // Identity tokens carry no jti, so the session key is the user id.
     let session_key = req
         .extensions()
         .get::<crate::middleware::auth::Claims>()
-        .map(|c| c.jti.clone().unwrap_or_else(|| c.sub.clone()));
+        .map(|c| c.sub.clone());
 
     let verified = match session_key {
         Some(session) => {

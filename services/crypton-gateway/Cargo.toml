@@ -52,3 +52,5 @@ dotenvy     = "0.15"
 [dev-dependencies]
 # Router-level tests drive the real Axum router with `ServiceExt::oneshot`.
 tower = { version = "0.5", features = ["util"] }
+# crypton-id's real token/auth source, compiled for end-to-end tests only.
+identity-src = { path = "tests-support/identity-src" }

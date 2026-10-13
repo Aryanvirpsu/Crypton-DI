@@ -1,3 +1,4 @@
+use jsonwebtoken::DecodingKey;
 use redis::aio::ConnectionManager;
 use redis::Client as RedisClient;
 use sqlx::PgPool;
@@ -7,7 +8,6 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct Metrics {
     pub auth_jwt_accepted: AtomicU64,
-    pub auth_opaque_accepted: AtomicU64,
     pub auth_rejected: AtomicU64,
 
     pub rate_limit_block_ip: AtomicU64,
@@ -29,6 +29,12 @@ pub struct Metrics {
     pub proxy_upstream_4xx: AtomicU64,
     pub proxy_upstream_5xx: AtomicU64,
     pub proxy_upstream_error: AtomicU64,
+
+    /// Decision-trail rows that could not be written. Allow decisions fail
+    /// closed (503) when this happens; deny decisions are still enforced.
+    pub audit_write_failed: AtomicU64,
+    pub audit_decisions_allowed: AtomicU64,
+    pub audit_decisions_denied: AtomicU64,
 }
 
 impl Metrics {
@@ -42,22 +48,23 @@ impl Metrics {
 pub struct AppState {
     pub redis: Arc<ConnectionManager>,
     pub pg: PgPool,
-    /// Shared HTTP client for upstream proxy and opaque-token verification.
+    /// Shared HTTP client for the upstream proxy.
     pub http_client: reqwest::Client,
     pub identity_base: String,
     pub metrics: Arc<Metrics>,
     /// When true (default), risk-engine DENY/CHALLENGE/HOLD actually block the
     /// request. Set POLICY_ENFORCE=false to run in dry-run mode.
     pub policy_enforce: bool,
-    // Security: both env vars are required at startup — process exits if absent.
-    pub jwt_secret: String,
+    /// Public half of the `crypton-id` Ed25519 signing key. The gateway can
+    /// verify identity tokens but never mint them.
+    pub jwt_decoding_key: DecodingKey,
+    // Security: INTERNAL_TOKEN is required at startup. Process exits if absent.
     pub internal_token: String,
 }
 
 impl AppState {
     pub async fn new(redis_url: &str, pg_conn: &str) -> anyhow::Result<Self> {
-        let jwt_secret = std::env::var("JWT_SECRET")
-            .map_err(|_| anyhow::anyhow!("JWT_SECRET is required but not set"))?;
+        let jwt_decoding_key = load_decoding_key()?;
 
         let internal_token = std::env::var("INTERNAL_TOKEN").map_err(|_| {
             anyhow::anyhow!("INTERNAL_TOKEN is required — authenticates service-to-service calls")
@@ -89,8 +96,23 @@ impl AppState {
             identity_base,
             metrics: Arc::new(Metrics::default()),
             policy_enforce,
-            jwt_secret,
+            jwt_decoding_key,
             internal_token,
         })
     }
+}
+
+/// Read the identity service's Ed25519 PUBLIC key (SPKI PEM), same convention
+/// as `crypton-id`: `JWT_PUBLIC_KEY_PEM_FILE` (a path) wins over
+/// `JWT_PUBLIC_KEY_PEM` (inline, newline-escaped in `.env`). Startup aborts if it
+/// is missing or not a valid Ed25519 public key.
+fn load_decoding_key() -> anyhow::Result<DecodingKey> {
+    let pem = match std::env::var("JWT_PUBLIC_KEY_PEM_FILE") {
+        Ok(path) => std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("failed to read JWT_PUBLIC_KEY_PEM_FILE ({path}): {e}"))?,
+        Err(_) => std::env::var("JWT_PUBLIC_KEY_PEM")
+            .map_err(|_| anyhow::anyhow!("JWT_PUBLIC_KEY_PEM (or JWT_PUBLIC_KEY_PEM_FILE) is required"))?,
+    };
+    DecodingKey::from_ed_pem(pem.as_bytes())
+        .map_err(|e| anyhow::anyhow!("JWT public key is not a valid Ed25519 SPKI PEM key: {e}"))
 }

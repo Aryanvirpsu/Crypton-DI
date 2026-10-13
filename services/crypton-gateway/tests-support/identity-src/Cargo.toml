@@ -1,0 +1,25 @@
+# Test support only. Compiles crypton-id's REAL token/auth source files
+# (jwt.rs, error.rs, redis/sessions.rs, routes/me.rs) verbatim via #[path], with
+# the same dependency versions crypton-id uses, so the gateway's end-to-end tests
+# can mint tokens with crypton-id's production `issue_jwt` and use its real
+# `AuthUser` extractor as the upstream. It exists because the full crypton-id
+# binary cannot be built on every host (webauthn-rs -> openssl-sys needs OpenSSL
+# development libraries). Never a dependency of the gateway proper.
+[package]
+name = "identity-src"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+anyhow = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "json"] }
+redis = { version = "0.26", features = ["tokio-comp"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+jsonwebtoken = "9"

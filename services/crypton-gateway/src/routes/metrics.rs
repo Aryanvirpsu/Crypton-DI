@@ -17,10 +17,6 @@ pub async fn handler(State(state): State<AppState>) -> impl IntoResponse {
         m.auth_jwt_accepted.load(std::sync::atomic::Ordering::Relaxed),
     ));
     body.push_str(&format_counter(
-        "gateway_auth_opaque_accepted_total",
-        m.auth_opaque_accepted.load(std::sync::atomic::Ordering::Relaxed),
-    ));
-    body.push_str(&format_counter(
         "gateway_auth_rejected_total",
         m.auth_rejected.load(std::sync::atomic::Ordering::Relaxed),
     ));
@@ -98,6 +94,14 @@ pub async fn handler(State(state): State<AppState>) -> impl IntoResponse {
         m.proxy_upstream_error
             .load(std::sync::atomic::Ordering::Relaxed),
     ));
+
+    for (name, c) in [
+        ("gateway_audit_write_failed_total", &m.audit_write_failed),
+        ("gateway_audit_decisions_allowed_total", &m.audit_decisions_allowed),
+        ("gateway_audit_decisions_denied_total", &m.audit_decisions_denied),
+    ] {
+        body.push_str(&format_counter(name, c.load(std::sync::atomic::Ordering::Relaxed)));
+    }
 
     let mut resp = Response::new(body);
     resp.headers_mut()

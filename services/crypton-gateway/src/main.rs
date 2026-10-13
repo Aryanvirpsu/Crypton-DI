@@ -6,9 +6,11 @@
 //!   Internal  127.0.0.1:9090 — metrics, diagnostics, audit ingest (never exposed publicly)
 //!
 //! Middleware order on the external listener (outermost → innermost):
-//!   auth → nonce → rate_limit → device_context → step_up_context → policy → proxy
+//!   deny-recorder → auth → nonce → rate_limit → device_context → step_up_context
+//!   → policy → allow-recorder → proxy
 //!
-//! Startup aborts if JWT_SECRET or INTERNAL_TOKEN are not set in the environment.
+//! Startup aborts if the identity public key (JWT_PUBLIC_KEY_PEM[_FILE]) or
+//! INTERNAL_TOKEN is not set in the environment.
 
 mod audit;
 #[cfg(test)]
@@ -23,7 +25,7 @@ use axum::{
     body::Body,
     extract::State,
     http::{HeaderName, Method, Request, Response, StatusCode},
-    middleware::{from_fn, from_fn_with_state},
+    middleware::from_fn_with_state,
     routing::{get, post},
     Router,
 };
@@ -39,6 +41,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use middleware::{
     auth::{require_admin, validate_jwt},
+    decision::{record_allow, record_deny},
     device_context::inject_device_context,
     nonce::enforce_nonce,
     policy::enforce_policy,
@@ -106,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
 
-    // AppState::new validates JWT_SECRET and INTERNAL_TOKEN — startup aborts
+    // AppState::new validates the identity public key and INTERNAL_TOKEN — startup aborts
     // here if either is missing, before any port is bound.
     let app_state = AppState::new(&redis_url, &database_url).await?;
 
@@ -177,11 +180,14 @@ fn build_external_router(state: AppState) -> Router {
         .layer(from_fn_with_state(state.clone(), limit))
         .layer(from_fn_with_state(state.clone(), inject_device_context))
         .layer(from_fn_with_state(state.clone(), inject_step_up_context))
-        .layer(from_fn_with_state(state.clone(), enforce_policy));
+        .layer(from_fn_with_state(state.clone(), enforce_policy))
+        .layer(from_fn_with_state(state.clone(), record_allow));
 
     let proxy_router = Router::new()
         .fallback(proxy_handler)
         .layer(auth_stack)
+        // Outermost security layer: records every denial with its reason.
+        .layer(from_fn_with_state(state.clone(), record_deny))
         .with_state(state.clone());
 
     let router = Router::new()
@@ -201,7 +207,7 @@ fn build_internal_router(state: AppState) -> Router {
         .route("/user/:user_id", get(routes::diagnostics::user))
         .route("/device/:device_id", get(routes::diagnostics::device))
         .route("/ip/:ip", get(routes::diagnostics::ip))
-        .layer(from_fn(require_admin))
+        .layer(from_fn_with_state(state.clone(), require_admin))
         .layer(from_fn_with_state(state.clone(), validate_jwt));
 
     let router = Router::new()

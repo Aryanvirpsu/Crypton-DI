@@ -100,7 +100,7 @@ for the marked extension point where that wiring will eventually happen.
 
 ```text
 services/crypton-id        Rust/Axum identity service — WebAuthn, JWT, devices, recovery, audit log, admin
-services/crypton-gateway   Rust/Axum gateway — proxy + wired auth/nonce/rate-limit/risk-policy middleware (unproven end to end; see its README)
+services/crypton-gateway   Rust/Axum gateway — verifies crypton-id EdDSA tokens, nonce/rate-limit/risk-policy, durable decision trail (see its README for what is and is not proven)
 services/crypton-console   Product frontend — register, login, devices, recovery, admin
 services/crypton-main      Public marketing site, no backend calls
 libs/crypton-sdk           TypeScript client SDK — the only thing that talks to crypton-id over HTTP

@@ -16,6 +16,7 @@ use risk_engine::{
     CredentialStatus, Decision, OrgRiskLevel, PolicyConfig, RiskAction, RiskContext,
 };
 
+use crate::middleware::reject::Reject;
 use crate::middleware::risk_store::GatewaySignalStore;
 use crate::state::{AppState, Metrics};
 
@@ -261,7 +262,7 @@ pub async fn enforce_policy(
     State(state): State<AppState>,
     mut req: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, Reject> {
     // Own the path string so we can mutably borrow req later (extensions_mut).
     let raw_path = req.uri().path().to_owned();
     let path: &str = raw_path.strip_prefix("/api").unwrap_or(&raw_path);
@@ -274,7 +275,7 @@ pub async fn enforce_policy(
     // Without an authenticated session, only allow public paths.
     let Some(claims) = claims_opt else {
         if path.starts_with("/private") {
-            return Err(StatusCode::UNAUTHORIZED);
+            return Err(Reject::new(StatusCode::UNAUTHORIZED, "private_path_unauthenticated"));
         }
         req.extensions_mut().insert(PolicyContext { risk_score: 0 });
         return Ok(next.run(req).await);
@@ -288,7 +289,7 @@ pub async fn enforce_policy(
     // velocity / escalation / lock state into one shared bucket.
     let Ok(user_id) = Uuid::parse_str(&claims.sub) else {
         tracing::warn!(sub = %claims.sub, "policy: non-UUID subject claim rejected");
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err(Reject::new(StatusCode::UNAUTHORIZED, "subject_not_uuid"));
     };
 
     // Derive the client IP from the trusted-peer logic — NOT raw X-Forwarded-For.
@@ -382,19 +383,19 @@ pub async fn enforce_policy(
         "policy: risk engine decision"
     );
 
-    let blocking_status = match &effective_decision {
+    let blocking = match &effective_decision {
         Decision::Allow => None,
         // Challenge → 401 so the client knows to present a step-up prompt.
-        Decision::Challenge => Some(StatusCode::UNAUTHORIZED),
+        Decision::Challenge => Some((StatusCode::UNAUTHORIZED, "policy_challenge")),
         // Hold → 202 so the client knows the request is queued for review.
-        Decision::Hold => Some(StatusCode::ACCEPTED),
-        Decision::Deny => Some(StatusCode::FORBIDDEN),
+        Decision::Hold => Some((StatusCode::ACCEPTED, "policy_hold")),
+        Decision::Deny => Some((StatusCode::FORBIDDEN, "policy_deny")),
     };
 
-    if let Some(status) = blocking_status {
+    if let Some((status, reason)) = blocking {
         Metrics::inc(&state.metrics.policy_blocked_locked);
         if state.policy_enforce {
-            return Err(status);
+            return Err(Reject::new(status, reason));
         }
         Metrics::inc(&state.metrics.policy_would_block_dry_run);
         tracing::warn!(?status, score = final_score, "policy(dry-run): would block");
