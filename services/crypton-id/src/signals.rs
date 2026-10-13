@@ -102,7 +102,9 @@ pub async fn ensure_not_locked(state: &AppState, user: Uuid) -> Result<(), AppEr
 
 /// A login attempt began for a known user (feeds the risk engine's velocity).
 pub async fn record_login_attempt(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let keys = [
         (format!("velocity:login:{user}:1m"), 60u32),
         (format!("velocity:login:{user}:5m"), 300),
@@ -122,7 +124,9 @@ pub async fn record_login_attempt(state: &AppState, user: Uuid) {
 
 /// A WebAuthn assertion for `user` failed verification (login or step-up).
 pub async fn record_failed_assertion(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<i64, _> = redis::Script::new(FAILED_LUA)
         .key(format!("login:failed:{user}"))
         .key(locked_key(user))
@@ -140,7 +144,9 @@ pub async fn record_failed_assertion(state: &AppState, user: Uuid) {
 /// Successful login: clear the failure counters (never a held lock's expiry
 /// shortcut: a locked account cannot reach this point, `login/start` refuses).
 pub async fn record_login_success(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<(), _> = redis::pipe()
         .atomic()
         .del(format!("login:failed:{user}"))
@@ -154,7 +160,9 @@ pub async fn record_login_success(state: &AppState, user: Uuid) {
 
 /// A credential was revoked or marked lost.
 pub async fn record_revocation(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<i64, _> = redis::Script::new(COUNTERS_LUA)
         .key(format!("velocity:revocations:{user}:1h"))
         .arg(3600u32)
@@ -166,7 +174,9 @@ pub async fn record_revocation(state: &AppState, user: Uuid) {
 }
 
 pub async fn record_recovery_started(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<i64, _> = redis::Script::new(RECOVERY_LUA)
         .key(format!("recovery:pending:{user}"))
         .key(format!("velocity:recovery:{user}:24h"))
@@ -178,7 +188,9 @@ pub async fn record_recovery_started(state: &AppState, user: Uuid) {
 }
 
 pub async fn record_recovery_completed(state: &AppState, user: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<(), _> = redis::cmd("DEL")
         .arg(format!("recovery:pending:{user}"))
         .query_async(&mut c)
@@ -190,7 +202,9 @@ pub async fn record_recovery_completed(state: &AppState, user: Uuid) {
 
 /// An additional device was enrolled for an existing user.
 pub async fn record_device_added(state: &AppState, credential: Uuid) {
-    let Some(mut c) = conn(state).await else { return };
+    let Some(mut c) = conn(state).await else {
+        return;
+    };
     let r: Result<(), _> = redis::cmd("SET")
         .arg(format!("device:added:{credential}"))
         .arg(1)
@@ -206,7 +220,11 @@ pub async fn record_device_added(state: &AppState, credential: Uuid) {
 /// Server-side proof that `user` just completed a WebAuthn step-up for the
 /// session token issued at `iat`. Only called after
 /// `finish_passkey_authentication` succeeded: never from a client-supplied flag.
-pub async fn record_step_up_completed(state: &AppState, user: Uuid, iat: u64) -> Result<(), AppError> {
+pub async fn record_step_up_completed(
+    state: &AppState,
+    user: Uuid,
+    iat: u64,
+) -> Result<(), AppError> {
     let mut c = state
         .redis_conn()
         .await

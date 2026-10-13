@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
 # Keep this fast and boring: format/check/test each crate and each frontend
@@ -86,6 +86,36 @@ jobs:
         working-directory: services/crypton-gateway
         run: cargo test
 
+      # Router-level and end-to-end tests against the Redis/Postgres service
+      # containers above (they are #[ignore]d locally so a plain `cargo test`
+      # never needs infrastructure). They create their own databases; the base one
+      # below is only where they connect first.
+      - name: Create database for gateway integration tests
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'create database gwtest'
+
+      - name: crypton-gateway — integration tests (real Redis/Postgres)
+        working-directory: services/crypton-gateway
+        env:
+          GATEWAY_TEST_REDIS_URL: redis://127.0.0.1:6379
+          GATEWAY_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/gwtest
+        run: cargo test -- --ignored
+
+  # The real services (crypton-id + gateway images built from source) with real
+  # Postgres/Redis, driven end to end. This is the only job that exercises the
+  # whole system; see docs/testing.md and docs/deployment-topology.md.
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Real-stack runtime verification
+        run: bash tests/runtime/run.sh
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -97,7 +127,7 @@ jobs:
           cache: npm
 
       - name: Install workspace dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build SDK (cjs + esm + types)
         run: npm run build:sdk
@@ -110,16 +140,11 @@ jobs:
         working-directory: libs/crypton-sdk
         run: npm test
 
-      # CI=false here on purpose: react-scripts treats build warnings as
-      # errors when CI=true (GitHub Actions sets it by default), and
-      # crypton-main carries some pre-existing lint warnings in Landing.js
-      # that are marketing-copy/JSX nits, not correctness bugs. See
-      # DECISIONS.md.
+      # CI is true on GitHub Actions, so react-scripts treats lint warnings as
+      # errors: both production builds must be warning-free.
       - name: Build crypton-main
         working-directory: services/crypton-main
-        run: npm install && npm run build
-        env:
-          CI: false
+        run: npm run build
 
       - name: Test crypton-main
         working-directory: services/crypton-main
@@ -127,9 +152,7 @@ jobs:
 
       - name: Build crypton-console
         working-directory: services/crypton-console
-        run: npm install && npm run build
-        env:
-          CI: false
+        run: npm run build
 
       - name: Test crypton-console
         working-directory: services/crypton-console

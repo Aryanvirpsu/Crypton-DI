@@ -275,7 +275,10 @@ pub async fn enforce_policy(
     // Without an authenticated session, only allow public paths.
     let Some(claims) = claims_opt else {
         if path.starts_with("/private") {
-            return Err(Reject::new(StatusCode::UNAUTHORIZED, "private_path_unauthenticated"));
+            return Err(Reject::new(
+                StatusCode::UNAUTHORIZED,
+                "private_path_unauthenticated",
+            ));
         }
         req.extensions_mut().insert(PolicyContext { risk_score: 0 });
         return Ok(next.run(req).await);
@@ -334,14 +337,17 @@ pub async fn enforce_policy(
     // zeroed counter set is indistinguishable from a clean user and would read
     // `account_locked = false`. Flag the degradation instead so the engine
     // force-challenges sensitive actions rather than trusting empty signals.
-    let (counters, redis_degraded) =
-        match SignalStore::get_velocity_counters(&store, user_id, request_ip).await {
-            Ok(c) => (c, false),
-            Err(e) => {
-                tracing::warn!(error = %e, "policy: velocity counter fetch failed; marking redis degraded");
-                (VelocityCounters::default(), true)
-            }
-        };
+    let (counters, redis_degraded) = match SignalStore::get_velocity_counters(
+        &store, user_id, request_ip,
+    )
+    .await
+    {
+        Ok(c) => (c, false),
+        Err(e) => {
+            tracing::warn!(error = %e, "policy: velocity counter fetch failed; marking redis degraded");
+            (VelocityCounters::default(), true)
+        }
+    };
 
     let ctx = build_risk_context(RiskContextInputs {
         user_id,
@@ -418,37 +424,76 @@ mod tests {
     #[test]
     fn auth_paths() {
         assert!(matches!(path_to_action("/auth/login"), RiskAction::Login));
-        assert!(matches!(path_to_action("/auth/login/passkey"), RiskAction::Login));
-        assert!(matches!(path_to_action("/auth/register"), RiskAction::Register));
-        assert!(matches!(path_to_action("/auth/oauth/callback"), RiskAction::OauthComplete));
+        assert!(matches!(
+            path_to_action("/auth/login/passkey"),
+            RiskAction::Login
+        ));
+        assert!(matches!(
+            path_to_action("/auth/register"),
+            RiskAction::Register
+        ));
+        assert!(matches!(
+            path_to_action("/auth/oauth/callback"),
+            RiskAction::OauthComplete
+        ));
     }
 
     #[test]
     fn device_paths_exact_segments() {
-        assert!(matches!(path_to_action("/devices/revoke/abc"), RiskAction::DeviceRevoke));
-        assert!(matches!(path_to_action("/devices/mark-lost/abc"), RiskAction::DeviceMarkLost));
+        assert!(matches!(
+            path_to_action("/devices/revoke/abc"),
+            RiskAction::DeviceRevoke
+        ));
+        assert!(matches!(
+            path_to_action("/devices/mark-lost/abc"),
+            RiskAction::DeviceMarkLost
+        ));
         assert!(matches!(path_to_action("/devices"), RiskAction::DeviceList));
-        assert!(matches!(path_to_action("/user/devices"), RiskAction::DeviceList));
-        assert!(matches!(path_to_action("/user/devices/"), RiskAction::DeviceList));
+        assert!(matches!(
+            path_to_action("/user/devices"),
+            RiskAction::DeviceList
+        ));
+        assert!(matches!(
+            path_to_action("/user/devices/"),
+            RiskAction::DeviceList
+        ));
     }
 
     #[test]
     fn device_substring_does_not_match() {
         // `/devices-export` is a different segment — must not be DeviceList.
-        assert!(matches!(path_to_action("/vendor/devices-export"), RiskAction::Unknown { .. }));
-        assert!(matches!(path_to_action("/my-devices-list"), RiskAction::Unknown { .. }));
+        assert!(matches!(
+            path_to_action("/vendor/devices-export"),
+            RiskAction::Unknown { .. }
+        ));
+        assert!(matches!(
+            path_to_action("/my-devices-list"),
+            RiskAction::Unknown { .. }
+        ));
     }
 
     #[test]
     fn recovery_paths() {
-        assert!(matches!(path_to_action("/recovery/start"), RiskAction::RecoveryStart));
-        assert!(matches!(path_to_action("/recovery/approve"), RiskAction::RecoveryApprove));
-        assert!(matches!(path_to_action("/recovery/complete"), RiskAction::RecoveryComplete));
+        assert!(matches!(
+            path_to_action("/recovery/start"),
+            RiskAction::RecoveryStart
+        ));
+        assert!(matches!(
+            path_to_action("/recovery/approve"),
+            RiskAction::RecoveryApprove
+        ));
+        assert!(matches!(
+            path_to_action("/recovery/complete"),
+            RiskAction::RecoveryComplete
+        ));
     }
 
     #[test]
     fn action_paths() {
-        assert!(matches!(path_to_action("/actions/challenge"), RiskAction::ActionChallenge));
+        assert!(matches!(
+            path_to_action("/actions/challenge"),
+            RiskAction::ActionChallenge
+        ));
         // ActionExecute must carry the action *name* (segment after `actions/`),
         // not the full path — otherwise the engine's exact-name match for
         // critical privileged actions never fires.
@@ -461,20 +506,35 @@ mod tests {
             other => panic!("expected ActionExecute, got {other:?}"),
         }
         // `/actions-log` is a different segment — must not be ActionExecute.
-        assert!(matches!(path_to_action("/user/actions-log"), RiskAction::Unknown { .. }));
+        assert!(matches!(
+            path_to_action("/user/actions-log"),
+            RiskAction::Unknown { .. }
+        ));
     }
 
     #[test]
     fn audit_path() {
-        assert!(matches!(path_to_action("/audit"), RiskAction::AuditLogExport));
-        assert!(matches!(path_to_action("/admin/audit"), RiskAction::AuditLogExport));
+        assert!(matches!(
+            path_to_action("/audit"),
+            RiskAction::AuditLogExport
+        ));
+        assert!(matches!(
+            path_to_action("/admin/audit"),
+            RiskAction::AuditLogExport
+        ));
         // `/pre-audit` is a different segment.
-        assert!(matches!(path_to_action("/pre-audit"), RiskAction::Unknown { .. }));
+        assert!(matches!(
+            path_to_action("/pre-audit"),
+            RiskAction::Unknown { .. }
+        ));
     }
 
     #[test]
     fn unknown_path() {
-        assert!(matches!(path_to_action("/profile"), RiskAction::Unknown { .. }));
+        assert!(matches!(
+            path_to_action("/profile"),
+            RiskAction::Unknown { .. }
+        ));
         assert!(matches!(path_to_action("/"), RiskAction::Unknown { .. }));
     }
 
@@ -526,10 +586,7 @@ mod tests {
         async fn block_ip(&self, _ip: IpAddr, _ttl: u64) -> Result<(), RiskEngineError> {
             Ok(())
         }
-        async fn get_jwt_fingerprint(
-            &self,
-            _k: &str,
-        ) -> Result<Option<String>, RiskEngineError> {
+        async fn get_jwt_fingerprint(&self, _k: &str) -> Result<Option<String>, RiskEngineError> {
             Ok(None)
         }
         async fn set_jwt_fingerprint(
@@ -601,7 +658,10 @@ mod tests {
         // A completed step-up satisfies a pure Challenge…
         assert_eq!(apply_step_up(Decision::Challenge, true), Decision::Allow);
         // …does nothing when step-up was not completed…
-        assert_eq!(apply_step_up(Decision::Challenge, false), Decision::Challenge);
+        assert_eq!(
+            apply_step_up(Decision::Challenge, false),
+            Decision::Challenge
+        );
         // …and never downgrades Hold/Deny (incl. escalated verdicts) or Allow.
         assert_eq!(apply_step_up(Decision::Hold, true), Decision::Hold);
         assert_eq!(apply_step_up(Decision::Deny, true), Decision::Deny);

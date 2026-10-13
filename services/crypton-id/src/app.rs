@@ -4,12 +4,12 @@ use axum::{
     Router,
     body::Body,
     extract::Request,
-    middleware::Next,
-    response::{IntoResponse, Response},
     http::{
         HeaderName, HeaderValue, Method,
         header::{AUTHORIZATION, CONTENT_TYPE},
     },
+    middleware::Next,
+    response::{IntoResponse, Response},
 };
 use tower::ServiceBuilder;
 use tower_http::{
@@ -114,9 +114,11 @@ pub fn app(state: AppState) -> Router {
                 )
                 .layer(PropagateRequestIdLayer::new(request_id_header)),
         )
-        .layer(axum::middleware::from_fn(move |req: Request, next: Next| {
-            require_gateway_secret(gateway_secret.clone(), req, next)
-        }))
+        .layer(axum::middleware::from_fn(
+            move |req: Request, next: Next| {
+                require_gateway_secret(gateway_secret.clone(), req, next)
+            },
+        ))
 }
 
 #[cfg(test)]
@@ -139,9 +141,9 @@ mod tests {
 pub fn gateway_secret_policy(required: bool, secret: Option<&str>) -> Result<(), &'static str> {
     match (required, secret.map(str::trim).filter(|s| !s.is_empty())) {
         (true, None) => Err("REQUIRE_GATEWAY_SECRET=true but GATEWAY_SHARED_SECRET is not set"),
-        (true, Some(s)) if s.len() < 16 => {
-            Err("GATEWAY_SHARED_SECRET must be at least 16 characters when REQUIRE_GATEWAY_SECRET=true")
-        }
+        (true, Some(s)) if s.len() < 16 => Err(
+            "GATEWAY_SHARED_SECRET must be at least 16 characters when REQUIRE_GATEWAY_SECRET=true",
+        ),
         _ => Ok(()),
     }
 }

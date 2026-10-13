@@ -393,6 +393,7 @@ function useSphereIntro() {
       window.removeEventListener("mousemove", onMouse);
       window.removeEventListener("touchmove", onTouch);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intro runs once on mount
   }, [runIntro]);
 
   return { canvasRef, introRef, heroRef, navRef };
@@ -462,6 +463,7 @@ export default function Landing({ go, toast }) {
 
       {/* ── NAV ── */}
       <div ref={navRef} className={`landing-nav${scrolled ? " scrolled" : ""}`} style={{ opacity: 0, zIndex: 600 }}>
+        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid -- scroll handler, no navigable target */}
         <a onClick={() => scrollTo("hero")} style={{ fontFamily: "var(--display)", fontSize: 20, letterSpacing: ".14em", color: "var(--paper)", textDecoration: "none", cursor: "pointer" }}>CRYPTON</a>
         <ul className="nav-links-wrap" style={{ display: "flex", gap: 36, listStyle: "none" }}>
           {NAV_LINKS.map(l => (
@@ -605,7 +607,7 @@ export default function Landing({ go, toast }) {
           {/* Live animation — merged into protocol */}
           <div className="rv" style={{ marginTop: 56, paddingTop: 40, borderTop: "1px solid var(--line)" }}>
             <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
-              <span style={{ color: "var(--accent)" }}>// live</span> — click any node to simulate a failure
+              <span style={{ color: "var(--accent)" }}>{"// live"}</span> — click any node to simulate a failure
               <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
             </div>
             <h2 style={{ fontFamily: "var(--display)", fontSize: "clamp(48px,6.5vw,88px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 48 }}>
@@ -971,6 +973,7 @@ function TrustAnimation() {
     const wait=()=>{if(canvas.offsetWidth>0)startLoop();else requestAnimationFrame(wait);};
     wait();
     return ()=>{cancelAnimationFrame(rafRef.current);roRef.current?.disconnect();};
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only effect by design
   },[]);
 
   useEffect(()=>{stRef.current.brokenAt=broken;},[broken]);
@@ -1028,7 +1031,7 @@ function TrustAnimation() {
             border:`1px solid ${isBrokenInfo?'rgba(251,191,36,0.3)':'rgba(200,245,90,0.18)'}`,
             background:isBrokenInfo?'rgba(251,191,36,0.05)':'rgba(200,245,90,0.04)',
             maxWidth:520}}>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+            <div style={{fontFamily:"'DM Mono',monospace",
               color:isBrokenInfo?'var(--warning)':'var(--accent)',letterSpacing:'.12em',marginTop:3,flexShrink:0,fontSize:8}}>
               {isBrokenInfo?'WITHOUT CRYPTON':'INFO'}
             </div>
@@ -1044,7 +1047,7 @@ function TrustAnimation() {
           </div>
         ):(
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'rgba(122,117,112,0.32)',letterSpacing:'.14em'}}>
-            // hover to inspect · click to simulate failure
+            {"// hover to inspect · click to simulate failure"}
           </div>
         )}
       </div>
@@ -1095,93 +1098,6 @@ function WhoCard({ card, idx, scrollTo }) {
           <span key={ch} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", padding: "4px 10px", border: "1px solid var(--line)", color: "var(--muted)" }}>{ch}</span>
         ))}
       </div>
-    </div>
-  );
-}
-
-/* ── Architecture Diagram ───────────────────────────────────────── */
-/* ── Architecture Diagram ───────────────────────────────────────── */
-function ArchDiagram() {
-  const [activeStep, setActiveStep] = useState(-1);
-  const steps = [
-    { n: "01", label: "Device Enclave",  sub: "TPM / Secure Element", detail: "Private key is generated on-device during enrollment. It is bound to the hardware and never exported — not even to Crypton.", color: "rgba(200,245,90," },
-    { n: "02", label: "SDK Challenge",   sub: "Client library",        detail: "The Crypton SDK requests a one-time nonce from the server and passes it to the device enclave for signing.",               color: "rgba(200,245,90," },
-    { n: "03", label: "Nonce + Sign",    sub: "Time-bound, single use", detail: "The enclave signs the nonce using the device private key. The signature is returned to the SDK. The key never moves.",        color: "rgba(200,245,90," },
-    { n: "04", label: "Verification",    sub: "Crypton Server",         detail: "The server verifies the signature against the registered public key. No password. No secret. Just math.",                   color: "rgba(200,245,90," },
-    { n: "05", label: "Access Granted",  sub: "Cryptographic proof",    detail: "Access is granted. The session is created, signed, and logged. Revocation is instant at any point.",                        color: "rgba(200,245,90," },
-  ];
-  return (
-    <div className="rv">
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 0, border: "1px solid var(--line)" }}>
-        {steps.map((step, idx) => {
-          const isActive = activeStep === idx;
-          const isLast   = idx === steps.length - 1;
-          return (
-            <div
-              key={step.n}
-              onMouseEnter={() => setActiveStep(idx)}
-              onMouseLeave={() => setActiveStep(-1)}
-              style={{
-                borderRight: idx < 4 ? "1px solid var(--line)" : "none",
-                background: isActive ? (isLast ? "rgba(200,245,90,0.08)" : "var(--ink-2)") : isLast ? "rgba(200,245,90,0.03)" : "var(--ink)",
-                transition: "background .25s",
-                cursor: "default",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              {/* Top accent bar on hover */}
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: isLast ? "var(--accent)" : "var(--accent)", transform: isActive ? "scaleX(1)" : "scaleX(0)", transformOrigin: "left", transition: "transform .35s cubic-bezier(.16,1,.3,1)" }} />
-              <div style={{ padding: "44px 28px 40px" }}>
-                {/* Number */}
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".18em", marginBottom: 28, opacity: isActive ? 1 : 0.5, transition: "opacity .2s" }}>{step.n}</div>
-                {/* Connector arrow (except last) */}
-                {idx < 4 && (
-                  <div style={{ position: "absolute", right: -7, top: "38%", width: 12, height: 12, borderTop: `1.5px solid ${isActive ? "rgba(200,245,90,0.7)" : "rgba(200,245,90,0.2)"}`, borderRight: `1.5px solid ${isActive ? "rgba(200,245,90,0.7)" : "rgba(200,245,90,0.2)"}`, transform: "rotate(45deg)", transition: "border-color .25s", zIndex: 2 }} />
-                )}
-                {/* Label */}
-                <div style={{ fontFamily: "var(--display)", fontSize: "clamp(15px,1.5vw,20px)", letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.1, marginBottom: 10, color: isLast ? "var(--accent)" : "var(--paper)", transition: "color .2s" }}>{step.label}</div>
-                {/* Sub */}
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 20 }}>{step.sub}</div>
-                {/* Detail — reveals on hover */}
-                <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, maxHeight: isActive ? "120px" : "0", overflow: "hidden", opacity: isActive ? 1 : 0, transition: "max-height .35s ease, opacity .3s ease" }}>{step.detail}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)", letterSpacing: ".1em", marginTop: 16, textAlign: "right", opacity: 0.5 }}>// hover any step to expand</div>
-    </div>
-  );
-}
-
-/* ── Feature card (F.01 / F.02 / F.03) ─────────────────────── */
-function FeatureCard({ f, last }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        background: hov ? "var(--ink-2)" : "var(--ink)",
-        padding: "52px 40px",
-        position: "relative",
-        overflow: "hidden",
-        cursor: "default",
-        transition: "background .35s",
-        borderRight: last ? "none" : "1px solid var(--line)",
-      }}
-    >
-      <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em", marginBottom: 28 }}>{f.i}</div>
-      <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px,3vw,40px)", letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 18, lineHeight: 1 }}>{f.t}</div>
-      <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300, maxWidth: 280 }}>{f.b}</div>
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
-        background: "var(--accent)",
-        transform: hov ? "scaleX(1)" : "scaleX(0)",
-        transformOrigin: "left",
-        transition: "transform .5s cubic-bezier(.16,1,.3,1)",
-      }} />
     </div>
   );
 }
@@ -1280,43 +1196,6 @@ function PricingCard2({ plan, go, toast, expanded = false }) {
           : <BtnF onClick={()=>go('register')} style={{fontSize:9,padding:'9px 16px',width:'100%',justifyContent:'center'}}>{plan.cta} →</BtnF>
         }
       </div>
-    </div>
-  );
-}
-
-
-/* ── Vision card ────────────────────────────────────────────── */
-function VisionCard({ item, idx }) {
-  const [hov, setHov] = useState(false);
-  const col = idx % 3;
-  return (
-    <div
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        background: hov ? "var(--ink-2)" : "var(--ink)",
-        padding: "44px 36px",
-        position: "relative",
-        overflow: "hidden",
-        cursor: "default",
-        transition: "background .3s",
-        borderRight: col < 2 ? "1px solid var(--line)" : "none",
-        borderBottom: idx < 3 ? "1px solid var(--line)" : "none",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: ".12em" }}>{item.tag}</span>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 8, letterSpacing: ".1em", textTransform: "uppercase", color: item.accent ? "var(--accent)" : "var(--muted)", padding: "3px 8px", border: `1px solid ${item.accent ? "var(--accent)" : "var(--line)"}` }}>{item.status}</span>
-      </div>
-      <div style={{ fontFamily: "var(--display)", fontSize: 26, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 14, lineHeight: 1 }}>{item.t}</div>
-      <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, fontWeight: 300 }}>{item.b}</div>
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
-        background: "var(--accent)",
-        transform: hov ? "scaleX(1)" : "scaleX(0)",
-        transformOrigin: "left",
-        transition: "transform .45s cubic-bezier(.16,1,.3,1)",
-      }} />
     </div>
   );
 }
@@ -1479,38 +1358,6 @@ function HiWCard({ n, t, b }) {
       <div style={{ fontFamily: "var(--display)", fontSize: 36, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 14, lineHeight: 1 }}>{t}</div>
       <div style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.75, fontWeight: 300 }}>{b}</div>
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "var(--accent)", transform: hov ? "scaleX(1)" : "scaleX(0)", transformOrigin: "left", transition: "transform .5s cubic-bezier(.16,1,.3,1)" }} />
-    </div>
-  );
-}
-
-function CodeBlock({ toast }) {
-  const code = `import { Crypton } from '@crypton/sdk';
-
-const client = new Crypton({
-  apiKey: process.env.CRYPTON_KEY,
-  origin: 'https://yourapp.com',
-});
-
-// authenticate a device
-const { verified, deviceId } =
-  await client.authenticate({
-    userId: 'user_abc123',
-    challenge: generateNonce(),
-  });
-
-if (verified) {
-  // ✓ biometrically proven
-  grantAccess(deviceId);
-}`;
-  return (
-    <div style={{ background: "#0C0C0C", border: "1px solid var(--line)", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderBottom: "1px solid var(--line)", background: "rgba(255,255,255,.02)" }}>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted)", letterSpacing: ".05em" }}>crypton.ts</span>
-        <button onClick={() => { navigator.clipboard.writeText(code); toast("Code copied"); }} style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: ".08em", color: "var(--accent)", background: "none", border: "1px solid rgba(200,245,90,.25)", padding: "4px 11px", cursor: "pointer" }}>COPY</button>
-      </div>
-      <div style={{ padding: "22px 18px", fontFamily: "var(--mono)", fontSize: 12.5, lineHeight: 2, overflowX: "auto" }}>
-        <pre style={{ margin: 0 }}><code dangerouslySetInnerHTML={{ __html: code.replace(/import|const|await|if/g, w => `<span style="color:#CC99FF">${w}</span>`).replace(/'[^']*'/g, m => `<span style="color:#C8F55A">${m}</span>`).replace(/Crypton|authenticate|grantAccess|generateNonce/g, m => `<span style="color:#82AAFF">${m}</span>`) }} /></pre>
-      </div>
     </div>
   );
 }

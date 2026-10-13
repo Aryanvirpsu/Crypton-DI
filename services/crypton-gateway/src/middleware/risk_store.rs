@@ -185,11 +185,7 @@ return snapshot
         Ok((final_decision, was_escalated))
     }
 
-    async fn lock_account(
-        &self,
-        user_id: Uuid,
-        ttl_seconds: u64,
-    ) -> Result<(), RiskEngineError> {
+    async fn lock_account(&self, user_id: Uuid, ttl_seconds: u64) -> Result<(), RiskEngineError> {
         let mut conn = self.redis.as_ref().clone();
         redis::cmd("SET")
             .arg(format!("login:locked:{user_id}"))
@@ -201,11 +197,7 @@ return snapshot
             .map_err(|e| RiskEngineError::StoreError(e.to_string()))
     }
 
-    async fn block_ip(
-        &self,
-        ip: IpAddr,
-        ttl_seconds: u64,
-    ) -> Result<(), RiskEngineError> {
+    async fn block_ip(&self, ip: IpAddr, ttl_seconds: u64) -> Result<(), RiskEngineError> {
         let mut conn = self.redis.as_ref().clone();
         redis::cmd("SET")
             .arg(format!("ip:blocked:{ip}"))

@@ -104,4 +104,3 @@ pub async fn ip(
 
     Ok(Json(out))
 }
-

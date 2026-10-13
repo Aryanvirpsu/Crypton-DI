@@ -188,9 +188,10 @@ cd labs/agent-lab && ./.venv/Scripts/python -m pytest -q   # Windows; .venv/bin/
 tests/runtime/run.sh                          # the real services in containers, 88 checks, needs Docker + Node
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the Rust and frontend
-suites against real service containers on every push/PR; it does not yet run the runtime
-suite (see `docs/testing.md`).
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the Rust, gateway-integration,
+real-stack runtime and frontend-build jobs on every push to `main`/`dev` and every PR. The
+workflow is validated locally only; it has not yet run on GitHub-hosted runners (see
+`docs/testing.md`).
 
 ## Current status
 

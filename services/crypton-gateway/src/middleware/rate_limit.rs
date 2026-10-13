@@ -64,7 +64,10 @@ pub async fn limit(
         {
             tracing::warn!(%ip, "rate limit exceeded for ip");
             Metrics::inc(&state.metrics.rate_limit_block_ip);
-            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_ip"));
+            return Err(Reject::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited_ip",
+            ));
         }
     }
 
@@ -76,7 +79,10 @@ pub async fn limit(
         {
             tracing::warn!(user = %claims.sub, "rate limit exceeded for user");
             Metrics::inc(&state.metrics.rate_limit_block_user);
-            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_user"));
+            return Err(Reject::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited_user",
+            ));
         }
     }
 
@@ -92,7 +98,10 @@ pub async fn limit(
         {
             tracing::warn!(device = %device, "rate limit exceeded for device");
             Metrics::inc(&state.metrics.rate_limit_block_device);
-            return Err(Reject::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited_device"));
+            return Err(Reject::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited_device",
+            ));
         }
     }
 

@@ -79,6 +79,16 @@ docker run --rm -v "$PWD/services/crypton-id:/src" -v idtest-target:/src/target 
 
 ## CI
 
-`.github/workflows/ci.yml` runs the Rust and frontend suites on every push/PR against real
-Postgres/Redis service containers. It does not yet run the runtime suite or the gateway's
-`--ignored` tests; that is a known gap, not a claim of coverage.
+`.github/workflows/ci.yml` (push to `main`/`dev`, and every PR) has three jobs:
+
+- `rust`: `cargo fmt --check`, `check --all-targets` and `test` for `crypton-id` and the gateway
+  against Postgres/Redis service containers, then the gateway's `-- --ignored` integration tests
+  against a dedicated `gwtest` database.
+- `runtime`: `bash tests/runtime/run.sh`, the real-stack suite (builds both images, 88 checks).
+- `frontend`: `npm ci`, SDK build/typecheck/tests, production builds of `crypton-main` and
+  `crypton-console` with `CI=true` (lint warnings are errors), and their tests.
+
+Status of this configuration: every command above was run locally and passes, and the YAML
+parses, but **it has not run on GitHub-hosted runners** (nothing has been pushed). Treat the first
+hosted run as the real test; likely first-run differences are runner-specific (Docker/Node
+versions, Postgres service networking).

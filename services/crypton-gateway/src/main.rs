@@ -78,20 +78,22 @@ fn init_tracing() {
 fn with_request_id(router: Router) -> Router {
     let header = HeaderName::from_static(REQUEST_ID_HEADER);
     router
-        .layer(TraceLayer::new_for_http().make_span_with(|req: &Request<Body>| {
-            let request_id = req
-                .headers()
-                .get(REQUEST_ID_HEADER)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("-")
-                .to_string();
-            tracing::info_span!(
-                "http_request",
-                request_id = %request_id,
-                method = %req.method(),
-                path = %req.uri().path(),
-            )
-        }))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &Request<Body>| {
+                let request_id = req
+                    .headers()
+                    .get(REQUEST_ID_HEADER)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("-")
+                    .to_string();
+                tracing::info_span!(
+                    "http_request",
+                    request_id = %request_id,
+                    method = %req.method(),
+                    path = %req.uri().path(),
+                )
+            }),
+        )
         .layer(PropagateRequestIdLayer::new(header.clone()))
         .layer(SetRequestIdLayer::new(header, MakeRequestUuid))
 }

@@ -94,13 +94,12 @@ impl AppState {
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
 
-        let identity_base = std::env::var("IDENTITY_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
+        let identity_base =
+            std::env::var("IDENTITY_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
 
-        let policy_enforce = std::env::var("POLICY_ENFORCE")
+        let policy_enforce = !std::env::var("POLICY_ENFORCE")
             .unwrap_or_else(|_| "true".into())
-            .to_ascii_lowercase()
-            != "false";
+            .eq_ignore_ascii_case("false");
 
         Ok(AppState {
             redis: Arc::new(conn),
@@ -126,8 +125,9 @@ fn load_decoding_key() -> anyhow::Result<DecodingKey> {
     let pem = match std::env::var("JWT_PUBLIC_KEY_PEM_FILE") {
         Ok(path) => std::fs::read_to_string(&path)
             .map_err(|e| anyhow::anyhow!("failed to read JWT_PUBLIC_KEY_PEM_FILE ({path}): {e}"))?,
-        Err(_) => std::env::var("JWT_PUBLIC_KEY_PEM")
-            .map_err(|_| anyhow::anyhow!("JWT_PUBLIC_KEY_PEM (or JWT_PUBLIC_KEY_PEM_FILE) is required"))?,
+        Err(_) => std::env::var("JWT_PUBLIC_KEY_PEM").map_err(|_| {
+            anyhow::anyhow!("JWT_PUBLIC_KEY_PEM (or JWT_PUBLIC_KEY_PEM_FILE) is required")
+        })?,
     };
     DecodingKey::from_ed_pem(pem.as_bytes())
         .map_err(|e| anyhow::anyhow!("JWT public key is not a valid Ed25519 SPKI PEM key: {e}"))
@@ -140,9 +140,9 @@ fn load_decoding_key() -> anyhow::Result<DecodingKey> {
 pub fn gateway_secret_policy(required: bool, secret: Option<&str>) -> Result<(), &'static str> {
     match (required, secret.map(str::trim).filter(|s| !s.is_empty())) {
         (true, None) => Err("REQUIRE_GATEWAY_SECRET=true but GATEWAY_SHARED_SECRET is not set"),
-        (true, Some(s)) if s.len() < 16 => {
-            Err("GATEWAY_SHARED_SECRET must be at least 16 characters when REQUIRE_GATEWAY_SECRET=true")
-        }
+        (true, Some(s)) if s.len() < 16 => Err(
+            "GATEWAY_SHARED_SECRET must be at least 16 characters when REQUIRE_GATEWAY_SECRET=true",
+        ),
         _ => Ok(()),
     }
 }

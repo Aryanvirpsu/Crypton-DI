@@ -38,7 +38,14 @@ active uncommitted workstream. The overlap is three small, byte-identical boiler
 (`Buttons.js`, `hooks.js`, a favicon/`vercel.json` pair), which is cheaper to carry than a shared
 frontend package would be to build and maintain; revisit if a third frontend appears or the
 shared files start to diverge. Dead files proven unused in `crypton-console` were removed
-(`src/App.css`, `src/logo.svg`: no importers). Nothing under `services/crypton-main/` was changed.
+(`src/App.css`, `src/logo.svg`: no importers). In `crypton-main`, four components that were
+defined but never referenced (`ArchDiagram`, `FeatureCard`, `VisionCard`, `CodeBlock` in
+`Landing.js`) were removed and its six remaining lint warnings were resolved without changing
+rendered output (duplicate `fontSize` key whose later value already won, literal `// ...` text
+made an explicit string, two documented `eslint-disable` lines for mount-only effects and a
+scroll-only anchor), so both frontends now build with `CI=true`. Known stale behaviour left
+alone: `crypton-main` redirects admin-flavoured links to `<console>/admin/login`, a route the
+consolidated console does not define.
 
 ## Generated and local-only artifacts (never tracked)
 
