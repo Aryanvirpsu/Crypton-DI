@@ -1,79 +1,84 @@
 # Testing
 
-## What exists
+This is the single reference for how to run every test layer and what each one does
+and does not prove. Numbers are the baselines recorded when this file was last updated
+(2026-10-13, branch `dev`); if a number here disagrees with a run, the run wins and this
+file is stale.
 
-| Layer | Where | What it proves |
-|---|---|---|
-| Rust unit tests | `crypton-id/src/jwt.rs` | JWT issue/verify/expiry logic — no DB/Redis needed |
-| Rust unit tests | `crypton-id/src/routes/admin.rs` (bottom) | Pure display-formatting helpers (`security_score`, `relative_time_secs`, `map_audit_to_activity`) |
-| Rust unit tests | `crypton-id/src/routes/contact.rs` was removed with the route | (n/a — route deleted, zero callers) |
-| **Rust integration tests** | `crypton-id/src/routes/devices.rs`, `admin.rs`, `recovery.rs` (bottom of each file, `#[cfg(test)] mod tests`) | Real Postgres via `#[sqlx::test]` — handlers called directly (not mocked), exercising real SQL, real authorization checks (last-admin guard, wrong-user rejection, status-transition guards), and the real recovery state machine |
-| **Redis integration test** | `crypton-id/src/redis/sessions.rs` | Real Redis round-trip for the logout/JWT-denylist mechanism |
-| SDK unit tests | `libs/crypton-sdk/src/__tests__/sdk.test.ts` | `fetch` and `navigator.credentials` are mocked (real WebAuthn hardware can't run in CI) — but every mock assertion checks the exact URL and request body the SDK sends, so an endpoint or payload-shape regression fails these tests. Verified: `npm test` → 10/10 passing. |
-| Frontend unit test | `crypton-console/src/auth.regression.test.js` | `getValidToken()` expiry-boundary logic — a real regression this pinned before |
-| Frontend smoke test | `crypton-console/src/App.test.js` | Renders without crashing and shows the login page when logged out |
+## Layers
 
-## What's intentionally NOT covered
+| Layer | Where | Baseline | What it proves | Needs |
+|---|---|---|---|---|
+| **Real-stack runtime suite** | `tests/runtime/` | 88 checks | The REAL `crypton-id` and gateway images, real Postgres/Redis, real WebAuthn verification (driven by a software authenticator): registration, login, token verification, revocation, logout, account lock and signals, step-up changing a Challenge decision, audit persistence, single-entry-point isolation and bypass attempts, Redis/Postgres outages | Docker (compose v2), Node >= 18 |
+| Gateway unit tests | `services/crypton-gateway/src` | 32 | Pure logic: policy action mapping, public-route allowlist, nonce format/scope, claims shape, secret policy | none |
+| Gateway router + end-to-end tests | `services/crypton-gateway/src/gateway_tests.rs` | 37 (`#[ignore]`d without infra) | The full middleware stack at the request boundary against a stub upstream and against `crypton-id`'s real token/auth source (`tests-support/identity-src`). Faster, narrower sibling of the runtime suite; **not** a substitute for it | throwaway Redis + Postgres |
+| `crypton-id` tests | `services/crypton-id/src` (`#[sqlx::test]`, unit) | 41 | Real SQL and authorization in handlers (devices, admin, recovery state machine), JWT issue/verify, Redis denylist, gateway-secret policy | Postgres + Redis; **Linux/OpenSSL dev libs** |
+| `risk-engine` | `risk-engine/` | 309 (+3 ignored) | Scoring, gates, escalation, golden snapshots | none |
+| `policy-engine` | `policy-engine/` | 35 | Standalone evaluators (**not wired into anything deployed**) | none |
+| agent-lab | `labs/agent-lab` | 453 | Agent identity, delegation chains, authorization, approval, tracing | project `.venv` (see its README) |
+| SDK | `libs/crypton-sdk` | 11 | Request shapes, envelope handling, replay headers (fetch and WebAuthn mocked) | Node |
+| Frontend | `services/crypton-console` | `App.test.js`, `auth.regression.test.js` | Renders; token-expiry boundary | Node |
+| Experiments / assessment | `labs/exp-*`, `labs/validation-benchmark`, `assessment-kit` | per experiment | Reproducible findings; see each directory's README | per experiment |
 
-Full WebAuthn ceremonies (register/login ending in a real signature
-verification) aren't exercised by any automated test — that needs a
-virtual FIDO2 authenticator, which this cleanup didn't build. This is the
-one explicit "mocks are acceptable" carve-out per the cleanup brief:
-hardware interaction can't be automated cheaply, so the SDK's WebAuthn
-plumbing is unit-tested against a mock, and the backend's WebAuthn
-verification itself relies on the `webauthn-rs` crate (not re-tested here —
-it's a well-tested third-party library, not code this repo wrote).
-
-`public_complete_recovery` (the one recovery handler that touches both
-Postgres *and* Redis) isn't covered by the recovery.rs integration tests,
-because `#[sqlx::test]` only manages a throwaway Postgres database, not
-Redis. Every other part of the recovery state machine is covered.
-
-## Running tests
+## Commands
 
 ```sh
-# Rust — needs Postgres + Redis reachable (see infra/docker-compose.yml)
-cd services/crypton-id && cargo test
-cd services/crypton-gateway && cargo test   # no tests currently — gateway is proxy-only
+# Real-stack runtime suite: builds images, starts the stack, runs the checks, tears down.
+tests/runtime/run.sh                 # KEEP_STACK=1 to leave it running
 
-# SDK
-cd libs/crypton-sdk && npm test
+# Gateway
+cd services/crypton-gateway
+cargo test                           # unit tests
+# router + end-to-end tests: start THROWAWAY infra, never a shared one
+docker run -d --rm --name gw-redis -p 127.0.0.1:16379:6379 redis:7-alpine
+docker run -d --rm --name gw-pg -e POSTGRES_PASSWORD=<throwaway> -e POSTGRES_DB=gwtest -p 127.0.0.1:15432:5432 postgres:16-alpine
+GATEWAY_TEST_REDIS_URL=redis://127.0.0.1:16379 \
+GATEWAY_TEST_DATABASE_URL=postgres://postgres:<throwaway>@127.0.0.1:15432/gwtest \
+  cargo test -- --ignored
 
-# Frontend
-cd services/crypton-console && npm test -- --watchAll=false
+# crypton-id: Linux, or Docker (see "Windows" below)
+cd services/crypton-id && cargo test   # DATABASE_URL, REDIS_URL, JWT_*_PEM_FILE, WEBAUTHN_* set (see ci.yml)
+
+# Libraries and labs
+(cd risk-engine && cargo test)
+(cd policy-engine && cargo test)
+(cd libs/crypton-sdk && npm test)
+(cd labs/agent-lab && .venv/Scripts/python -m pytest -q)     # Linux/macOS: .venv/bin/python
+(cd services/crypton-console && npm test -- --watchAll=false)
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of the above against real
-Postgres/Redis service containers on every push/PR.
+Running `risk-engine`'s tests rewrites `risk-engine/risk_playground.log` (generated output,
+gitignored).
 
-Also needed for `services/crypton-id`'s Rust tests (unrelated to
-Postgres/Redis): each `cargo test` run generates a fresh Ed25519 keypair
-into `JWT_SIGNING_KEY_PEM_FILE`/`JWT_PUBLIC_KEY_PEM_FILE` — `start.sh`/
-`run.bat` do this automatically for local dev; CI does it explicitly as a
-workflow step. See `services/crypton-id/.env.example` for the exact env
-vars if running `cargo test` directly without either script.
+## What is and is not demonstrated
 
-### Windows note: `openssl-sys` needs an OpenSSL *development* install
+- The runtime suite is the only layer that exercises the real services together. It uses a
+  **software WebAuthn authenticator** (ES256, `none` attestation) that the server verifies for
+  real; it does not use a physical passkey or a platform authenticator.
+- The gateway's router tests and the `identity-src` harness use a stub upstream or
+  `crypton-id`'s token source only; label results from them as such.
+- Not covered anywhere: production platform networking; recovery and device-added signals at
+  runtime (they need two actors); the frontends against a live gateway; any real browser.
+- `public_complete_recovery` (Postgres + Redis) is not covered by the `#[sqlx::test]` recovery
+  tests, which manage only a throwaway Postgres.
 
-`services/crypton-id` depends on `webauthn-rs`, which depends on the
-`openssl` crate (for WebAuthn attestation-certificate verification) — a
-genuine, load-bearing dependency, not something to remove. On Windows,
-Git for Windows' bundled `openssl.exe` is a **runtime binary only**: no
-headers, no `.lib` import libraries, so `openssl-sys`'s build script can't
-find anything to link against and `cargo check`/`cargo test` fail with
-*"Could not find directory of OpenSSL installation."* `cargo fmt --check`
-is unaffected (it doesn't run `build.rs`).
+## Windows: `crypton-id` needs OpenSSL development libraries
 
-Fix: install [vcpkg](https://github.com/microsoft/vcpkg) if you don't
-already have it, then:
+`services/crypton-id` depends on `webauthn-rs` -> `openssl-sys`, which needs OpenSSL headers
+and import libraries. Git for Windows' `openssl.exe` is a runtime binary only, so
+`cargo test` for `crypton-id` fails with "Could not find directory of OpenSSL installation."
+Either run it in Linux (the Dockerfile's builder image has what is needed; the runtime suite
+builds `crypton-id` that way) or install OpenSSL via vcpkg
+(`vcpkg install openssl:x64-windows-static-md`, set `VCPKG_ROOT`). Example, from the repo root:
 
 ```sh
-vcpkg install openssl:x64-windows-static-md
+docker run --rm -v "$PWD/services/crypton-id:/src" -v idtest-target:/src/target -w /src \
+  --network <net with postgres+redis> -e DATABASE_URL=... -e REDIS_URL=... \
+  rust:1.89-bookworm bash -c "apt-get update -qq && apt-get install -y -qq pkg-config libssl-dev && cargo test"
 ```
 
-and set `VCPKG_ROOT` to your vcpkg clone directory in your shell profile
-(not committed anywhere — it's a per-machine env var like `JAVA_HOME`).
-`openssl-sys` auto-detects vcpkg via `VCPKG_ROOT` with no further
-configuration. Linux/macOS CI and most Linux dev machines resolve
-`openssl-sys` against the system package manager's OpenSSL automatically
-and don't need any of this.
+## CI
+
+`.github/workflows/ci.yml` runs the Rust and frontend suites on every push/PR against real
+Postgres/Redis service containers. It does not yet run the runtime suite or the gateway's
+`--ignored` tests; that is a known gap, not a claim of coverage.

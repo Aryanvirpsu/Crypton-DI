@@ -68,3 +68,7 @@ __pycache__/
 
 # Throwaway runtime-verification secrets (tests/runtime/stack-env.sh)
 .stack-secrets/
+
+# Tool-managed worktrees and test-generated output (kept locally, not tracked)
+.claude/worktrees/
+risk-engine/risk_playground.log

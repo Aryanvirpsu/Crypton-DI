@@ -104,6 +104,9 @@ async fn main() -> anyhow::Result<()> {
 
     init_tracing();
 
+    // Refuse to start in a production-intended deployment without the gateway secret.
+    state::enforce_gateway_secret_policy()?;
+
     let redis_url =
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
     let database_url =

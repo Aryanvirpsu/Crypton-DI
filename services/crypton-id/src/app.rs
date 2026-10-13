@@ -131,3 +131,46 @@ mod tests {
         assert!(!secrets_match("", "x"));
     }
 }
+
+/// Production-intended deployments set `REQUIRE_GATEWAY_SECRET=true`: the service
+/// then refuses to start unless `GATEWAY_SHARED_SECRET` is set to a value of at
+/// least 16 characters, so a missing secret can never silently disable the
+/// gateway-bypass defence. Without the flag the secret stays optional (local dev).
+pub fn gateway_secret_policy(required: bool, secret: Option<&str>) -> Result<(), &'static str> {
+    match (required, secret.map(str::trim).filter(|s| !s.is_empty())) {
+        (true, None) => Err("REQUIRE_GATEWAY_SECRET=true but GATEWAY_SHARED_SECRET is not set"),
+        (true, Some(s)) if s.len() < 16 => {
+            Err("GATEWAY_SHARED_SECRET must be at least 16 characters when REQUIRE_GATEWAY_SECRET=true")
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Reads the environment and applies [`gateway_secret_policy`]. Call before anything
+/// else touches the network.
+pub fn enforce_gateway_secret_policy() -> anyhow::Result<()> {
+    let required = std::env::var("REQUIRE_GATEWAY_SECRET").as_deref() == Ok("true");
+    let secret = std::env::var("GATEWAY_SHARED_SECRET").ok();
+    gateway_secret_policy(required, secret.as_deref()).map_err(|e| anyhow::anyhow!(e))
+}
+
+#[cfg(test)]
+mod secret_policy_tests {
+    use super::gateway_secret_policy as p;
+
+    #[test]
+    fn optional_unless_required() {
+        assert!(p(false, None).is_ok());
+        assert!(p(false, Some("")).is_ok());
+        assert!(p(false, Some("x")).is_ok());
+    }
+
+    #[test]
+    fn required_means_present_and_long_enough() {
+        assert!(p(true, None).is_err());
+        assert!(p(true, Some("")).is_err());
+        assert!(p(true, Some("   ")).is_err());
+        assert!(p(true, Some("short")).is_err());
+        assert!(p(true, Some("0123456789abcdef")).is_ok());
+    }
+}

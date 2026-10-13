@@ -1,6 +1,12 @@
 # Architecture
 
-## Components
+This file describes how the pieces fit together and what is real versus experimental.
+Network exposure, the trust boundary and the security-signal producer/consumer table are in
+[`deployment-topology.md`](deployment-topology.md) (the single authoritative place for them);
+test layers are in [`testing.md`](testing.md); the repository map and branch workflow are in
+[`repository.md`](repository.md).
+
+## Components (development view)
 
 ```
                      browser
@@ -13,8 +19,8 @@
                                           │ CRA dev proxy (same-origin)
                                           ▼
                                 crypton-gateway (:8090)
-                                proxy + CORS + health +
-                                x-request-id + logging
+                          verifies crypton-id tokens · nonce ·
+                          rate limit · risk policy · decision trail
                                           │
                                           ▼
                                   crypton-id (:8080)
@@ -37,9 +43,11 @@ future integrator use it, never raw `fetch`.
    `client.auth.login(email)` (`libs/crypton-sdk/src/modules/auth.ts`).
 2. The SDK does a real WebAuthn ceremony (`navigator.credentials.create` /
    `.get`) against challenges the backend issued.
-3. Requests go through the CRA dev proxy to `crypton-gateway`, which
-   assigns/forwards an `x-request-id` and proxies everything (headers,
-   cookies, body) to `crypton-id` unchanged.
+3. Requests go through the CRA dev proxy to `crypton-gateway`. The SDK adds a fresh
+   `x-nonce` and `x-timestamp` to every request. The public auth-bootstrap routes (exact
+   allowlist) pass without a token; everything else needs a valid `crypton-id` token. The
+   gateway enforces nonce/rate-limit/risk policy, records the decision, assigns
+   `x-request-id`, and proxies to `crypton-id` (adding `x-gateway-secret`).
 4. `crypton-id` verifies the WebAuthn response
    (`src/routes/auth_webauthn.rs`), persists the credential in Postgres,
    issues a JWT (`src/jwt.rs`), and writes an audit log row.
@@ -60,34 +68,20 @@ A fresh deployment starts with zero admins. `POST /admin/bootstrap`
 promotes the calling user to `super_admin` — but only while no admin
 exists yet; every subsequent call 403s. See `crypton-id/src/routes/admin.rs`.
 
-## Extension point for agent identity
+## Agent identity and the gateway
 
-`crypton-gateway/src/main.rs` has a marked spot, between routing and the
-transparent proxy fallback, for agent-authorization middleware — the place
-that will eventually answer "is this agent allowed to call this route, on
-this human's behalf, with this delegated scope?" Nothing agent-specific is
-implemented yet; see `labs/README.md` for the planned next step.
+The gateway has **no agent-delegation checks**. Agent authorization is enforced in-process in
+`labs/agent-lab` (`authorization.py`, `chain.py`, `approval.py`), not at the gateway; see
+`labs/README.md`. The gateway enforces human-session controls only (token, revocation, nonce,
+rate limit, risk policy).
 
-## Enforcement coverage — a deployment/threat-model limitation, not a bug
+## Enforcement coverage
 
-Crypton's enforcement point (today: `crypton-id`'s own extractors;
-eventually: the gateway's marked extension point above) can only enforce
-traffic that actually reaches it:
-
-```
-routed through Crypton's enforcement point  →  enforceable
-bypasses Crypton entirely                   →  outside enforcement coverage
-```
-
-Any deployment where a caller can reach a protected resource by some
-other path (a direct DB connection, a different network route, a
-misconfigured second ingress) is outside what Crypton can see or decide
-on, by construction — this is true of any reverse-proxy/PEP-based
-authorization model, not specific to this codebase. It is a property to
-design deployments around (route everything security-relevant through the
-enforcement point, don't expose a bypass), not something to "solve" with
-host-level interception, kernel hooks, or endpoint agents — none of that
-is planned or in scope here.
+An enforcement point only sees traffic that reaches it. The container stack
+(`infra/docker-compose.stack.yml`) makes the gateway the single published port and keeps
+identity, Postgres and Redis on an internal network; `GATEWAY_SHARED_SECRET` adds a second
+layer on identity. That is demonstrated for the stack and **not** verifiable for any production
+platform from this repository. See `deployment-topology.md`.
 
 ## What's real vs. experimental
 

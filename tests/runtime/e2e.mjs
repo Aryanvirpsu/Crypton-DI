@@ -350,6 +350,22 @@ async function main() {
   await waitFor(async () => (await http('GET', '/me', { token: a.token })).status === 200, 'recovery after Postgres restart', 90, 1000);
   check('Postgres back: service recovers', true);
 
+  group('10. startup policy: a production-intended service refuses to start without the gateway secret');
+  const startup = (image, env) => {
+    const args = ['run', '--rm', '--network', 'none', '-e', 'REQUIRE_GATEWAY_SECRET=true', ...env.flatMap((e) => ['-e', e]), image];
+    const r = spawnSync('docker', args, { encoding: 'utf8', timeout: 60000 });
+    return { code: r.status, out: `${r.stdout}${r.stderr}` };
+  };
+  for (const svc of ['identity', 'gateway']) {
+    const image = `${PROJECT}-${svc}`;
+    const missing = startup(image, []);
+    check(`${svc}: exits non-zero with REQUIRE_GATEWAY_SECRET=true and no secret`, missing.code !== 0 && /GATEWAY_SHARED_SECRET is not set/.test(missing.out), missing.out.slice(-200));
+    const weak = startup(image, ['GATEWAY_SHARED_SECRET=short']);
+    check(`${svc}: refuses a secret shorter than 16 characters`, weak.code !== 0 && /at least 16/.test(weak.out), weak.out.slice(-200));
+    const fine = startup(image, ['GATEWAY_SHARED_SECRET=0123456789abcdef']);
+    check(`${svc}: with a valid secret it gets past the policy (and fails later on other missing config)`, fine.code !== 0 && !/GATEWAY_SHARED_SECRET/.test(fine.out), fine.out.slice(-200));
+  }
+
   // ── summary ────────────────────────────────────────────────────────────────
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

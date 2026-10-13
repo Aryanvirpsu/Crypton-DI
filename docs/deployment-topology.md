@@ -94,7 +94,7 @@ Challenge is decided by the risk engine's scores, not by an explicit per-action 
 ## How to reproduce
 
 ```sh
-tests/runtime/run.sh              # builds the real images, starts the stack, runs 82 checks, tears down
+tests/runtime/run.sh              # builds the real images, starts the stack, runs 88 checks, tears down
 KEEP_STACK=1 tests/runtime/run.sh # leave it running to inspect
 ```
 

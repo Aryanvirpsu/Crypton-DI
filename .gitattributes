@@ -1,0 +1,14 @@
+# Scripts and container build inputs must keep LF endings on every platform: a CRLF
+# shebang or Dockerfile breaks on Linux/CI even when authored on Windows.
+*.sh              text eol=lf
+Dockerfile        text eol=lf
+*.dockerfile      text eol=lf
+.dockerignore     text eol=lf
+docker-compose*.yml text eol=lf
+*.mjs             text eol=lf
+*.pem             text eol=lf
+.gitattributes    text eol=lf
+
+# Windows-only launchers keep CRLF.
+*.ps1             text eol=crlf
+*.bat             text eol=crlf

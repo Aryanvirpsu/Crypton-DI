@@ -57,6 +57,8 @@ services:
       JWT_SIGNING_KEY_PEM_FILE: /run/secrets/jwt_signing_key.pem
       JWT_PUBLIC_KEY_PEM_FILE: /run/secrets/jwt_public_key.pem
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:?set GATEWAY_SHARED_SECRET}
+      # Refuse to start if the secret is missing or short.
+      REQUIRE_GATEWAY_SECRET: "true"
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - ${STACK_SECRETS_DIR:?set STACK_SECRETS_DIR}/jwt_signing_key.pem:/run/secrets/jwt_signing_key.pem:ro
@@ -77,7 +79,8 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_PUBLIC_KEY_PEM_FILE: /run/secrets/jwt_public_key.pem
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set INTERNAL_TOKEN}
-      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:?set GATEWAY_SHARED_SECRET}
+      REQUIRE_GATEWAY_SECRET: "true"
       POLICY_ENFORCE: ${POLICY_ENFORCE:-true}
       LOG_FORMAT: json
       RUST_LOG: ${RUST_LOG:-info}

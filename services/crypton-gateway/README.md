@@ -106,7 +106,7 @@ cargo run
 
 ## Verification status
 
-**Real-service runtime verification** (`tests/runtime/run.sh`, 82 checks, no stubs): the real
+**Real-service runtime verification** (`tests/runtime/run.sh`, 88 checks, no stubs): the real
 `crypton-id` and gateway images built from source in Linux containers with real Postgres and
 Redis; registration, login, step-up and failed-login flows driven with a software WebAuthn
 authenticator that the server verifies for real. It covers token issuance and gateway
@@ -119,7 +119,7 @@ Postgres outages. See `docs/deployment-topology.md`.
 source compiled via `tests-support/identity-src`; they are a different, faster layer and are
 not the real-service run.
 
-`cargo test` runs 30 tests with no infrastructure. The 37 router-level and end-to-end tests
+`cargo test` runs 32 tests with no infrastructure. The 37 router-level and end-to-end tests
 in `src/gateway_tests.rs` are `#[ignore]`d unless you provide throwaway infrastructure:
 
 ```sh

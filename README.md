@@ -92,9 +92,9 @@ flowchart LR
 
 The two paths share one identity source (the JWT `crypton-id` issues) but
 run separately today: `agent-lab` verifies the same JWTs, it doesn't call
-`crypton-id` over the network, and it isn't routed through the gateway.
-See [`docs/architecture.md`](docs/architecture.md#extension-point-for-agent-identity)
-for the marked extension point where that wiring will eventually happen.
+`crypton-id` over the network, and it isn't routed through the gateway, which
+has no agent-delegation checks. See
+[`docs/architecture.md`](docs/architecture.md#agent-identity-and-the-gateway).
 
 ## Repository structure
 
@@ -104,10 +104,18 @@ services/crypton-gateway   Rust/Axum gateway — verifies crypton-id EdDSA token
 services/crypton-console   Product frontend — register, login, devices, recovery, admin
 services/crypton-main      Public marketing site, no backend calls
 libs/crypton-sdk           TypeScript client SDK — the only thing that talks to crypton-id over HTTP
+risk-engine                Rust library — risk scoring, linked into the gateway
+policy-engine              Rust library — standalone policy evaluators (not linked into anything deployed)
 labs/agent-lab             Agent identity, delegation, and authorization prototype (Python)
-docs/                      Architecture, recovery flow, testing notes
-infra/                     docker-compose for Postgres + Redis
+labs/exp-*, labs/validation-benchmark   Reproducible experiments and benchmark cases
+assessment-kit, assessment-engagement, pilot-pack, crypton-bigidea-2026   Assessment manual, reference engagement, pilot and verification evidence
+tests/runtime              Real-stack verification suite (tests/runtime/run.sh)
+infra/                     docker-compose: dev Postgres+Redis, and the full single-entry-point stack
+docs/                      Documentation — start at docs/README.md (one authoritative place per topic)
 ```
+
+Both frontends are kept deliberately: `crypton-console` is the product app, `crypton-main` is
+the marketing site (see [`docs/repository.md`](docs/repository.md)).
 
 ## Running it locally
 
@@ -177,12 +185,12 @@ cd services/crypton-id && cargo test          # needs Postgres + Redis (infra/do
 cd libs/crypton-sdk && npm test
 cd services/crypton-console && npm test -- --watchAll=false
 cd labs/agent-lab && ./.venv/Scripts/python -m pytest -q   # Windows; .venv/bin/python on macOS/Linux
+tests/runtime/run.sh                          # the real services in containers, 88 checks, needs Docker + Node
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of it
-against real service containers on every push/PR. The `crypton-sdk` and
-`agent-lab` suites (no external services required) were run for this
-cleanup and pass in full.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the Rust and frontend
+suites against real service containers on every push/PR; it does not yet run the runtime
+suite (see `docs/testing.md`).
 
 ## Current status
 

@@ -32,6 +32,9 @@ async fn main() -> anyhow::Result<()> {
             .init();
     }
 
+    // Refuse to start in a production-intended deployment without the gateway secret.
+    app::enforce_gateway_secret_policy()?;
+
     let cfg = Config::from_env()?;
     let state = AppState::new(&cfg).await?;
 
