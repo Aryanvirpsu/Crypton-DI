@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run(\"rapid_registration_from_hosting\", ctx).await"
+---
+scenario: rapid_registration_from_hosting
+decision: Deny
+score: 100
+base_score: 100
+adjusted_score: 100
+required_action: None
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: true
+notify_user: true
+notify_admin: true
+breakdown: D=5 S=0 N=28 B=45 C=65 base=143 m_action=1.30 m_org=1.00 a=0 final=100
+top_factors:
+  - name: sybil_spree_pattern  component: Correlation  contribution: 35
+  - name: automated_scraper_pattern  component: Correlation  contribution: 30
+  - name: sybil_registration  component: Behavioral  contribution: 25
+triggered_rules: ["automated_scraper_pattern", "disposable_email", "headless_ua", "hosting_ip", "new_ip_address", "sybil_registration", "sybil_spree_pattern"]

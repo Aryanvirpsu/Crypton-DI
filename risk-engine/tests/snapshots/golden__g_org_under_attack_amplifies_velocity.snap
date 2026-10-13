@@ -1,0 +1,22 @@
+---
+source: tests/golden.rs
+expression: "run(\"org_under_attack_amplifies_velocity\", ctx).await"
+---
+scenario: org_under_attack_amplifies_velocity
+decision: Allow
+score: 33
+base_score: 33
+adjusted_score: 33
+required_action: None
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: false
+notify_admin: false
+breakdown: D=5 S=0 N=0 B=10 C=0 base=15 m_action=1.20 m_org=2.00 a=0 final=33
+top_factors:
+  - name: login_velocity_moderate  component: Behavioral  contribution: 10
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["headless_ua", "login_velocity_moderate"]

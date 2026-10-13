@@ -1,0 +1,848 @@
+================================================================================
+ CRYPTON-DI RISK ENGINE — COMPLETE SECURITY & POLICY ENGINE REFERENCE
+================================================================================
+
+ Generated: 2026-04-10
+ Engine Version: 0.1.0
+ Crate: risk-engine (standalone, zero Crypton service dependencies)
+
+================================================================================
+ TABLE OF CONTENTS
+================================================================================
+
+  1.  Architecture Overview
+  2.  Core Formula
+  3.  Score-to-Decision Mapping
+  4.  Hard Policy Gates (11 binary blocks)
+  5.  Device Trust Component (D) — 25 points max
+  6.  Session Anomaly Component (S) — 25 points max
+  7.  Network Risk Component (N) — 20 points max
+  8.  Behavioral Velocity Component (B) — 20 points max
+  9.  Absolute Adder (A) — 30 points max
+  10. Action Multiplier Table (M_action)
+  11. Org Risk Multiplier (M_org)
+  12. Org-Graph Intelligence Layer
+  13. Escalation Memory
+  14. Challenge Action Selection Logic
+  15. Side-Effect Directives
+  16. RiskContext — Full Input Contract (82 fields)
+  17. RiskDecision — Full Output Contract
+  18. Store Trait Contracts
+  19. Signal Collection Budget
+  20. Adapter Integration Points
+  21. Enums Reference
+  22. Attack Graph Model
+  23. Tenant Risk Profiles & Adaptive Thresholds
+  24. Error Types
+
+================================================================================
+ 1. ARCHITECTURE OVERVIEW
+================================================================================
+
+  evaluate()
+    ├── Step 1: evaluate_hard_gates()  → immediate DENY if any fire
+    ├── Step 2: compute_score()        → R = (D+S+N+B) * M_action * M_org + A
+    ├── Step 3: degraded_signals()     → force CHALLENGE on sensitive if Redis down
+    ├── Step 4: org_graph_bias()       → additive bias + threshold adjustment
+    ├── Step 5: score_to_decision()    → map effective score to Decision
+    ├── Step 6: escalation_memory()    → promote decision from recent history
+    ├── Step 7: compute_directives()   → lock, notify, hold reason
+    └── Step 8: apply_side_effects()   → lock_account, block_ip
+
+  Constraints:
+  - Zero dependencies on Crypton service code
+  - All signal I/O abstracted behind traits (SignalStore, IncrementStore, OrgGraphStore)
+  - Fully synchronous scoring logic — async only at signal-fetch boundaries
+  - No ML, no probabilistic models. Every outcome is traceable
+  - Fails open when org data is unavailable
+
+================================================================================
+ 2. CORE FORMULA
+================================================================================
+
+  R = ((D + S + N + B) * M_action * M_org) + A
+
+  Where:
+    D  = Device trust score        (0–25)
+    S  = Session anomaly score     (0–25)
+    N  = Network risk score        (0–20)
+    B  = Behavioral velocity score (0–20)
+    Base = D + S + N + B           (0–90)
+
+    M_action = Action sensitivity multiplier  (1.0–3.0)
+    M_org    = Org risk-level multiplier      (1.0–2.0)
+
+    Scaled = floor((Base * M_action * M_org), clamped 0–255)
+
+    A  = Absolute adder            (0–30, applied after multiplication)
+
+    Final Score = min(Scaled + A, 100)
+
+  Then: org-graph bias + threshold shift → effective score (0–100)
+    after_bias = min(final_score + total_org_bias, 100)
+    effective_score = clamp(after_bias + threshold_shift, 0, 100)
+
+================================================================================
+ 3. SCORE-TO-DECISION MAPPING
+================================================================================
+
+  ┌─────────────┬───────────┬─────────────────────────────────────────────┐
+  │ Score Range │ Decision  │ Required Action / Behavior                  │
+  ├─────────────┼───────────┼─────────────────────────────────────────────┤
+  │   0 – 29    │ Allow     │ None. Proceed without friction.             │
+  │  30 – 49    │ Challenge │ StepUpWebAuthn (default) or ReverifyDevice  │
+  │  50 – 59    │ Challenge │ ReLogin (high-bracket challenge)            │
+  │  60 – 84    │ Hold      │ AdminApproval (202 Accepted, async review)  │
+  │  85 – 100   │ Deny      │ Hard block. Account may be locked.          │
+  └─────────────┴───────────┴─────────────────────────────────────────────┘
+
+  Challenge action selection:
+    - score >= 50                           → ReLogin
+    - JWT fingerprint stored != current     → ReverifyDevice
+    - otherwise                             → StepUpWebAuthn
+
+================================================================================
+ 4. HARD POLICY GATES (11 binary blocks)
+================================================================================
+
+  Hard gates are evaluated BEFORE scoring. If any fire, the engine returns
+  an immediate DENY with score=100. All gates are accumulated (not short-
+  circuited) so the output lists every violated gate.
+
+  ┌────┬──────────────────────────────────┬──────────────────────────────────────┐
+  │  # │ Gate Name                        │ Trigger Condition                    │
+  ├────┼──────────────────────────────────┼──────────────────────────────────────┤
+  │  1 │ RevokedCredential                │ credential_status == Revoked         │
+  │  2 │ AccountLocked                    │ account_locked == true               │
+  │  3 │ NonceReplay                      │ nonce_already_used == true           │
+  │  4 │ SignCountRollback                │ prev > 0 AND new <= prev (cloning)  │
+  │  5 │ ImpossibleTravelViaTor           │ impossible_travel AND ip == Tor      │
+  │  6 │ TorOnSensitiveAction             │ ip == Tor AND action.is_sensitive()  │
+  │  7 │ RecoveryCompletedWithNoPending   │ RecoveryComplete AND !pending        │
+  │  8 │ OauthNonceIpMismatchOnTor        │ auth_ip != req_ip AND ip == Tor      │
+  │  9 │ SanctionedCountry                │ is_sanctioned_country == Some(true)  │
+  │ 10 │ BreachedCredentialOnSensitive    │ breached == true AND is_sensitive()  │
+  │ 11 │ VpnOnCriticalAction              │ VPN/proxy detected AND critical act  │
+  └────┴──────────────────────────────────┴──────────────────────────────────────┘
+
+  Impossible travel formula: km > elapsed_hours * 900.0 + 500.0
+    (commercial flight speed ~900 km/h + 500 km buffer for airport transit)
+
+  VPN detection: ip_asn_type == Vpn OR ip_is_vpn == true OR ip_is_proxy == true
+
+  Critical privileged actions:
+    RecoveryApprove, RecoveryComplete, add_admin, rotate_api_key, delete_resource
+
+================================================================================
+ 5. DEVICE TRUST COMPONENT (D) — Cap: 25 points
+================================================================================
+
+  ┌────┬──────────────────────────┬────────┬──────────────────────────────────────┐
+  │  # │ Factor Name              │ Points │ Condition                            │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │  1 │ credential_lost          │  25    │ Status == Lost (immediate cap)       │
+  │  2 │ credential_age           │  15    │ Registered < 1 hour ago              │
+  │    │                          │  10    │ Registered < 24 hours ago            │
+  │    │                          │   5    │ Registered < 72 hours ago            │
+  │  3 │ dormant_device           │   8    │ Last used > 30 days ago              │
+  │  4 │ sign_count_jump_critical │  12    │ WebAuthn counter jumped > 100        │
+  │    │ sign_count_jump_high     │   8    │ Counter jumped 11–100                │
+  │    │ sign_count_jump          │   5    │ Counter jumped 2–10 (expected: 1)    │
+  │  5 │ ua_family_mismatch       │  12    │ Browser family differs from reg UA   │
+  │  6 │ headless_ua              │  20    │ UA matches automation client         │
+  │  7 │ webdriver_detected       │  20    │ navigator.webdriver === true          │
+  │  8 │ captcha_score_very_low   │  15    │ CAPTCHA score < 0.3 (likely bot)     │
+  │    │ captcha_score_low        │   8    │ CAPTCHA score 0.3–0.5 (suspicious)   │
+  │  9 │ mobile_ua_no_touch       │  10    │ Mobile UA but no touch capability    │
+  │ 10 │ suspicious_resolution    │   5    │ Screen res = 800x600/1024x768/0x0    │
+  │ 11 │ no_device_fingerprint    │   3    │ No fingerprint on sensitive action   │
+  │ 12 │ bot_tls_fingerprint      │  15    │ JA3 matches known bot                │
+  │ 13 │ new_device_sensitive     │   8    │ DeviceTrustLevel::New + sensitive     │
+  │    │ new_device               │   4    │ DeviceTrustLevel::New (non-sensitive) │
+  │    │ recognized_device_sens.  │   3    │ DeviceTrustLevel::Recognized + sens.  │
+  │ 14 │ sole_credential          │   5    │ Only 1 active credential (no backup) │
+  └────┴──────────────────────────┴────────┴──────────────────────────────────────┘
+
+  Headless UA patterns detected (21):
+    headlesschrome, phantomjs, selenium, puppeteer, playwright,
+    python-requests, curl/, go-http-client, node-fetch, axios/,
+    scrapy, httpclient, java/, okhttp, libwww-perl, wget/,
+    python-urllib, httpx/, aiohttp/, undici/, got/
+    + mozilla/ without applewebkit or gecko
+
+  Known bot JA3 fingerprints (7):
+    e7d705a3286e19ea42f587b344ee6865  (Python requests)
+    b32309a26951912be7dba376398abc3b  (Go default)
+    3b5074b1b5d032e5620f69f9f700ff0e  (curl)
+    cd08e31494f9531f560d64c695473da9  (Java HttpClient)
+    473cd7cb9faa642487833865d516e578  (Python urllib3)
+    a0e9f5d64349fb13191bc781f81f42e1  (Node.js default)
+    6734f37431670b3ab4292b8f60f29984  (Golang fasthttp)
+
+  Suspicious screen resolutions: 800x600, 1024x768, 0x0, 1x1
+
+  Browser family detection:
+    edge, vivaldi, brave, firefox, opera, safari, chrome, other
+
+================================================================================
+ 6. SESSION ANOMALY COMPONENT (S) — Cap: 25 points
+================================================================================
+
+  ┌────┬──────────────────────────┬────────┬──────────────────────────────────────┐
+  │  # │ Factor Name              │ Points │ Condition                            │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │  1 │ jwt_fingerprint_mismatch │  20    │ sha256(ip|ua) ≠ stored fingerprint   │
+  │  2 │ jwt_near_expiry          │  10    │ JWT ≥ 90% of lifetime elapsed        │
+  │  3 │ concurrent_sessions_high │  12    │ > 5 active sessions                  │
+  │    │ concurrent_sessions_elev │   6    │ 4–5 active sessions                  │
+  │  4 │ oauth_ip_mismatch        │  12    │ /authorize IP ≠ /complete IP         │
+  │  5 │ timestamp_skew           │   5    │ Client timestamp > 30s from server   │
+  │  6 │ nonce_absent             │   5    │ No x-nonce header on sensitive action│
+  │  7 │ language_change          │   5    │ Accept-Language primary tag changed   │
+  │  8 │ out_of_hours             │   5    │ Activity outside user_typical_hours   │
+  │  9 │ email_not_verified       │   5    │ Unverified email + sensitive action   │
+  └────┴──────────────────────────┴────────┴──────────────────────────────────────┘
+
+  Language comparison: extracts primary language tag before comma and dash
+    "en-US,en;q=0.9,fr" → "en"
+
+  Out-of-hours detection: supports wrapping ranges (e.g., 22:00–06:00 for night shift)
+
+================================================================================
+ 7. NETWORK RISK COMPONENT (N) — Cap: 20 points
+================================================================================
+
+  ┌────┬──────────────────────────┬────────┬──────────────────────────────────────┐
+  │  # │ Factor Name              │ Points │ Condition                            │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │  1 │ tor_exit_node            │  20    │ AsnType::Tor                         │
+  │  2 │ proxy_ip                 │  15    │ AsnType::Proxy                       │
+  │  3 │ hosting_ip               │  12    │ AsnType::Hosting                     │
+  │  4 │ datacenter_ip            │  12    │ AsnType::Datacenter                  │
+  │  5 │ vpn_ip                   │  10    │ AsnType::Vpn                         │
+  │  6 │ relay_ip                 │   5    │ AsnType::Relay (Apple/Cloudflare)    │
+  │  7 │ ip_flagged_vpn           │   8    │ ip_is_vpn=true (non-VPN ASN)         │
+  │  8 │ ip_flagged_proxy         │  10    │ ip_is_proxy=true (non-Proxy ASN)     │
+  │  9 │ ip_flagged_relay         │   3    │ ip_is_relay=true (non-Relay ASN)     │
+  │ 10 │ ip_abuse_confidence      │  15    │ Abuse score ≥ 80%                    │
+  │    │                          │  10    │ Abuse score ≥ 50%                    │
+  │    │                          │   5    │ Abuse score ≥ 25%                    │
+  │ 11 │ internal_network         │  -5    │ RFC-1918 private address (bonus)     │
+  │ 12 │ impossible_travel        │  18    │ km > elapsed_h * 900 + 500           │
+  │ 13 │ large_geo_jump           │   8    │ > 1000 km since last login           │
+  │ 14 │ moderate_geo_jump        │   4    │ 500–1000 km since last login         │
+  │ 15 │ country_change           │   5    │ Country code changed since last login│
+  │ 16 │ geo_not_in_allowlist     │  12    │ Country not in geo_allowed_countries │
+  │ 17 │ unknown_ip_for_user      │   7    │ known_ip_for_user == Some(false)     │
+  │ 18 │ new_ip_address           │   5    │ IP ≠ last_login_ip (fallback)        │
+  │ 19 │ no_ip_history            │   3    │ First login, no prior IP             │
+  └────┴──────────────────────────┴────────┴──────────────────────────────────────┘
+
+  RFC-1918 detection covers:
+    10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, IPv6 ::1
+
+  IP intelligence flags are checked INDEPENDENTLY of ASN type because a
+  residential ASN can still be a VPN exit node (residential proxy services).
+
+================================================================================
+ 8. BEHAVIORAL VELOCITY COMPONENT (B) — Cap: 20 points
+================================================================================
+
+  Uses overlapping time windows. Tightest window fires first; wider windows
+  only checked if narrower didn't trigger (prevents double-counting).
+
+  ┌────┬──────────────────────────┬────────┬──────────────────────────────────────┐
+  │  # │ Factor Name              │ Points │ Condition                            │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │    │ LOGIN VELOCITY (exclusive — tightest window wins)                        │
+  │  1 │ login_velocity_burst     │  15    │ > 3 attempts in 1 minute             │
+  │  2 │ login_velocity_critical  │  20    │ > 10 attempts in 5 minutes           │
+  │    │ login_velocity_elevated  │  10    │ 6–10 attempts in 5 minutes           │
+  │    │ login_velocity_moderate  │   5    │ 4–5 attempts in 5 minutes            │
+  │  3 │ login_velocity_hourly    │   8    │ > 20 attempts in 1 hour              │
+  │  4 │ login_velocity_daily     │   5    │ > 50 attempts in 24 hours            │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │    │ FAILED LOGIN ATTEMPTS                                                    │
+  │  5 │ failed_attempts_high     │  10    │ > 5 failures in 1 hour               │
+  │    │ failed_attempts_elevated │   8    │ 4–5 failures in 1 hour               │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │    │ OTHER VELOCITY SIGNALS                                                   │
+  │  6 │ recovery_velocity        │  10    │ > 1 recovery request in 24 hours     │
+  │  7 │ action_velocity          │  12    │ > 3 protected actions in 5 minutes   │
+  │  8 │ revocation_spree         │  15    │ > 2 device revocations in 1 hour     │
+  │    │ revocation_elevated      │   7    │ 2 device revocations in 1 hour       │
+  │  9 │ sybil_registration       │  15    │ > 3 registrations from IP in 10 min  │
+  │ 10 │ zero_audit_history       │   5    │ 0 prior audit events for user        │
+  ├────┼──────────────────────────┼────────┼──────────────────────────────────────┤
+  │    │ ACCOUNT INTELLIGENCE                                                     │
+  │ 11 │ disposable_email         │  10    │ Disposable/temporary email domain    │
+  │ 12 │ young_account_sensitive  │   8    │ Account created today + sensitive    │
+  │    │ new_account_sensitive    │   5    │ Account ≤ 3 days + sensitive         │
+  └────┴──────────────────────────┴────────┴──────────────────────────────────────┘
+
+================================================================================
+ 9. ABSOLUTE ADDER (A) — Cap: 30 points
+================================================================================
+
+  Applied AFTER multipliers. These are composite risk signals that cross
+  component boundaries or represent unconditional risk factors.
+
+  ┌────┬────────────────────────────────────────┬────────┬──────────────────────┐
+  │  # │ Factor Name                            │ Points │ Condition            │
+  ├────┼────────────────────────────────────────┼────────┼──────────────────────┤
+  │  1 │ fresh_credential_sensitive_action       │  20    │ Credential < 5min +  │
+  │    │                                        │        │ sensitive action      │
+  │  2 │ recovery_pending                       │  15    │ Active recovery req  │
+  │  3 │ add_admin_low_history                  │  20    │ add_admin + <10 audit│
+  │    │                                        │        │ events               │
+  │  4 │ unfingerprinted_jwt_sensitive          │   5    │ JWT pre-dates finger-│
+  │    │                                        │        │ printing deployment  │
+  │  5 │ breached_credential                    │  15    │ Breached + non-sensi-│
+  │    │                                        │        │ tive (sens. = gate)  │
+  │  6 │ disposable_email_young_account_sensi.  │  15    │ Disposable email +   │
+  │    │                                        │        │ age < 7d + sensitive │
+  └────┴────────────────────────────────────────┴────────┴──────────────────────┘
+
+================================================================================
+ 10. ACTION MULTIPLIER TABLE (M_action)
+================================================================================
+
+  ┌──────────────────────────────┬────────────┐
+  │ Action                       │ Multiplier │
+  ├──────────────────────────────┼────────────┤
+  │ DeviceList                   │    1.0     │
+  │ Login                        │    1.2     │
+  │ Register                     │    1.3     │
+  │ OauthComplete                │    1.3     │
+  │ ActionChallenge              │    1.3     │
+  │ DeviceMarkLost               │    1.5     │
+  │ ActionExecute (default)      │    1.5     │
+  │ DeviceRevoke                 │    1.8     │
+  │ RecoveryStart                │    2.0     │
+  │ AuditLogExport               │    2.0     │
+  │ ActionExecute("export_data") │    2.0     │
+  │ RecoveryApprove              │    2.2     │
+  │ RecoveryComplete             │    2.5     │
+  │ ActionExecute("rotate_key")  │    2.5     │
+  │ ActionExecute("delete_res")  │    2.5     │
+  │ ActionExecute("add_admin")   │    3.0     │
+  │ Unknown                      │    1.0     │
+  └──────────────────────────────┴────────────┘
+
+  Sensitive actions (RiskAction.is_sensitive()):
+    Login, OauthComplete, DeviceRevoke, DeviceMarkLost,
+    RecoveryStart, RecoveryApprove, RecoveryComplete,
+    ActionExecute (all), AuditLogExport
+
+================================================================================
+ 11. ORG RISK MULTIPLIER (M_org)
+================================================================================
+
+  ┌─────────────┬────────────┐
+  │ OrgRiskLevel│ Multiplier │
+  ├─────────────┼────────────┤
+  │ Normal      │    1.0     │
+  │ Elevated    │    1.5     │
+  │ UnderAttack │    2.0     │
+  └─────────────┴────────────┘
+
+================================================================================
+ 12. ORG-GRAPH INTELLIGENCE LAYER
+================================================================================
+
+  The org-graph detects coordinated attacks across users within a tenant.
+  Graph updates happen AFTER evaluate() (fire-and-forget). Background
+  recomputation rebuilds cluster membership periodically.
+
+  ── Org Bias Computation ──
+
+  compute_org_bias(org_risk_score) → 0–10:
+    Score  0–30:  0 points
+    Score 31–60:  (score - 30) / 6   (linear 0–5)
+    Score 61–80:  5 + (score - 60)/7  (linear 5–8)
+    Score 81–100: 8 + (score - 80)/10 (linear 8–10)
+
+  compute_cluster_bias(membership) → 0–15:
+    bias = floor(cluster_risk * confidence * severity / 10.0)
+
+  total_bias = min(org_bias + cluster_bias, 25)  ← hard cap
+
+  ── Threshold Shift ──
+
+  Per-tenant adaptive threshold from TenantRiskProfile:
+    Bounded [-15, +20]. Moves at most 3 points per recomputation cycle.
+
+    attack_pressure > 0.7 → target +15 (severe)
+    attack_pressure > 0.5 → target +10 (moderate)
+    attack_pressure > 0.3 → target +6  (minor)
+    cluster_density > 0.15 → additional +4
+    stability > 0.9 && pressure < 0.1 → target -5 (proven stable)
+
+  ── Graph Model ──
+
+  Node types: User, Credential, IpAddress, Device
+  Edge types (with base weights):
+    SharedIp        (0.6) — same IP, multiple users
+    SharedDevice    (0.9) — same device fingerprint
+    LoginSequence   (0.5) — user A then B from same IP
+    RecoveryChain   (0.8) — recovery linking between users
+    ActionLink      (0.4) — both targeted same resource
+
+  Time decay: w(t) = initial_weight * 2^(-(elapsed_hours / 6))
+    Half-life: 6 hours. Pruned below 0.1.
+
+  Memory bounds: MAX_NODES_PER_TENANT = 50,000
+
+  ── Attack Type Classification ──
+
+  ┌────────────────────────┬──────────┬────────────┬──────────────────────────┐
+  │ Type                   │ Severity │ Base Risk  │ Classification Rule      │
+  ├────────────────────────┼──────────┼────────────┼──────────────────────────┤
+  │ SessionHijackCluster   │   1.5    │    80      │ ≥2 SharedDevice edges    │
+  │ RecoveryAbuse          │   1.4    │    75      │ ≥2 RecoveryChain edges   │
+  │ CredentialStuffing     │   1.2    │    70      │ ≥4 SharedIp AND ≥2 Login │
+  │ SybilFarm              │   1.0    │    60      │ ≥3 LoginSeq AND ≥1 Actio │
+  │ ProxyNetwork           │   0.7    │    45      │ ≥6 SharedIp (no other)   │
+  │ UnknownAnomaly         │   0.6    │    35      │ Catch-all                │
+  └────────────────────────┴──────────┴────────────┴──────────────────────────┘
+
+  OrgRiskSnapshot staleness threshold: 5 minutes (300 seconds)
+
+================================================================================
+ 13. ESCALATION MEMORY
+================================================================================
+
+  Per-user decision history stored at risk:recent:{uid} (Redis list, TTL 5min).
+  Implemented via check_and_record_escalation() for TOCTOU safety.
+
+  Rules (applied in order, 5-minute window):
+    ≥ 2 Hold   decisions in 5m AND current ∈ {Challenge, Hold} → Deny
+    ≥ 3 Challenge decisions in 5m AND current == Challenge      → Hold
+
+  Production implementations MUST use Redis Lua scripts or MULTI/EXEC
+  for atomicity. The default trait impl is non-atomic (get→check→record).
+
+================================================================================
+ 14. CHALLENGE ACTION SELECTION LOGIC
+================================================================================
+
+  When decision == Challenge, the engine selects the appropriate friction:
+
+    1. score >= 50            → RequiredAction::ReLogin
+    2. JWT fingerprint stored
+       AND stored != current  → RequiredAction::ReverifyDevice
+    3. otherwise              → RequiredAction::StepUpWebAuthn
+
+  Additional RequiredAction variants (for adapter-level use):
+    4. CompleteCaptcha  — bot-suspected traffic, progressive friction
+    5. VerifyEmail      — email verification needed
+    6. AdminApproval    — async human review (used with Hold)
+
+================================================================================
+ 15. SIDE-EFFECT DIRECTIVES
+================================================================================
+
+  lock_account:
+    Set login:locked:{uid} (TTL 3600s) when:
+      decision == Deny AND action ∈ {Login, OauthComplete, Register}
+
+  block_ip:
+    Set ip:blocked:{ip} (TTL 3600s) when:
+      decision == Deny AND action == Register
+    (Anti-sybil: prevents repeated registration from same IP)
+
+  notify_user:
+    True for any blocking decision (Challenge, Hold, Deny)
+
+  notify_admin:
+    True for Hold or Deny
+
+  hold_reason:
+    Format: "Score threshold exceeded. Top signals: {top3}. Action: {label}."
+    Or:     "Escalated from repeated challenges. Top signals: {top3}. Action: {label}."
+
+================================================================================
+ 16. RISKCONTEXT — FULL INPUT CONTRACT (82 fields)
+================================================================================
+
+  All fields marked [opt] are Option<T>. Fields marked [serde] have
+  #[serde(default)] for backward-compatible deserialization.
+
+  ── Request Identity ──
+    request_id:                   Uuid
+    evaluated_at:                 DateTime<Utc>
+
+  ── User / Credential Identity ──
+    user_id:                      Uuid
+    username:                     String
+    credential_id:                [opt] Uuid      (None during registration)
+
+  ── Action ──
+    action:                       RiskAction
+    resource_id:                  [opt] String
+
+  ── DB Signals: Credential Metadata ──
+    credential_status:            CredentialStatus
+    credential_created_at:        DateTime<Utc>
+    credential_last_used_at:      [opt] DateTime<Utc>
+    credential_sign_count_prev:   i64             (before this auth)
+    credential_sign_count_new:    i64             (from WebAuthn assertion)
+    credential_registered_ua:     [opt] String    (UA at registration time)
+    credential_count_for_user:    u32             (active credentials)
+
+  ── DB Signals: Historical Context ──
+    prior_audit_event_count:      u32             (approximated COUNT)
+    last_login_ip:                [opt] IpAddr
+    last_login_at:                [opt] DateTime<Utc>
+    last_login_geo:               [opt] GeoPoint
+
+  ── Session / JWT Signals ──
+    jwt_issued_at:                [opt] DateTime<Utc>
+    jwt_expires_at:               [opt] DateTime<Utc>
+    jwt_fingerprint_stored:       [opt] String    (sha256(ip||ua) from Redis)
+    jwt_fingerprint_current:      [opt] String    (computed this request)
+
+  ── Network Signals ──
+    request_ip:                   [opt] IpAddr
+    request_ua:                   [opt] String
+    request_geo:                  [opt] GeoPoint
+    ip_asn_type:                  [opt] AsnType
+
+  ── Redis Signals: Velocity Counters ──
+    login_attempts_5m:            [opt] u32       (velocity:login:{uid}:5m)
+    failed_login_attempts_1h:     [opt] u32       (velocity:failed:{uid}:1h)
+    actions_executed_5m:          [opt] u32       (velocity:actions:{uid}:5m)
+    recovery_requests_24h:        [opt] u32       (velocity:recovery:{uid}:24h)
+    device_revocations_1h:        [opt] u32       (velocity:revoke:{uid}:1h)
+    registrations_from_ip_10m:    [opt] u32       (velocity:reg:{ip}:10m)
+
+  ── Redis Signals: Session State ──
+    active_session_count:         [opt] u32       (sessions:active:{uid})
+    account_locked:               bool            (login:locked:{uid})
+    recovery_pending:             bool
+
+  ── OAuth Signals ──
+    oauth_authorize_ip:           [opt] IpAddr
+
+  ── Nonce / Replay Signals ──
+    nonce_present:                bool
+    nonce_already_used:           bool
+
+  ── Org-Level Risk ──
+    org_risk_level:               OrgRiskLevel
+
+  ── Signal Collection Metadata ──
+    redis_signals_degraded:       bool
+    db_signals_degraded:          bool
+
+  ── Org-Graph Intelligence [serde] ──
+    tenant_id:                    String
+    org_risk_score:               [opt] u8        (0–100)
+    cluster_membership:           [opt] ClusterMembership
+    threshold_shift:              [opt] i8        ([-15, +20])
+    org_active_cluster_count:     u32
+
+  ── Extended Velocity Counters [serde] ──
+    login_attempts_1m:            [opt] u32       (velocity:login:{uid}:1m)
+    login_attempts_1h:            [opt] u32       (velocity:login:{uid}:1h)
+    login_attempts_24h:           [opt] u32       (velocity:login:{uid}:24h)
+
+  ── Client-Side Signals [serde] ──
+    client_timestamp:             [opt] DateTime<Utc>  (x-timestamp header)
+    device_fingerprint_hash:      [opt] String         (canvas/WebGL hash)
+    ja3_fingerprint:              [opt] String          (TLS fingerprint)
+
+  ── IP Reputation [serde] ──
+    known_ip_for_user:            [opt] bool
+
+  ── IP Intelligence [serde] ──
+    ip_is_vpn:                    [opt] bool      (from threat feed)
+    ip_is_proxy:                  [opt] bool
+    ip_is_relay:                  [opt] bool
+    ip_abuse_confidence:          [opt] u8        (0–100, AbuseIPDB)
+
+  ── Geo Intelligence [serde] ──
+    geo_allowed_countries:        [opt] Vec<String>  (ISO 3166-1 alpha-2)
+    is_sanctioned_country:        [opt] bool
+
+  ── Bot / Browser Integrity [serde] ──
+    webdriver_detected:           [opt] bool      (navigator.webdriver)
+    captcha_score:                [opt] f32       (0.0=bot, 1.0=human)
+    screen_resolution:            [opt] String    ("WIDTHxHEIGHT")
+    touch_capable:                [opt] bool      (navigator.maxTouchPoints)
+
+  ── Account Intelligence [serde] ──
+    account_age_days:             [opt] u32       (0 = created today)
+    email_verified:               [opt] bool
+    email_domain_disposable:      [opt] bool      (guerrillamail, etc.)
+    breached_credential:          [opt] bool      (HaveIBeenPwned)
+
+  ── Time / Behavioral Context [serde] ──
+    user_typical_hours:           [opt] (u8, u8)  (start, end in UTC)
+    accept_language:              [opt] String
+    previous_accept_language:     [opt] String
+
+  ── Device Trust [serde] ──
+    device_trust_level:           [opt] DeviceTrustLevel
+
+================================================================================
+ 17. RISKDECISION — FULL OUTPUT CONTRACT
+================================================================================
+
+  ── Primary Verdict ──
+    decision:             Decision         (Allow, Challenge, Hold, Deny)
+    score:                u8               (raw base score, always 0–100)
+    required_action:      [opt] RequiredAction  (set when Challenge)
+
+  ── Diagnostics ──
+    score_breakdown:      ScoreBreakdown   (D, S, N, B, base, multipliers, A, final)
+    triggered_gates:      Vec<HardGate>    (which hard gates fired)
+    triggered_rules:      Vec<String>      (factor names, sorted by contribution)
+    contributing_factors: Vec<Factor>      (full factor detail, sorted desc)
+
+  ── Side-Effect Directives ──
+    lock_account:         bool
+    notify_user:          bool
+    notify_admin:         bool
+    hold_reason:          [opt] String
+    signals_degraded:     bool
+
+  ── Escalation ──
+    escalated:            bool             (decision promoted by escalation memory)
+
+  ── Org-Graph Output ──
+    base_score:           u8               (pre-org-adjustment)
+    adjusted_score:       u8               (after org bias + threshold shift)
+    org_risk_score:       [opt] u8         (tenant aggregate 0–100)
+    cluster_factors:      Vec<ClusterFactor>
+    applied_threshold_shift: i8
+
+  ── Correlation ──
+    request_id:           Uuid
+    evaluated_at:         DateTime<Utc>
+    engine_version:       &'static str     (CARGO_PKG_VERSION)
+
+================================================================================
+ 18. STORE TRAIT CONTRACTS
+================================================================================
+
+  ── SignalStore (async read-side, engine core) ──
+
+  get_velocity_counters(user_id, request_ip)     → VelocityCounters
+  get_recent_decisions(user_id)                   → Vec<EscalationEntry>
+  record_decision(user_id, entry)                 → ()
+  check_and_record_escalation(user_id, dec, s, t) → (Decision, bool)
+  lock_account(user_id, ttl_seconds)              → ()
+  block_ip(ip, ttl_seconds)                       → ()  [default no-op]
+  get_jwt_fingerprint(key)                        → Option<String>
+  set_jwt_fingerprint(key, value, ttl)            → ()
+  is_nonce_used(nonce)                            → bool
+  consume_nonce(nonce)                            → ()
+
+  NONCE_TTL_SECONDS = 300
+
+  ── IncrementStore (async write-side, post-decision) ──
+
+  increment_login_attempts(user_id)               → ()
+  increment_failed_attempts(user_id)              → ()
+  increment_actions_executed(user_id)             → ()
+  increment_recovery_requests(user_id)            → ()
+  increment_device_revocations(user_id)           → ()
+  increment_registrations_from_ip(ip)             → ()
+  increment_active_sessions(user_id)              → ()
+  decrement_active_sessions(user_id)              → ()
+
+  Note: Prefer PRE-incrementing velocity counters BEFORE evaluate()
+  using atomic Redis INCR+GET to close the concurrency race window.
+
+  ── OrgGraphStore (async, org-level) ──
+
+  Per-request reads (< 10ms):
+    get_org_risk_snapshot(tenant_id)               → Option<OrgRiskSnapshot>
+    get_cluster_membership(tenant_id, node_key)    → Option<ClusterMembership>
+    get_tenant_profile(tenant_id)                  → Option<TenantRiskProfile>
+
+  Post-request writes (fire-and-forget):
+    push_graph_update(tenant_id, update)           → ()
+    record_decision_stats(tenant_id, was_blocked)  → ()
+
+  Background-only:
+    recompute_org_graph(tenant_id, total_users)    → ()
+    prune_graph(tenant_id)                         → ()
+
+================================================================================
+ 19. SIGNAL COLLECTION BUDGET
+================================================================================
+
+  ┌────────────────────────────────────────┬─────────┐
+  │ Signal Source                          │ Budget  │
+  ├────────────────────────────────────────┼─────────┤
+  │ Redis velocity keys (MGET pipeline)   │ ≤ 20ms  │
+  │ Redis escalation (LRANGE)             │ ≤ 10ms  │
+  │ PostgreSQL credential (single SELECT) │ ≤ 50ms  │
+  │ GeoIP (local database)                │ ≤ 2ms   │
+  │ JWT fingerprint (Redis GET)           │ ≤ 10ms  │
+  │ TOTAL                                 │ ≤ 92ms  │
+  └────────────────────────────────────────┴─────────┘
+
+================================================================================
+ 20. ADAPTER INTEGRATION POINTS
+================================================================================
+
+  IP-1: POST /auth/login/finish      (after WebAuthn success)
+  IP-2: POST /auth/oauth/complete    (before code issue)
+  IP-3: POST /actions/execute        (before action dispatch)
+  IP-4: POST /recovery/start         (before record create)
+  IP-5: POST /recovery/approve       (before approval)
+  IP-6: POST /devices/:id/revoke     (before status update)
+  IP-6: POST /devices/:id/mark-lost  (before status update)
+
+  Decision → HTTP mapping:
+    Allow     → forward response as-is
+    Challenge → 428 Precondition Required + {required_action, request_id}
+    Hold      → 202 Accepted + {hold_id, reason}
+    Deny      → 403 Forbidden + {request_id}
+
+================================================================================
+ 21. ENUMS REFERENCE
+================================================================================
+
+  RiskAction:
+    Register, Login, OauthComplete, DeviceList, DeviceRevoke,
+    DeviceMarkLost, RecoveryStart, RecoveryApprove, RecoveryComplete,
+    ActionChallenge, ActionExecute { action_name }, AuditLogExport,
+    Unknown { name }
+
+  CredentialStatus:
+    Active, Lost, Revoked
+
+  AsnType:
+    Residential, Corporate, Datacenter, Tor, Vpn, Proxy, Hosting,
+    Relay, Unknown
+
+  DeviceTrustLevel:
+    New, Recognized, Trusted
+
+  OrgRiskLevel:
+    Normal, Elevated, UnderAttack
+
+  RequiredAction:
+    StepUpWebAuthn, ReverifyDevice, ReLogin, AdminApproval,
+    CompleteCaptcha, VerifyEmail
+
+  Decision:
+    Allow, Challenge, Hold, Deny
+
+  HardGate:
+    RevokedCredential, AccountLocked, NonceReplay, SignCountRollback,
+    ImpossibleTravelViaTor, TorOnSensitiveAction,
+    RecoveryCompletedWithNoPending, OauthNonceIpMismatchOnTor,
+    SanctionedCountry, BreachedCredentialOnSensitive, VpnOnCriticalAction
+
+  ScoreComponent:
+    Device, Session, Network, Behavioral, Absolute, Gate
+
+  AttackType:
+    SessionHijackCluster, RecoveryAbuse, CredentialStuffing,
+    SybilFarm, ProxyNetwork, UnknownAnomaly
+
+  NodeType:
+    User, Credential, IpAddress, Device
+
+  EdgeType:
+    SharedIp, SharedDevice, LoginSequence, RecoveryChain, ActionLink
+
+  RiskEngineError:
+    StoreError(String), Timeout { ms: u64 }, InvalidContext(String)
+
+================================================================================
+ 22. ATTACK GRAPH MODEL
+================================================================================
+
+  Nodes:
+    user:{uuid}              — authenticated user
+    cred:{uuid}              — WebAuthn credential
+    ip:{x.x.x.x}            — IP address
+    dev:{fingerprint_hash}   — device fingerprint
+
+  Edges (undirected, time-decaying):
+    SharedIp        (0.6)  — multiple users from same IP
+    SharedDevice    (0.9)  — same device fingerprint, multiple users
+    LoginSequence   (0.5)  — sequential logins from same IP
+    RecoveryChain   (0.8)  — recovery linking
+    ActionLink      (0.4)  — both targeted same resource
+
+  Decay: w(t) = initial_weight * 2^(-(elapsed_hours / 6))
+  Half-life: 6 hours
+  Pruned below: 0.1
+  Reinforcement: 0.7 * base_type + 0.3 * current
+
+  Clustering:
+    Union-find with path compression + union-by-rank
+    Only merges on edges with weight >= 0.25
+    Clusters pruned if confidence < 0.2 or size < 2
+
+  Confidence formula:
+    confidence = w_size * size_factor + w_density * edge_density + w_weight * avg_weight
+    Where weights are per-attack-type (all sum to 1.0)
+
+  Risk score formula:
+    base = attack_type.base_risk_score()
+    size_factor = min(1 + ln(member_count), 4.5) / 4.5
+    raw = base * confidence * size_factor
+    Clamped to 0–100
+
+================================================================================
+ 23. TENANT RISK PROFILES & ADAPTIVE THRESHOLDS
+================================================================================
+
+  TenantRiskProfile:
+    - attack_pressure:      blocked_requests / total_requests (0.0–1.0)
+    - stability_score:      1.0 - instability (0.0–1.0)
+    - cluster_density:      clustered_users / total_users (0.0–1.0)
+    - active_cluster_count: count of active clusters
+    - threshold_shift:      [-15, +20] bounded, inertia ±3 per cycle
+
+  Under-attack detection:
+    attack_pressure > 0.6 OR active_cluster_count >= 5
+
+  Stable tenant detection:
+    stability > 0.9 AND active_clusters == 0
+
+  OrgRiskSnapshot:
+    - org_risk_score:       0–100 aggregate
+    - cluster_severity_distribution: [low, medium, high, critical]
+    - Stale after 5 minutes (300 seconds)
+
+================================================================================
+ 24. ERROR TYPES
+================================================================================
+
+  RiskEngineError:
+    StoreError(String)         — Redis/DB I/O failure
+    Timeout { ms: u64 }       — signal collection timeout
+    InvalidContext(String)     — malformed RiskContext
+
+================================================================================
+ END OF REFERENCE
+================================================================================
+
+  Total scoring factors:    ~60+
+  Total hard gates:         11
+  Total RiskContext fields:  82
+  Total AsnType variants:   9
+  Total HardGate variants:  11
+  Total RequiredAction:     6
+  Total AttackType:         6
+  Total EdgeType:           5
+  Total NodeType:           4
+
+  Engine characteristics:
+    - Deterministic (no ML, no randomness)
+    - Traceable (every factor recorded)
+    - Fail-open (missing signals → no penalty, except degraded + sensitive)
+    - Backward compatible (all new fields serde(default))
+    - Async only at I/O boundaries (scoring is synchronous)
+    - Max org-graph nodes: 50,000 per tenant
+    - Escalation window: 5 minutes
+    - Edge time-decay half-life: 6 hours
