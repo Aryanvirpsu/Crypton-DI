@@ -97,6 +97,6 @@ is planned or in scope here.
 | Recovery (lost-device, trusted-device-approves, no email/SMS) | Real, working |
 | Step-up verification (`/actions/*`) | Real cryptographic proof-of-presence; carries no business logic itself |
 | OAuth authorization-code flow | Real state machine, but no PKCE, single hardcoded client — unmounted unless `ENABLE_OAUTH=true` |
-| Rate limiting / replay protection / policy engine at the gateway | Not implemented (see `DECISIONS.md`) |
+| Rate limiting / replay protection / policy engine at the gateway | On `dev`: wired and router-tested in isolation (HS256 tokens). Not proven with real `crypton-id` tokens (EdDSA); see `services/crypton-gateway/README.md`. Absent on `main`. |
 | Agent identity / delegation (`labs/agent-lab`) | Real, working, but a separate Python lab, not wired behind the gateway — see `labs/README.md`. As of v0.6: multi-hop delegation chains (`Human -> Agent -> Agent -> ...`), Ed25519-signed, scope-attenuated (child authority can only narrow), verified by one authoritative walker (`chain.py`) — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 and `DECISIONS.md`. Root-only (single-hop) delegation remains fully supported as the degenerate case. Human-issued Approval sits on top, unchanged. |
 | Agent-security testing (adversarial/attack simulation) | Not implemented |

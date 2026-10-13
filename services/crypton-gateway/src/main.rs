@@ -11,6 +11,8 @@
 //! Startup aborts if JWT_SECRET or INTERNAL_TOKEN are not set in the environment.
 
 mod audit;
+#[cfg(test)]
+mod gateway_tests;
 mod middleware;
 mod routes;
 mod state;
@@ -20,7 +22,7 @@ use std::net::SocketAddr;
 use axum::{
     body::Body,
     extract::State,
-    http::{Method, Request, Response, StatusCode},
+    http::{HeaderName, Method, Request, Response, StatusCode},
     middleware::{from_fn, from_fn_with_state},
     routing::{get, post},
     Router,
@@ -30,6 +32,7 @@ use state::{AppState, Metrics};
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -43,19 +46,60 @@ use middleware::{
     step_up_context::inject_step_up_context,
 };
 
+const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// Plain-text logs by default; set LOG_FORMAT=json for machine-parseable
+/// output. Every request-scoped event carries `request_id` via the span in
+/// [`with_request_id`].
+fn init_tracing() {
+    let filter =
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
+
+    if std::env::var("LOG_FORMAT").as_deref() == Ok("json") {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}
+
+/// Assign (or keep a caller-supplied) `x-request-id`, log it on the request
+/// span, forward it to the upstream (the proxy copies non-hop-by-hop headers)
+/// and echo it on the response. Applied outermost so requests rejected by the
+/// security middleware also carry a request ID.
+fn with_request_id(router: Router) -> Router {
+    let header = HeaderName::from_static(REQUEST_ID_HEADER);
+    router
+        .layer(TraceLayer::new_for_http().make_span_with(|req: &Request<Body>| {
+            let request_id = req
+                .headers()
+                .get(REQUEST_ID_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-")
+                .to_string();
+            tracing::info_span!(
+                "http_request",
+                request_id = %request_id,
+                method = %req.method(),
+                path = %req.uri().path(),
+            )
+        }))
+        .layer(PropagateRequestIdLayer::new(header.clone()))
+        .layer(SetRequestIdLayer::new(header, MakeRequestUuid))
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    init_tracing();
 
     let redis_url =
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
@@ -140,11 +184,11 @@ fn build_external_router(state: AppState) -> Router {
         .layer(auth_stack)
         .with_state(state.clone());
 
-    Router::new()
+    let router = Router::new()
         .route("/health", get(|| async { "crypton-gateway ok" }))
         .merge(proxy_router)
-        .layer(cors_layer())
-        .layer(TraceLayer::new_for_http())
+        .layer(cors_layer());
+    with_request_id(router)
 }
 
 // ── Internal router ───────────────────────────────────────────────────────────
@@ -160,12 +204,12 @@ fn build_internal_router(state: AppState) -> Router {
         .layer(from_fn(require_admin))
         .layer(from_fn_with_state(state.clone(), validate_jwt));
 
-    Router::new()
+    let router = Router::new()
         .route("/internal/metrics", get(routes::metrics::handler))
         .nest("/internal/diagnostics", diag_router)
         .route("/internal/audit/ingest", post(audit::ingest))
-        .with_state(state)
-        .layer(TraceLayer::new_for_http())
+        .with_state(state);
+    with_request_id(router)
 }
 
 // ── Transparent proxy ─────────────────────────────────────────────────────────

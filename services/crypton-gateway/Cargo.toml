@@ -8,7 +8,7 @@ edition = "2021"
 axum        = { version = "0.7", features = ["macros"] }
 tokio       = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
 tower       = "0.5"
-tower-http  = { version = "0.6", features = ["trace", "cors"] }
+tower-http  = { version = "0.6", features = ["trace", "cors", "request-id"] }
 
 # HTTP client (proxying to identity)
 reqwest     = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
@@ -34,7 +34,7 @@ bytes       = "1"
 
 # Logging / tracing
 tracing             = "0.1"
-tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber  = { version = "0.3", features = ["env-filter", "json"] }
 
 # Risk engine (local path — deterministic scoring and policy decisions)
 risk-engine = { path = "../../risk-engine" }
@@ -48,3 +48,7 @@ async-trait = "0.1"
 # Utilities
 anyhow      = "1"
 dotenvy     = "0.15"
+
+[dev-dependencies]
+# Router-level tests drive the real Axum router with `ServiceExt::oneshot`.
+tower = { version = "0.5", features = ["util"] }

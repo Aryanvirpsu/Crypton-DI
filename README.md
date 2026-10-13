@@ -65,8 +65,9 @@ Agent identity is behind the gateway's extension point in name only —
 `agent-lab` runs as a standalone CLI today, not wired into
 `crypton-gateway`'s request path. Also not implemented: agent-security /
 adversarial testing (prompt or tool injection, delegation-attack
-simulation), MCP integration, and rate limiting / a policy engine at the
-gateway.
+simulation), MCP integration, and any agent-delegation check in the
+gateway. (Rate limiting, replay protection and risk-engine policy middleware
+exist on `dev` but are not proven end to end; see the gateway README.)
 
 ## Architecture
 
@@ -99,7 +100,7 @@ for the marked extension point where that wiring will eventually happen.
 
 ```text
 services/crypton-id        Rust/Axum identity service — WebAuthn, JWT, devices, recovery, audit log, admin
-services/crypton-gateway   Rust/Axum reverse proxy — routing, CORS, correlation IDs
+services/crypton-gateway   Rust/Axum gateway — proxy + wired auth/nonce/rate-limit/risk-policy middleware (unproven end to end; see its README)
 services/crypton-console   Product frontend — register, login, devices, recovery, admin
 services/crypton-main      Public marketing site, no backend calls
 libs/crypton-sdk           TypeScript client SDK — the only thing that talks to crypton-id over HTTP
