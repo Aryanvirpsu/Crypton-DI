@@ -47,30 +47,16 @@ pub async fn handler(State(state): State<AppState>) -> impl IntoResponse {
         m.nonce_timestamp_invalid.load(std::sync::atomic::Ordering::Relaxed),
     ));
 
-    body.push_str(&format_counter(
-        "gateway_policy_blocked_locked_total",
-        m.policy_blocked_locked.load(std::sync::atomic::Ordering::Relaxed),
-    ));
-    body.push_str(&format_counter(
-        "gateway_policy_blocked_private_unauth_total",
-        m.policy_blocked_private_unauth
-            .load(std::sync::atomic::Ordering::Relaxed),
-    ));
-    body.push_str(&format_counter(
-        "gateway_policy_blocked_device_inactive_total",
-        m.policy_blocked_device_inactive
-            .load(std::sync::atomic::Ordering::Relaxed),
-    ));
-    body.push_str(&format_counter(
-        "gateway_policy_blocked_stepup_required_total",
-        m.policy_blocked_stepup_required
-            .load(std::sync::atomic::Ordering::Relaxed),
-    ));
-    body.push_str(&format_counter(
-        "gateway_policy_blocked_recovery_pending_total",
-        m.policy_blocked_recovery_pending
-            .load(std::sync::atomic::Ordering::Relaxed),
-    ));
+    for (name, c) in [
+        ("gateway_policy_blocked_deny_total", &m.policy_blocked_deny),
+        ("gateway_policy_blocked_challenge_total", &m.policy_blocked_challenge),
+        ("gateway_policy_blocked_hold_total", &m.policy_blocked_hold),
+    ] {
+        body.push_str(&format_counter(
+            name,
+            c.load(std::sync::atomic::Ordering::Relaxed),
+        ));
+    }
     body.push_str(&format_counter(
         "gateway_policy_would_block_dry_run_total",
         m.policy_would_block_dry_run

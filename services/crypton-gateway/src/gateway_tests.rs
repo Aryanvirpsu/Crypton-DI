@@ -177,6 +177,7 @@ async fn build_state(redis_url: &str, pg_url: &str, identity_base: String) -> Ap
         policy_enforce: true,
         jwt_decoding_key: DecodingKey::from_ed_pem(PUBLIC_KEY_PEM.as_bytes()).unwrap(),
         internal_token: INTERNAL_TOKEN.to_string(),
+        gateway_secret: None,
     }
 }
 
@@ -1813,7 +1814,8 @@ fn mint_with_identity(i: &Ident) -> String {
         &i.username,
         i.cred,
         &EncodingKey::from_ed_pem(SIGNING_KEY_PEM.as_bytes()).unwrap(),
-    ).unwrap_or_else(|_| panic!("issue_jwt failed"))
+    )
+    .unwrap_or_else(|_| panic!("issue_jwt failed"))
 }
 
 struct E2e {
@@ -2050,4 +2052,125 @@ async fn known_gap_identity_is_reachable_directly_and_gateway_only_controls_are_
             .0,
         StatusCode::UNAUTHORIZED
     );
+}
+
+// ── 12. Runtime-integration additions ────────────────────────────────────────
+
+#[tokio::test]
+#[ignore = "needs throwaway redis+postgres (see module docs)"]
+async fn gateway_secret_is_forwarded_and_a_client_supplied_one_is_stripped() {
+    let (redis, pg_url) = infra();
+    let (up, seen) = spawn_upstream().await;
+    let mut state = build_state(&redis, &pg_url, up).await;
+    apply_identity_migrations(&state.pg).await;
+    state.gateway_secret = Some("s3cret-from-gateway".to_string());
+    let env = Env::from_state(state, seen);
+    let i = env.ident().await;
+
+    let st = env
+        .status(
+            Req::get("/profile")
+                .auth(&i)
+                .header("x-gateway-secret", "attacker-supplied"),
+        )
+        .await;
+    assert_eq!(st, StatusCode::OK);
+    let seen = env.seen.lock().unwrap();
+    let hit = seen.iter().find(|s| s.path == "/profile").unwrap();
+    assert_eq!(
+        hit.header_all("x-gateway-secret"),
+        vec!["s3cret-from-gateway".to_string()],
+        "only the gateway's own secret reaches the upstream"
+    );
+}
+
+#[tokio::test]
+#[ignore = "needs throwaway redis+postgres (see module docs)"]
+async fn policy_blocks_are_counted_by_verdict_and_other_denials_do_not_touch_them() {
+    let env = Env::new().await;
+    let i = env.ident().await;
+    for _ in 0..6 {
+        let ev = json!({"event_type":"login_failed","user_id":i.user.to_string(),"details":{}});
+        assert_eq!(
+            ingest(&env, Some(INTERNAL_TOKEN), &ev, &rid()).await,
+            StatusCode::ACCEPTED
+        );
+    }
+    let m0 = env.metrics().await;
+    assert!(
+        !m0.contains("gateway_policy_blocked_locked_total"),
+        "the misleading all-purpose counter is gone"
+    );
+    assert_eq!(metric(&m0, "gateway_policy_blocked_deny_total"), 0);
+
+    // Not a policy denial: must leave the policy counters alone.
+    assert_eq!(
+        env.status(Req::get("/profile")).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        env.status(Req::get("/profile").auth(&i).nonce(None)).await,
+        StatusCode::BAD_REQUEST
+    );
+    let m1 = env.metrics().await;
+    for name in [
+        "gateway_policy_blocked_deny_total",
+        "gateway_policy_blocked_challenge_total",
+        "gateway_policy_blocked_hold_total",
+    ] {
+        assert_eq!(metric(&m1, name), 0, "{name} moved on a non-policy denial");
+    }
+
+    // A real policy denial (locked account) moves exactly the deny counter.
+    let st = env.status(Req::get("/profile").auth(&i)).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    let m2 = env.metrics().await;
+    assert_eq!(metric(&m2, "gateway_policy_blocked_deny_total"), 1);
+    assert_eq!(metric(&m2, "gateway_policy_blocked_challenge_total"), 0);
+}
+
+#[tokio::test]
+#[ignore = "needs throwaway redis+postgres (see module docs)"]
+async fn known_gap_ingest_commit_failure_leaves_the_signal_without_an_audit_row() {
+    // The ingest is NOT fully atomic across Postgres and Redis. Order is: insert
+    // the audit row in a transaction, apply the Redis effect, COMMIT. A failure at
+    // COMMIT (forced here with a deferred constraint trigger) leaves the Redis
+    // signal applied and no audit row, and the caller sees a 500 and may retry
+    // (which would apply the signal twice). The order is deliberate: a security
+    // signal that is applied without its audit row is safer than the reverse.
+    let env = Env::with_own_database().await;
+    let i = env.ident().await;
+    sqlx::query(
+        "CREATE FUNCTION fail_at_commit() RETURNS trigger LANGUAGE plpgsql AS \
+         $$ BEGIN RAISE EXCEPTION 'forced commit-time failure'; END $$",
+    )
+    .execute(&env.state.pg)
+    .await
+    .unwrap();
+    sqlx::query(
+        "CREATE CONSTRAINT TRIGGER audit_fail AFTER INSERT ON audit_logs \
+         DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fail_at_commit()",
+    )
+    .execute(&env.state.pg)
+    .await
+    .unwrap();
+
+    let id = rid();
+    let ev = json!({"event_type":"login_failed","user_id":i.user.to_string(),"details":{}});
+    assert_eq!(
+        ingest(&env, Some(INTERNAL_TOKEN), &ev, &id).await,
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert_eq!(
+        redis_get(&env, &format!("velocity:failed:{}:1h", i.user)).await,
+        Some(1),
+        "Redis effect was applied"
+    );
+    let n: (i64,) =
+        sqlx::query_as("SELECT count(*) FROM audit_logs WHERE detail->>'request_id' = $1")
+            .bind(&id)
+            .fetch_one(&env.state.pg)
+            .await
+            .unwrap();
+    assert_eq!(n.0, 0, "but no audit row was committed");
 }

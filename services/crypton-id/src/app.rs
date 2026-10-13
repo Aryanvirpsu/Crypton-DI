@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
 use axum::{
     Router,
     body::Body,
     extract::Request,
+    middleware::Next,
+    response::{IntoResponse, Response},
     http::{
         HeaderName, HeaderValue, Method,
         header::{AUTHORIZATION, CONTENT_TYPE},
@@ -17,6 +21,40 @@ use tower_http::{
 use crate::{routes, state::AppState};
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// Header the gateway adds to every request it forwards.
+pub const GATEWAY_SECRET_HEADER: &str = "x-gateway-secret";
+
+fn secrets_match(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut diff = (a.len() ^ b.len()) as u32;
+    for i in 0..a.len().max(b.len()) {
+        diff |= (*a.get(i).unwrap_or(&0) ^ *b.get(i).unwrap_or(&0)) as u32;
+    }
+    diff == 0
+}
+
+/// Defence in depth behind network isolation: when `GATEWAY_SHARED_SECRET` is set,
+/// every request except `/health` (the platform liveness probe) must carry it in
+/// `x-gateway-secret`, which only the gateway adds. A client that somehow reaches
+/// this service directly, without going through the gateway, is refused. This is
+/// NOT a substitute for keeping the service on a private network.
+async fn require_gateway_secret(secret: Option<Arc<String>>, req: Request, next: Next) -> Response {
+    if let Some(expected) = secret {
+        let ok = req.uri().path() == "/health"
+            || req
+                .headers()
+                .get(GATEWAY_SECRET_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| secrets_match(v, &expected))
+                .unwrap_or(false);
+        if !ok {
+            tracing::warn!(path = %req.uri().path(), "refused request without the gateway secret");
+            return (axum::http::StatusCode::FORBIDDEN, "forbidden").into_response();
+        }
+    }
+    next.run(req).await
+}
 
 pub fn app(state: AppState) -> Router {
     let cors_origin: HeaderValue = state
@@ -34,6 +72,16 @@ pub fn app(state: AppState) -> Router {
         ]);
 
     let request_id_header = HeaderName::from_static(REQUEST_ID_HEADER);
+
+    let gateway_secret = std::env::var("GATEWAY_SHARED_SECRET")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(Arc::new);
+    if gateway_secret.is_none() {
+        tracing::warn!(
+            "GATEWAY_SHARED_SECRET is not set: this service accepts requests that did not come through the gateway"
+        );
+    }
 
     Router::<AppState>::new()
         .merge(routes::router())
@@ -66,4 +114,20 @@ pub fn app(state: AppState) -> Router {
                 )
                 .layer(PropagateRequestIdLayer::new(request_id_header)),
         )
+        .layer(axum::middleware::from_fn(move |req: Request, next: Next| {
+            require_gateway_secret(gateway_secret.clone(), req, next)
+        }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secret_comparison() {
+        assert!(secrets_match("abc", "abc"));
+        assert!(!secrets_match("abc", "abd"));
+        assert!(!secrets_match("abc", "ab"));
+        assert!(!secrets_match("", "x"));
+    }
 }

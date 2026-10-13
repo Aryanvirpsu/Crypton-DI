@@ -197,6 +197,7 @@ async fn start_recovery(
         "success",
     )
     .await;
+    crate::signals::record_recovery_started(&state, auth.user_id).await;
 
     tracing::info!(user_id = %auth.user_id, request_id = %resp.id, "recovery started");
     Ok(Json(ApiResponse::success(resp)))
@@ -331,6 +332,7 @@ async fn complete_recovery(
         "success",
     )
     .await;
+    crate::signals::record_recovery_completed(&state, auth.user_id).await;
 
     tracing::info!(user_id = %auth.user_id, request_id = %resp.id, "recovery completed");
     Ok(Json(ApiResponse::success(resp)))
@@ -452,6 +454,7 @@ async fn public_start_recovery(
         "success",
     )
     .await;
+    crate::signals::record_recovery_started(&state, user_id).await;
 
     Ok(Json(ApiResponse::success(PublicStartResp {
         request: public_recovery(&resp),
@@ -553,6 +556,7 @@ async fn public_complete_recovery(
         "success",
     )
     .await;
+    crate::signals::record_recovery_completed(&state, user_id).await;
 
     Ok(Json(ApiResponse::success(PublicCompleteResp {
         request: public_recovery(&resp),

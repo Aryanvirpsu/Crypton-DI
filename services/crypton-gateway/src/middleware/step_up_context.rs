@@ -19,11 +19,12 @@ pub async fn inject_step_up_context(
     mut req: Request,
     next: Next,
 ) -> Response {
-    // Identity tokens carry no jti, so the session key is the user id.
+    // Identity tokens carry no jti: bind to this token (user + iat), the key
+    // crypton-id writes after a server-verified WebAuthn step-up.
     let session_key = req
         .extensions()
         .get::<crate::middleware::auth::Claims>()
-        .map(|c| c.sub.clone());
+        .map(|c| format!("{}:{}", c.sub, c.iat));
 
     let verified = match session_key {
         Some(session) => {

@@ -247,6 +247,8 @@ const CLIENT_SPOOFABLE_FORWARD_HEADERS: &[&str] = &[
     "cf-connecting-ip",
     "cf-ipcountry",
     "forwarded",
+    // Only the gateway may assert it is the gateway.
+    "x-gateway-secret",
 ];
 
 fn is_strippable_forward_header(name: &str) -> bool {
@@ -286,6 +288,10 @@ async fn proxy_handler(
         if !is_strippable_forward_header(name.as_str()) {
             builder = builder.header(name.as_str(), value.as_bytes());
         }
+    }
+
+    if let Some(secret) = &st.gateway_secret {
+        builder = builder.header("x-gateway-secret", secret.as_str());
     }
 
     // Set X-Forwarded-For to the gateway-resolved client IP. This is the only

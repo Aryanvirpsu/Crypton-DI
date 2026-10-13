@@ -5,6 +5,7 @@ mod error;
 mod jwt;
 mod redis;
 mod routes;
+mod signals;
 mod state;
 
 use crate::{config::Config, state::AppState};
@@ -41,7 +42,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app = app::app(state);
 
-    let addr = format!("0.0.0.0:{}", cfg.app_port);
+    // Containers need 0.0.0.0 (the default); a bare-metal/dev run should set
+    // BIND_ADDR=127.0.0.1 so identity is not reachable around the gateway.
+    let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let addr = format!("{}:{}", bind_addr, cfg.app_port);
     tracing::info!("crypton-identity starting on {}", addr);
 
     let socket_addr = addr.parse()?;

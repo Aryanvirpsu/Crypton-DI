@@ -93,6 +93,16 @@ impl AppState {
             .redis
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("REDIS_URL not configured"))?;
-        Ok(client.get_multiplexed_tokio_connection().await?)
+        // Bound the connect: with Redis unreachable, an unbounded connect hangs every
+        // request that needs it instead of failing fast.
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            client.get_multiplexed_tokio_connection(),
+        )
+        .await
+        {
+            Ok(conn) => Ok(conn?),
+            Err(_) => Err(anyhow::anyhow!("redis connect timed out")),
+        }
     }
 }

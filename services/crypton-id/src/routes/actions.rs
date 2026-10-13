@@ -140,6 +140,7 @@ struct ActionExecuteResp {
 async fn action_execute(
     auth: AuthUser,
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     AppJson(req): AppJson<ActionExecuteReq>,
 ) -> Result<Json<ApiResponse<ActionExecuteResp>>, AppError> {
     if !is_valid_intent(&req.action) {
@@ -159,10 +160,16 @@ async fn action_execute(
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
         .map_err(|_| AppError::bad_request("invalid_assertion"))?;
 
-    let auth_result = state
+    let auth_result = match state
         .webauthn
         .finish_passkey_authentication(&auth_cred, &challenge.auth_state)
-        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
+    {
+        Ok(r) => r,
+        Err(_) => {
+            crate::signals::record_failed_assertion(&state, auth.user_id).await;
+            return Err(AppError::bad_request("webauthn_verification_failed"));
+        }
+    };
 
     let db = state
         .db
@@ -192,6 +199,18 @@ async fn action_execute(
         "success",
     )
     .await;
+
+    // Record completion SERVER-SIDE, bound to this session token (user + iat), only
+    // now that the assertion has been cryptographically verified above. The
+    // gateway reads this key; nothing a client sends can create it. If it cannot
+    // be stored the caller is told so rather than being told "verified".
+    let bearer = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("missing_token"))?;
+    let claims = crate::jwt::verify_token(&state, bearer)?;
+    crate::signals::record_step_up_completed(&state, auth.user_id, claims.iat).await?;
 
     tracing::info!(user_id = %auth.user_id, intent = %req.action, "step-up verified");
 

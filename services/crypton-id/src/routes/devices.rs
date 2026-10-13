@@ -114,6 +114,7 @@ async fn revoke_device(
         "success",
     )
     .await;
+    crate::signals::record_revocation(&state, auth.user_id).await;
 
     tracing::info!(user_id = %auth.user_id, device_id = %id, "device revoked");
     Ok(Json(ApiResponse::success(RevokeResp { status: "revoked" })))
@@ -160,6 +161,7 @@ async fn mark_lost(
         "success",
     )
     .await;
+    crate::signals::record_revocation(&state, auth.user_id).await;
 
     tracing::info!(user_id = %auth.user_id, device_id = %id, "device marked lost");
     Ok(Json(ApiResponse::success(MarkLostResp { status: "lost" })))

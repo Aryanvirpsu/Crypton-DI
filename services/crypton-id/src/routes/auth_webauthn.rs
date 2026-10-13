@@ -403,6 +403,10 @@ async fn register_finish(
         &state.jwt_encoding_key,
     )?;
 
+    if challenge.existing_user {
+        crate::signals::record_device_added(&state, cred_uuid).await;
+    }
+
     // Audit
     audit::log_event(
         db,
@@ -465,6 +469,11 @@ async fn login_start(
     let user_id: Uuid = user_row
         .try_get("id")
         .map_err(|e| AppError::internal(e.to_string()))?;
+
+    // Account lock is enforced here, by the authentication authority: the
+    // public login routes carry no token for the gateway's policy to evaluate.
+    crate::signals::ensure_not_locked(&state, user_id).await?;
+    crate::signals::record_login_attempt(&state, user_id).await;
 
     // Block login only for non-expired approved recovery (prevents permanently stuck accounts)
     let pending_recovery = sqlx::query(
@@ -559,13 +568,34 @@ async fn login_finish(
         .await?
         .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
 
+    // A challenge issued before the account locked must not be usable after.
+    crate::signals::ensure_not_locked(&state, challenge.user_id).await?;
+
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
         .map_err(|_| AppError::bad_request("invalid_assertion"))?;
 
-    let auth_result = state
+    let auth_result = match state
         .webauthn
         .finish_passkey_authentication(&auth_cred, &challenge.auth_state)
-        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
+    {
+        Ok(r) => r,
+        Err(_) => {
+            crate::signals::record_failed_assertion(&state, challenge.user_id).await;
+            if let Some(db) = state.db.as_ref() {
+                audit::log_event(
+                    db,
+                    Some(challenge.user_id),
+                    &challenge.username,
+                    None,
+                    "login_failed",
+                    serde_json::json!({ "reason": "webauthn_verification_failed" }),
+                    "failure",
+                )
+                .await;
+            }
+            return Err(AppError::bad_request("webauthn_verification_failed"));
+        }
+    };
 
     let db = state
         .db
@@ -652,6 +682,8 @@ async fn login_finish(
         cred_uuid,
         &state.jwt_encoding_key,
     )?;
+
+    crate::signals::record_login_success(&state, challenge.user_id).await;
 
     // Audit
     audit::log_event(

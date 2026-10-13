@@ -65,3 +65,6 @@ __pycache__/
 .venv/
 *.egg-info/
 .ruff_cache/
+
+# Throwaway runtime-verification secrets (tests/runtime/stack-env.sh)
+.stack-secrets/

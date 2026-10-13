@@ -18,11 +18,11 @@ pub struct Metrics {
     pub nonce_timestamp_missing: AtomicU64,
     pub nonce_timestamp_invalid: AtomicU64,
 
-    pub policy_blocked_locked: AtomicU64,
-    pub policy_blocked_private_unauth: AtomicU64,
-    pub policy_blocked_device_inactive: AtomicU64,
-    pub policy_blocked_stepup_required: AtomicU64,
-    pub policy_blocked_recovery_pending: AtomicU64,
+    /// Requests the risk-engine policy actually blocked, by verdict.
+    pub policy_blocked_deny: AtomicU64,
+    pub policy_blocked_challenge: AtomicU64,
+    pub policy_blocked_hold: AtomicU64,
+    /// Verdicts that WOULD have blocked but POLICY_ENFORCE=false let through.
     pub policy_would_block_dry_run: AtomicU64,
 
     pub proxy_upstream_2xx: AtomicU64,
@@ -60,6 +60,9 @@ pub struct AppState {
     pub jwt_decoding_key: DecodingKey,
     // Security: INTERNAL_TOKEN is required at startup. Process exits if absent.
     pub internal_token: String,
+    /// When set, added as `x-gateway-secret` to every request forwarded to
+    /// identity (which refuses requests without it when it has the same secret).
+    pub gateway_secret: Option<String>,
 }
 
 impl AppState {
@@ -71,7 +74,17 @@ impl AppState {
         })?;
 
         let client = RedisClient::open(redis_url)?;
-        let conn = client.get_connection_manager().await?;
+        // Bounded retries and timeouts: with Redis unreachable every Redis-backed
+        // check (revocation, nonce, rate limit, policy) must fail fast and closed,
+        // not queue behind default exponential backoff.
+        let conn = redis::aio::ConnectionManager::new_with_config(
+            client,
+            redis::aio::ConnectionManagerConfig::new()
+                .set_number_of_retries(1)
+                .set_connection_timeout(std::time::Duration::from_secs(2))
+                .set_response_timeout(std::time::Duration::from_secs(2)),
+        )
+        .await?;
 
         let pg = PgPool::connect(pg_conn).await?;
 
@@ -98,6 +111,9 @@ impl AppState {
             policy_enforce,
             jwt_decoding_key,
             internal_token,
+            gateway_secret: std::env::var("GATEWAY_SHARED_SECRET")
+                .ok()
+                .filter(|s| !s.is_empty()),
         })
     }
 }

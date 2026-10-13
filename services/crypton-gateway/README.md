@@ -78,6 +78,20 @@ second audit table).
   commits only if it succeeded (Redis failure -> 503, row rolled back; Postgres failure ->
   500, no Redis change). Residual window: a commit failure after a successful Redis write.
 
+## Signals and identity integration
+
+Identity produces the security signals and writes them to the shared Redis; the gateway
+consumes them (full producer/consumer matrix: `docs/deployment-topology.md`). The gateway
+adds `x-gateway-secret` (`GATEWAY_SHARED_SECRET`) to every forwarded request and strips
+any client-supplied one; identity refuses requests without it. Step-up completion
+(`stepup:completed:{sub}:{iat}`) is written only by identity after server-side WebAuthn
+verification; the gateway downgrades a Challenge to Allow for that token, never a Hold or
+Deny. `/internal/audit/ingest` remains for non-identity producers.
+
+Metrics: policy blocks are counted per verdict (`gateway_policy_blocked_{deny,challenge,hold}_total`);
+the former catch-all `..._blocked_locked_total` (which counted every verdict) is removed,
+as are four counters that were never incremented.
+
 ## Environment
 
 See `.env.example`. Required at startup: `DATABASE_URL`, `INTERNAL_TOKEN`, and the identity
@@ -92,7 +106,20 @@ cargo run
 
 ## Verification status
 
-`cargo test` runs 30 tests with no infrastructure. The 34 router-level and end-to-end tests
+**Real-service runtime verification** (`tests/runtime/run.sh`, 82 checks, no stubs): the real
+`crypton-id` and gateway images built from source in Linux containers with real Postgres and
+Redis; registration, login, step-up and failed-login flows driven with a software WebAuthn
+authenticator that the server verifies for real. It covers token issuance and gateway
+verification, protected requests, credential revocation, logout, account lock and signals,
+step-up changing a Challenge decision, audit persistence, bypass attempts (published ports,
+network reachability, direct calls with a valid token, gateway-internal paths), and Redis /
+Postgres outages. See `docs/deployment-topology.md`.
+
+**Router-level and end-to-end tests below** use a stub upstream or crypton-id's real token
+source compiled via `tests-support/identity-src`; they are a different, faster layer and are
+not the real-service run.
+
+`cargo test` runs 30 tests with no infrastructure. The 37 router-level and end-to-end tests
 in `src/gateway_tests.rs` are `#[ignore]`d unless you provide throwaway infrastructure:
 
 ```sh
@@ -126,13 +153,17 @@ the passkey ceremony, register/login handlers and identity's own audit writes ar
 exercised.
 
 **Remaining gaps**
-- Identity must not be reachable except through the gateway; nothing here enforces or
-  verifies that (`known_gap_identity_is_reachable_directly...`). Gateway-only controls are
-  bypassed by direct access.
-- `crypton-id` does not call `/internal/audit/ingest` and nothing writes
-  `stepup:completed:*`, so the lockout/recovery/velocity signals and step-up Challenge
-  satisfaction have no producer outside tests.
-- Every policy block increments `gateway_policy_blocked_locked_total` regardless of reason
-  (the decision trail has the accurate reason).
+- Isolation is a deployment property. The container stack enforces and tests it (see above);
+  the router-test harness reaches its upstream directly by construction
+  (`known_gap_identity_is_reachable_directly...`), and no production platform is verified from
+  here.
+- `actions_executed_5m`, `registrations_from_ip_10m` and `active_session_count` (read by the
+  risk engine) have no producer.
+- A completed step-up is not bound to the action it names: any completion satisfies any
+  Challenge on that token for 5 minutes.
+- Two failed assertions in an hour make the risk engine deny every request on already-issued
+  tokens (observed at runtime). That is a policy-tuning question, not changed here.
+- `GATEWAY_SHARED_SECRET` is opt-in; unset, identity accepts requests that bypassed the
+  gateway if the network allows it.
 - No key rotation; no `iss`/`aud`; no gateway-side agent-delegation checks.
 - Not tested: step-up completion, org/tenant policy overrides, Postgres outage during auth.

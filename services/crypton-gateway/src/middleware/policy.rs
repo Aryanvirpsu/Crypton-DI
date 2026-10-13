@@ -393,8 +393,12 @@ pub async fn enforce_policy(
     };
 
     if let Some((status, reason)) = blocking {
-        Metrics::inc(&state.metrics.policy_blocked_locked);
         if state.policy_enforce {
+            Metrics::inc(match reason {
+                "policy_deny" => &state.metrics.policy_blocked_deny,
+                "policy_challenge" => &state.metrics.policy_blocked_challenge,
+                _ => &state.metrics.policy_blocked_hold,
+            });
             return Err(Reject::new(status, reason));
         }
         Metrics::inc(&state.metrics.policy_would_block_dry_run);

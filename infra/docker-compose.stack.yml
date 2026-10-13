@@ -1,0 +1,97 @@
+# Crypton full stack with ONE external entry point: the gateway.
+#
+#   client ──► gateway :8090 (published, 127.0.0.1 only here)
+#                 │   edge + internal networks
+#   internal network (internal: true: no host access, no outbound):
+#                 ├──► identity :8080      (no published port)
+#                 ├──► postgres :5432      (no published port)
+#                 └──► redis    :6379      (no published port)
+#
+# The gateway's own internal listener (metrics, diagnostics, audit ingest) binds
+# 127.0.0.1 inside its container and is not published at all.
+#
+# Required environment (no defaults on purpose; `tests/runtime/run.sh` generates
+# throwaway values for local verification):
+#   POSTGRES_PASSWORD, GATEWAY_SHARED_SECRET, INTERNAL_TOKEN
+# and the Ed25519 JWT keypair as files in ${STACK_SECRETS_DIR} :
+#   jwt_signing_key.pem  (identity only)   jwt_public_key.pem  (identity + gateway)
+#
+# This file is for local/CI verification of the topology. It does not configure
+# production; see docs/deployment-topology.md for the equivalent platform
+# requirements.
+name: crypton-stack
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crypton
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: crypton
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypton -d crypton"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  identity:
+    build:
+      context: ../services/crypton-id
+    environment:
+      APP_PORT: "8080"
+      DATABASE_URL: postgres://crypton:${POSTGRES_PASSWORD}@postgres:5432/crypton
+      REDIS_URL: redis://redis:6379
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:3000}
+      WEBAUTHN_RP_NAME: Crypton
+      JWT_SIGNING_KEY_PEM_FILE: /run/secrets/jwt_signing_key.pem
+      JWT_PUBLIC_KEY_PEM_FILE: /run/secrets/jwt_public_key.pem
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:?set GATEWAY_SHARED_SECRET}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ${STACK_SECRETS_DIR:?set STACK_SECRETS_DIR}/jwt_signing_key.pem:/run/secrets/jwt_signing_key.pem:ro
+      - ${STACK_SECRETS_DIR}/jwt_public_key.pem:/run/secrets/jwt_public_key.pem:ro
+    networks: [internal]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: services/crypton-gateway/Dockerfile
+    environment:
+      PORT: "8090"
+      IDENTITY_URL: http://identity:8080
+      DATABASE_URL: postgres://crypton:${POSTGRES_PASSWORD}@postgres:5432/crypton
+      REDIS_URL: redis://redis:6379
+      JWT_PUBLIC_KEY_PEM_FILE: /run/secrets/jwt_public_key.pem
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?set INTERNAL_TOKEN}
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      POLICY_ENFORCE: ${POLICY_ENFORCE:-true}
+      LOG_FORMAT: json
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ${STACK_SECRETS_DIR}/jwt_public_key.pem:/run/secrets/jwt_public_key.pem:ro
+    ports:
+      # The only published port in the stack.
+      - "127.0.0.1:${GATEWAY_HOST_PORT:-18090}:8090"
+    networks: [edge, internal]
+    depends_on:
+      identity: {condition: service_started}
+
+networks:
+  # internal: true => no route to the host or the internet from this network.
+  internal:
+    internal: true
+  edge: {}
