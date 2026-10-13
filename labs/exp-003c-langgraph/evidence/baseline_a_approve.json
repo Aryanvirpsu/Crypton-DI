@@ -1,0 +1,66 @@
+{
+  "approval_decision": {
+    "resume": {
+      "approved": true
+    }
+  },
+  "approval_request": {
+    "interrupt_id": "7e62537407a17fa65ca3f607e5d79702",
+    "value": {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool": "transfer_funds"
+    }
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "baseline_a",
+      "sequence": 1,
+      "thread_id": null,
+      "timestamp": 1791838890.0223372,
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "No execution before approval; exactly one execution; executed arguments == proposed arguments (state-sourced execution pattern)."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "baseline_a_approve",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "ba"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

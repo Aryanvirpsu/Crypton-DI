@@ -1,0 +1,24 @@
+[
+  {
+    "evidence_id": "E-001",
+    "evidence_type": "architecture_diagram | source_excerpt | policy_definition | authorization_log | execution_trace | approval_record | identity_record | live_observation | staging_test_result | config_excerpt",
+    "source": "<where this came from — a file, a system, an interview>",
+    "description": "<what this evidence shows, plainly>",
+    "timestamp": null,
+    "reference": null,
+    "integrity_hash": null,
+    "notes": null,
+
+    "_comment_2026_09_30": "Fields below were added in the 2026-09-30 remediation pass. All optional — populate them for every newly captured evidence item; never fabricate a value for older evidence that never recorded one. classification must be one of PUBLIC | RELEASE_APPROVED | CUSTOMER_CONFIDENTIAL | CRYPTON_PROPRIETARY.",
+    "assessment_id": null,
+    "test_id": null,
+    "run_id": null,
+    "target_product": null,
+    "target_version": null,
+    "target_commit": null,
+    "environment_manifest_reference": null,
+    "supports": null,
+    "redaction_status": null,
+    "classification": null
+  }
+]

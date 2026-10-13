@@ -1,0 +1,23 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, langsmith-0.12.5, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_exp003c.py::test_baseline_a_approve PASSED                    [  8%]
+tests/test_exp003c.py::test_baseline_b_reject PASSED                     [ 16%]
+tests/test_exp003c.py::test_baseline_c_persist_reload_resume_sqlite PASSED [ 25%]
+tests/test_exp003c.py::test_h1a_state_sourced_execution_is_immune_to_resume_payload_drift PASSED [ 33%]
+tests/test_exp003c.py::test_h1b_resume_sourced_execution_is_not_protected_by_the_framework PASSED [ 41%]
+tests/test_exp003c.py::test_h1c_update_state_public_api_can_mutate_pending_state_before_resume PASSED [ 50%]
+tests/test_exp003c.py::test_h2_delegation_approval_does_not_satisfy_child_approval PASSED [ 58%]
+tests/test_exp003c.py::test_h3_not_applicable_no_standing_approval_primitive_exists PASSED [ 66%]
+tests/test_exp003c.py::test_h4_resuming_an_already_completed_thread_does_not_reexecute PASSED [ 75%]
+tests/test_exp003c.py::test_h5_application_built_policy_recheck_blocks_stale_authorization PASSED [ 83%]
+tests/test_exp003c.py::test_h6a_resume_against_a_thread_with_its_own_distinct_pending_interrupt PASSED [ 91%]
+tests/test_exp003c.py::test_h6b_resume_against_a_thread_id_with_no_checkpoint_at_all PASSED [100%]
+
+============================= 12 passed in 0.51s ==============================

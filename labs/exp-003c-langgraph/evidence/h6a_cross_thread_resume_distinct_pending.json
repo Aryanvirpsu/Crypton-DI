@@ -1,0 +1,70 @@
+{
+  "approval_decision": {
+    "resume": {
+      "approved": true
+    },
+    "submitted_against": "thread_id=h6a_thread_b only"
+  },
+  "approval_request": {
+    "thread_a_interrupt_id": "1eef87b3c60410577772941d812ae3df",
+    "thread_b_interrupt_id": "e2d3f547bcde190a564d96537ab06abc"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "account": "savings",
+        "amount": 5,
+        "destination": "B-only"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "h6a",
+      "sequence": 8,
+      "thread_id": null,
+      "timestamp": 1791838890.252505,
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "A resume delivered to thread B's config only ever answers thread B's own interrupt() call with thread B's own checkpointed state; thread A's independent pending interrupt was left untouched (still next=('propose',))."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "thread_a": {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    "thread_b": {
+      "arguments": {
+        "account": "savings",
+        "amount": 5,
+        "destination": "B-only"
+      },
+      "tool_name": "transfer_funds"
+    }
+  },
+  "scenario": "h6a_cross_thread_resume_distinct_pending",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h6a_thread_b"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

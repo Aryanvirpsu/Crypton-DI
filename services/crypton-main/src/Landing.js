@@ -399,7 +399,7 @@ function useSphereIntro() {
 }
 
 
-export default function Landing({ go, toast, openSim }) {
+export default function Landing({ go, toast }) {
   useReveal([]);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -652,7 +652,6 @@ export default function Landing({ go, toast, openSim }) {
         <section id="attacks" style={{ padding: "0 52px 80px", borderTop: "1px solid var(--line)" }} className="section-pad">
           <div className="rv" style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".16em", color: "rgba(200,245,90,0.7)", marginBottom: 56, display: "flex", alignItems: "center", gap: 16, paddingTop: 100 }}>
             <span>05 — Attack Surface</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            <AttackSimTrigger openSim={openSim} />
           </div>
           <h2 className="rv" style={{ fontFamily: "var(--display)", fontSize: "clamp(52px,7.5vw,104px)", textTransform: "uppercase", letterSpacing: ".04em", lineHeight: .93, marginBottom: 16 }}>
             Every attack.<br /><span style={{ color: "var(--accent)" }}>Already blocked.</span>
@@ -1324,23 +1323,6 @@ function VisionCard({ item, idx }) {
 
 
 /* ── AttackTerminal — visual attack cards + terminal trace ──── */
-/* ── Attack Simulator — animated fullscreen takeover ──────────── */
-function AttackSimTrigger({ openSim }) {
-  return (
-    <button onClick={openSim} style={{
-      fontFamily:'var(--mono)',fontSize:9,letterSpacing:'.14em',textTransform:'uppercase',
-      color:'var(--accent)',background:'rgba(200,245,90,0.06)',
-      border:'1px solid rgba(200,245,90,0.3)',padding:'8px 18px',
-      cursor:'pointer',transition:'all .2s',display:'flex',alignItems:'center',gap:8,flexShrink:0,
-    }}
-      onMouseEnter={e=>e.currentTarget.style.background='rgba(200,245,90,0.14)'}
-      onMouseLeave={e=>e.currentTarget.style.background='rgba(200,245,90,0.06)'}
-    >
-      <span style={{fontSize:11}}>⌨</span> Try It →
-    </button>
-  );
-}
-
 function AttackTerminal() {
   const [active, setActive] = useState(null);
   const ATTACKS = [

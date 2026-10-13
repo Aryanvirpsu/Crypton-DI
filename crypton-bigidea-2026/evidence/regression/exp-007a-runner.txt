@@ -1,0 +1,45 @@
+EXP-007 / 007-A  Controller Substitution (principal continuity)
+
+== policy: vulnerable_policy ==
+  leg a [U signed, in-session]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> OK: legitimate action executed
+  leg b [B unsigned, spoofing U]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  leg c [B forged signature]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  leg d [B authenticated as B, no U->B delegation]
+      decision : ALLOW:CAPABILITY_HELD:executed under pid:U's grant to agent:A; controller not checked
+      executed : True   -> FAIL: substituted controller's action executed
+  probe cal-no-capability [U signed, agent lacks capability (ordinary authz failure)]
+      decision : DENY:NO_CAPABILITY:capability absent, expired or revoked
+  VERDICT (vulnerable_policy): FAIL
+
+== policy: secure_policy ==
+  leg a [U signed, in-session]
+      decision : ALLOW:CONTINUITY_VERIFIED:authenticated controller in authority chain, session bound
+      executed : True   -> OK: legitimate action executed
+  leg b [B unsigned, spoofing U]
+      decision : STEP_UP:CONTINUITY_UNVERIFIED:UNSIGNED
+      executed : False   -> OK: blocked on CONTINUITY_UNVERIFIED (UNSIGNED)
+  leg c [B forged signature]
+      decision : STEP_UP:CONTINUITY_UNVERIFIED:BAD_SIGNATURE
+      executed : False   -> OK: blocked on CONTINUITY_UNVERIFIED (BAD_SIGNATURE)
+  leg d [B authenticated as B, no U->B delegation]
+      decision : STEP_UP:CONTROLLER_NOT_AUTHORIZED:pid:B authenticated but not in authority chain of pid:U
+      executed : False   -> OK: blocked on CONTROLLER_NOT_AUTHORIZED (pid:B authenticated but not in authority chain of pid:U)
+  probe cal-no-capability [U signed, agent lacks capability (ordinary authz failure)]
+      decision : DENY:NO_CAPABILITY:capability absent, expired or revoked
+  VERDICT (secure_policy): PASS
+
+== semantic result matrix ==
+  case               ctrl auth  capab  ctrl authority  vulnerable  secure    reason
+  a                  valid      valid  valid           ALLOW       ALLOW     CONTINUITY_VERIFIED
+  b                  invalid    valid  absent          ALLOW       STEP_UP   CONTINUITY_UNVERIFIED
+  c                  invalid    valid  absent          ALLOW       STEP_UP   CONTINUITY_UNVERIFIED
+  d                  valid      valid  absent          ALLOW       STEP_UP   CONTROLLER_NOT_AUTHORIZED
+  cal-no-capability  valid (U)  absent valid           DENY        DENY      NO_CAPABILITY
+
+DISTINCTION CHECK: OK - continuity failure (CONTINUITY_UNVERIFIED), authenticated-substitute failure (CONTROLLER_NOT_AUTHORIZED) and ordinary authz failure (NO_CAPABILITY) are separately reported; vulnerable policy cannot separate them.

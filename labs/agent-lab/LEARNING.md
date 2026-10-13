@@ -1,0 +1,1512 @@
+# Learning notes: Crypton Agent Lab (v0.1 → v0.2 → v0.3 → v0.4 → v0.5 → v0.5.1 → v0.6)
+
+This is the "read this to understand exactly how it works" document the
+build was asked to produce. It assumes you've read `README.md` for setup
+but not necessarily any of the source yet. Sections 1-10 describe v0.1
+(the loop, tools, tracing, identity); the v0.2 addendum covers what
+changed when Sessions, Tasks, and persistent task state were added; the
+v0.3 addendum covers the Agent Registry; the v0.4 addendum covers
+Delegation and deterministic pre-execution authorization; the v0.5
+addendum covers human Approval bound to the exact consequential action;
+the v0.5.1 addendum covers the ground-truth/security-baseline pass (JWT
+asymmetric-signing migration, WebAuthn-duplication investigation); the
+**v0.6 addendum (at the very end — read that one first if you already
+know v0.1-v0.5.1) covers the technical wedge itself: provable multi-hop
+delegation with scope attenuation.** Sections 8 and 9 below are updated
+in place for v0.4 (authorization no longer goes through `authz.py`, which
+is removed); everywhere else is left as originally written and should be
+read as history — including every `JWT_SECRET` mention below, which the
+v0.5.1 addendum explains is now resolved, not current, and every "single-
+hop only" framing of Delegation, which the v0.6 addendum explains is now
+the degenerate case of a chain, not the only shape.
+
+## Architecture
+
+```
+ human (WebAuthn login via crypton-id, unchanged)
+   │
+   │  JWT { sub, username, cred_id, iat, exp }
+   ▼
+ identity.verify_human_identity(token)
+   │  -> HumanIdentity(user_id, username, cred_id)
+   ▼
+ AgentRunner(agent=AgentIdentity("support-agent"), model, db_conn)
+   │
+   │  .run(human, task)  ── creates a fresh AgentInstance (run id)
+   │                         and a Tracer for this run
+   ▼
+ ┌─────────────────── agent loop (agent.py) ───────────────────┐
+ │                                                              │
+ │   for step in 1..max_steps:                                 │
+ │                                                              │
+ │     model.complete(system, messages, tool_specs) ───────────┼──▶ LLM
+ │            │                                                │
+ │            ├─ final text ──────────────────────────────▶ return
+ │            │
+ │            └─ tool_call { name, arguments }
+ │                   │
+ │                   ▼
+ │             1. unknown tool?        -> reject
+ │             2. authorization.authorize_tool_call(agent_id, delegation_id, tool, resource)
+ │                                     -> reject if not allowed (v0.4; see addendum)
+ │             3. Pydantic validate arguments
+ │                                     -> reject if malformed
+ │             4. tools.<fn>(db_conn, human, instance, args)
+ │                   │
+ │                   ▼
+ │             SQLite, rows scoped by owner_user_id == human.user_id
+ │                   │
+ │             result or ToolError fed back as the next message
+ │                                                              │
+ │   every one of the above steps calls tracer.record(...)      │
+ └──────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+        data/traces/<instance_id>.jsonl  (one line per event)
+```
+
+## 1. What makes this an agent rather than a chatbot
+
+A chatbot maps `messages -> text`. This system maps
+`messages -> (text | tool call) -> tool execution -> messages -> ...`,
+repeated until the model stops asking for tools or a step limit is hit.
+The defining property is the **loop with an action in the middle**: the
+model's output can change what happens in the world (read/write rows in
+`db.py` through `tools.py`) before the model gets to respond again. A
+chatbot never does anything between "receive input" and "produce output"
+except think.
+
+## 2. Where the agent loop lives
+
+`src/agentlab/agent.py`, entirely in `AgentRunner.run()`. It's ~40 lines
+of actual control flow (the `for step in range(...)` loop) plus a helper,
+`_handle_tool_call`, that runs the four security boundaries in order.
+Read that file top to bottom — it's the whole system in miniature; every
+other module is a supporting piece it imports.
+
+## 3. What exactly is sent to the model
+
+Three things, every turn, and nothing else:
+
+- **`system`** — a fixed string (`agent.SYSTEM_PROMPT`) telling it it's a
+  support agent restricted to the given tools.
+- **`messages`** — the conversation so far: the original task, and for
+  each prior step either a tool call the model made or the tool's result
+  (or error) fed back as the next turn.
+- **`tools`** — a JSON-schema block built by
+  `models.tool_specs_for_model()`, derived directly from the same
+  Pydantic models (`TOOL_ARG_MODELS`) that validate incoming calls, so
+  the model can never be told about a tool shape that isn't also
+  enforced.
+
+The model is **never** sent: `JWT_SECRET`, `ANTHROPIC_API_KEY`, the
+`HumanIdentity.cred_id`, database connection details, or any other
+environment/secret value. See section 10 for why that boundary matters.
+
+## 4. How the model chooses a tool
+
+It doesn't — Agent Lab doesn't implement or influence tool selection at
+all. The model provider (Claude, via the Anthropic Messages API's native
+tool-use / function-calling) decides which tool (if any) best matches the
+task, based only on the tool name + description + JSON schema it was
+given in `tools`. Agent Lab's job starts *after* that decision: taking
+whatever the model asked for and deciding whether to honor it.
+
+## 5. Who actually executes the tool
+
+Never the model. `agent.py`'s `_handle_tool_call` looks up the actual
+Python function in `tools.TOOL_FUNCTIONS` — but only after the tool name
+has passed the unknown-tool check, the authorization check, and argument
+validation. The model can *request* `get_customer(customer_id="cust_1")`;
+it cannot make that request execute anything by itself. This is the same
+separation `crypton-gateway` draws between "a request arrived" and "the
+request is allowed to reach identity" — see
+`docs/architecture.md`'s extension-point note.
+
+## 6. Where state lives
+
+*(Updated for v0.2 — see the addendum below for the full breakdown of
+Session/Task/state/trace as four separate things.)*
+
+Everything is local to this lab's SQLite file and disposable — not the
+real Crypton Postgres database; deleting `data/agentlab.db` and
+`data/traces/` resets the lab to a clean slate. Four different kinds of
+state live there now, deliberately kept separate (see the v0.2 addendum,
+"state boundaries"):
+
+- **Business data** — customers, orders, case notes. Seeded by
+  `db.seed()` with two owners (`user-alice`, `user-bob`) so isolation is
+  testable.
+- **Sessions and Tasks** (`sessions.py`, `tasks.py`) — a Session is a
+  continuing interaction boundary; a Task is one specific objective
+  within it, with a validated lifecycle status and a small, schema-
+  validated `state` blob. New in v0.2 — v0.1 had neither.
+- **AgentInstance rows** (`instances.py`) — one row per concrete
+  execution/run of a Task, with start/end timestamps and status.
+- **`data/traces/<request_id>.jsonl`** — the full execution trace for one
+  call to `run()` (see §7 and the v0.2 addendum for what "one run" means
+  now that it spans session/task/instance creation, not just tool calls).
+
+There is still no long-term memory or vector store, and the
+model-context conversation (`messages` in `agent.py`) still lives only in
+a local Python list for the duration of one `run()` call and is discarded
+after — it is not persisted anywhere, and is a different thing from Task
+state (see the v0.2 addendum).
+
+## 7. Human ID vs. agent ID vs. run ID
+
+Three distinct types in `identity.py`, deliberately not collapsed into
+one ID:
+
+| Type | Example | Lifetime | Source |
+|---|---|---|---|
+| `HumanIdentity` | `user_id="a1b2..."` | one crypton-id login session | crypton-id JWT (`sub`, `username`, `cred_id`) — verified, not invented |
+| `AgentIdentity` | `agent_id="support-agent"` | fixed at deploy time | registered in `authz.REGISTRY` |
+| `AgentInstance` | `instance_id=<uuid4>` | one `AgentRunner.run()` call | minted fresh every run |
+
+Why keep them separate: each answers a different question that
+agent-security work will need to ask independently later — "which human
+authorized this?", "which agent application is this?", and "which
+specific execution, out of possibly many concurrent ones for the same
+human+agent, did this?" Collapsing them (e.g. using one ID for both the
+agent app and each run) would make it impossible to tell "the same agent
+acting for two different humans at once" apart from "one run gone wrong,"
+which is exactly the distinction an audit or an attack investigation
+needs.
+
+*(v0.2 extends `AgentInstance` to also reference `session_id`/`task_id`,
+and adds `Session`/`Task` as two further, equally-distinct entities — see
+the v0.2 addendum's "Session vs. Task vs. AgentInstance" section below.)*
+
+## 8. Where authorization is checked
+
+*(Updated for v0.4 — see the addendum at the end for the full story.
+`authz.py` and its name-keyed `REGISTRY`, described in earlier versions
+of this section, are removed as of v0.4.)*
+
+`agent.py`, `_handle_tool_call`, boundary 2 — `authorization.authorize_tool_call(...)`
+— called for **every** tool call, before arguments are validated or the
+tool runs. It checks the call against a real, persisted `Delegation`
+(`delegation.py`), keyed by canonical `agent_id`, never by name. Every
+attempt — allowed or denied — is persisted as an `AuthorizationDecision`
+with a stable, machine-readable `reason_code` (`TOOL_NOT_ALLOWED`,
+`DELEGATION_EXPIRED`, `AGENT_MISMATCH`, etc. — see the v0.4 addendum for
+the full list), traced as `tool_rejected` on denial, and reported back to
+the model as a generic `"unauthorized"` error with that reason code — the
+model is told it can't do that, never enough detail to probe the
+boundary.
+
+Data-level authorization (which *rows* a human can see) is a second,
+independent check inside `tools.py`: every query filters on
+`owner_user_id == human.user_id`. Tool-level authz answers "can this
+agent call this tool at all"; row-level authz answers "does this specific
+data belong to this specific human." Both have to pass.
+
+## 9. What currently happens if the model is malicious
+
+Worth stating plainly, since this lab exists to make that answerable:
+
+- **Model asks for a tool that doesn't exist** (`delete_customer`,
+  `run_shell`, anything not in `models.TOOL_ARG_MODELS`) → rejected
+  before any lookup happens, traced as `tool_rejected` /
+  `unknown_tool`, loop continues.
+- **Model asks for a real tool it isn't allowed to call**
+  (`read-only-agent` requesting `add_case_note`) → rejected by
+  `authorization.authorize_tool_call` (`TOOL_NOT_ALLOWED`), traced as
+  `tool_rejected` / `tool_not_allowed`, and persisted as a DENY
+  `AuthorizationDecision` — see the v0.4 addendum.
+- **Model sends malformed/extra/wrong-typed arguments** (missing
+  `customer_id`, an extra field, a customer_id of the wrong type) →
+  rejected by Pydantic (`extra="forbid"` catches surprise fields),
+  traced as `tool_rejected` / `invalid_arguments`.
+- **Model tries to reach another human's data** (asks for a
+  `customer_id` that exists but belongs to someone else) → the tool
+  itself returns `customer_not_found` — identical to the row not
+  existing at all, so the model can't distinguish "wrong id" from
+  "someone else's real id."
+- **Model just keeps calling tools forever** → `max_steps` (default 6)
+  cuts the loop off unconditionally; the run ends with
+  `stopped_reason="max_steps"`, no answer, but no runaway execution
+  either.
+- **Model's response is genuinely garbled / the API call itself fails**
+  → caught in `agent.py`'s `try/except` around `model.complete(...)`,
+  traced as an `error` event, loop stops cleanly.
+
+What a malicious model **cannot** currently do: name a tool that isn't
+registered and have it run; bypass the allowlist by any means (there's no
+"admin override" path in `authz.py`); run arbitrary Python, shell, or SQL
+(tools.py has three fixed, parameterized functions — nothing takes
+free-form code); or read another human's rows through any of the three
+tools (row filtering is unconditional, not something the model can
+disable by asking).
+
+## 10. What attack surfaces this creates
+
+This is a lab, not a hardened system — recording these honestly is the
+point:
+
+- **Argument-injection into `note` text** — `add_case_note`'s `note`
+  field accepts up to 2000 characters of free text with no content
+  filtering. It's stored and could later be *read back* by a human or
+  fed into a future model call; there's no prompt-injection defense on
+  data flowing back in. Not exploitable today (nothing re-reads notes
+  into a prompt), but the seam exists.
+- **The allowlist is static and coarse** — `authz.REGISTRY` grants a
+  whole agent identity access to a tool, not "this run" or "this human's
+  consent for this run." A compromised or misconfigured agent identity
+  has standing access to everything its entry lists, all the time.
+- **`JWT_SECRET` is a single shared symmetric key** — Agent Lab and
+  crypton-id both need it. Anyone who can read Agent Lab's environment
+  can mint tokens for any human (same property the real crypton-id has;
+  not new here, but worth naming since this lab now depends on it too).
+- **Traces contain full tool arguments and results in plaintext** —
+  by design (full tracing was a requirement), but a `data/traces/*.jsonl`
+  file is therefore sensitive: it contains customer names, emails, and
+  case note contents. No encryption or access control on trace files in
+  v0.1.
+- **No rate limiting or replay protection** on `AgentRunner.run()` itself
+  — nothing stops the same human token from being used to spin up
+  unlimited concurrent agent instances.
+- **The model is trusted to *ask* even though it can't *execute*
+  unilaterally** — the boundaries in section 9 hold today, but they are
+  all enforced in this one process, in Python, with no separate policy
+  engine. A bug in `agent.py`'s ordering (e.g. validating before
+  authorizing, or a future tool added to `TOOL_FUNCTIONS` without a
+  matching `authz` entry) would silently remove a boundary. This is
+  exactly the class of thing the eventual agent-security scanner should
+  test for.
+
+None of the above is fixed in v0.1 on purpose — see `labs/README.md`'s
+"do not build yet" list. They're the concrete starting point for the
+security work that comes after this lab.
+
+---
+
+## v0.2 addendum: Sessions, Tasks, and persistent state
+
+v0.1's `AgentRunner.run()` did one thing: take a task string, run the
+loop, return an answer. Nothing survived past the return statement except
+the trace file. v0.2 adds three persisted entities in front of and around
+that loop — `Session`, `Task`, and a fuller `AgentInstance` — without
+changing anything about how the loop itself validates, authorizes, or
+executes a tool call (sections 1-10 above are still accurate for that
+part).
+
+```
+HumanIdentity
+      ↓
+   Session
+      ↓
+     Task
+      ↓
+AgentInstance
+   ↙       ↘
+ Model     Tools
+      ↓
+ Task State
+      ↓
+   Traces
+```
+
+### Session vs. Task vs. AgentInstance
+
+Three more entities, on top of the three identity types from §7
+(`HumanIdentity`, `AgentIdentity`, `AgentInstance` itself) — and just as
+deliberately kept separate, not collapsed:
+
+| Type | Answers | Lifetime | Module |
+|---|---|---|---|
+| `Session` | "which continuing interaction is this part of?" | spans multiple tasks; created once, resumed by ID | `sessions.py` |
+| `Task` | "what specific objective was requested?" | one `create_task()` call to one terminal status | `tasks.py` |
+| `AgentInstance` | "which concrete execution attempted this task?" | one `run()` call's worth of model/tool iterations | `identity.py` + `instances.py` |
+
+A Session can contain many Tasks (a human might ask for several things in
+one sitting). In v0.2, a Task has exactly one AgentInstance — `run()`
+always creates a new Task and immediately a new AgentInstance for it, it
+never resumes a Task. A future retry mechanism could attach a *second*
+AgentInstance to the same Task (see "why retries create new
+AgentInstances" below), but nothing in v0.2 does that yet — don't read
+one-Task-one-instance as a hard 1:1 invariant, just the current reality.
+
+Concretely: `AgentRunner.run(human=alice, goal="...", session_id=None)`
+creates a session, a task, and an instance, in that order, before a
+single model call happens — see `agent.py`'s `run()`, which is the
+authoritative place to read this, not this document.
+
+### Task state vs. model context
+
+These are two different things that happen to both be "what the agent
+currently knows," and conflating them is exactly the mistake this split
+guards against:
+
+- **Model context** (`messages` in `agent.py`) — the full conversation
+  sent to the LLM: the goal, every tool call the model made, every tool
+  result (including errors) fed back. Ephemeral, lives only in a Python
+  list for one `run()` call, never persisted. This is *input to the
+  model*, and it is allowed to contain anything, including a hostile
+  model's own prior turns — nothing here is trusted.
+- **Task state** (`tasks.Task.state`, schema `tasks.TaskState`) — a
+  small, fixed set of fields (`last_tool`, `last_customer_id`,
+  `last_order_id`, `last_action`) that our own code chooses to remember
+  about a task's progress, persisted to SQLite, schema-validated on every
+  write. This is *trusted application state*, and nothing goes into it
+  except through `agent.derive_state_update` → `tasks.update_task_state`
+  → `TaskState.model_validate`.
+
+The rule the spec calls out — "do not persist arbitrary model output
+directly into trusted task state" — is enforced structurally:
+`derive_state_update(tool_name, result)` only ever reads `result`, the
+tool's own trusted return value (already scoped to the calling human by
+a DB query in `tools.py`), never `call.arguments` (the model's raw,
+untrusted JSON). Even then, it doesn't copy `result` wholesale — it picks
+specific named fields into a dict, which then still has to pass
+`TaskState`'s `extra="forbid"` validation before it's written. Three
+independent narrowings between "something the model said" and "what's in
+`tasks.state`," not one.
+
+### Why persistent state creates a new security boundary
+
+v0.1's only state was request-scoped: a customer/order lookup was
+checked against `human.user_id` and forgotten the moment `run()`
+returned. v0.2 introduces state that outlives a single call —
+`session_id` and `task_id` are values a caller can hand back in on a
+*later*, separate `run()` invocation (`--session-id` on the CLI). That
+turns "does this belong to this human" from a question answered once per
+lookup into a question that has to be answered correctly every time a
+persisted ID is presented, indefinitely into the future, potentially by
+a different process entirely. This is why `sessions.get_session` and
+`tasks.get_task` **always** re-run the ownership check against the
+current `HumanIdentity` — there is no "trusted session handle" or cached
+authorization anywhere; a `session_id`/`task_id` is just a string until
+it's been checked, every single time, exactly like a customer_id in
+tools.py.
+
+### Who controls lifecycle transitions
+
+Only `tasks.update_task_status`, and only via `lifecycle.validate_transition`
+— a fixed table with terminal statuses (`completed`/`failed`/`cancelled`)
+having zero outgoing transitions. The agent loop calls it at exactly four
+points (`RUNNING` at task start, then `COMPLETED`/`FAILED` via the single
+`_finish` exit path). Nothing else in the codebase writes `tasks.status`
+directly — not `tools.py`, not the model, not `cli.py`. The model
+influences *when* the loop decides a task is done (by returning final
+text instead of a tool call), but it never calls `update_task_status`
+itself and has no way to set a status value directly; the loop's control
+flow is what decides which of `COMPLETED`/`FAILED` to request, using its
+own logic (a clean final response vs. an exception vs. hitting
+`max_steps`), never anything read out of the model's output.
+
+**On max-step termination specifically**: the spec asks for "an explicit
+terminal lifecycle state," not a new status value. v0.2 maps it to
+`failed` — the task didn't reach a completed goal, so `failed` is
+accurate — and records *why* separately, as `reason="max_steps_exceeded"`
+on the `task_failed` trace event, rather than inventing a sixth
+`TaskStatus` member. This keeps the lifecycle vocabulary exactly the five
+values the spec lists ("do not rely on arbitrary status strings") while
+still making the specific cause reconstructable from the trace.
+
+### Why ownership must not come from model output
+
+Three independent reasons this holds, not one:
+
+1. **The tool argument schemas don't have ownership fields.** `GetCustomerArgs`/
+   `GetOrderArgs`/`AddCaseNoteArgs` have no `human_user_id`, `session_id`,
+   or `task_id` field, and `extra="forbid"` means a model that tries to
+   add one gets `invalid_arguments`, not a silently-ignored extra key.
+2. **Tool execution never reads identity out of `call.arguments`.**
+   `_handle_tool_call` passes the real `human`/`instance` objects — sourced
+   from the verified JWT and from `run()`'s own session/task creation —
+   into every tool function. There is no code path where a tool receives
+   an identity value derived from the model's JSON.
+3. **State updates only ever come from `derive_state_update`, never from
+   the model directly.** Even if a model's *tool result* somehow echoed
+   back something identity-shaped (it can't, today — see tools.py — but
+   hypothetically), `derive_state_update` only extracts `last_tool` /
+   `last_customer_id` / `last_order_id` / `last_action` by name; there is
+   no field in `TaskState` an ownership value could land in even by
+   accident.
+
+`tests/test_agent.py::test_model_cannot_override_ownership` exercises
+this directly: a scripted tool call with `human_user_id`/`session_id`
+fields in its arguments gets rejected by schema validation, and
+regardless, the task's real ownership (checked via `tasks.get_task`) is
+unaffected either way.
+
+### Why retries should create new AgentInstances
+
+A `Task` is "what was asked for and how it's going"; an `AgentInstance`
+is "one attempt at it." If a retry reused the same `AgentInstance` (e.g.
+by resetting its status back to `running`), the *evidence* of the first,
+failed attempt — its trace, its start/end timestamps, whatever tool
+calls it made before failing — would either be overwritten or become
+ambiguous about which attempt produced which trace lines. Attaching a
+new `AgentInstance` to the same `Task` instead (not built in v0.2 — the
+loop always creates one Task with one instance — but the shape is
+already there for it) means: the Task's identity and accumulated `state`
+persist across attempts, but each attempt's execution history stays
+intact and separately attributable via its own `instance_id`. This is
+the same reasoning as `TERMINAL_STATUSES` having no outgoing
+transitions — history should accumulate, not be silently overwritten.
+
+### What new attacks become possible when state persists
+
+v0.1's LEARNING.md §10 already named several attack surfaces that are
+still true. v0.2 adds these, specific to persistence:
+
+- **Session/task ID enumeration or guessing** — `session_id`/`task_id`
+  are UUIDv4s (not sequential), so guessing one is impractical, but the
+  *design* now depends on that being true; if a future change made these
+  IDs predictable, the ownership check (`get_session`/`get_task`) is the
+  only thing standing between "guess an ID" and "read someone else's
+  session/task metadata" (not their customer/order data, which has its
+  own independent check in `tools.py`, but the task's `goal` text and
+  accumulated `state` would be exposed).
+- **Stale-state confusion across a long-lived session** — a session can
+  now span many tasks over an arbitrary amount of real time. Nothing in
+  v0.2 expires a session or re-verifies the human is still "present" for
+  a *later* task the way `crypton-id`'s step-up verification does for a
+  specific sensitive action — a session_id, once obtained, is usable
+  indefinitely by anyone who can present it plus a valid JWT for the same
+  `human.user_id`.
+- **State-update logic bugs become persistent, not transient.** In v0.1,
+  a bug in a tool's return value only mattered for the single response it
+  fed back to the model. In v0.2, `derive_state_update` writing something
+  wrong doesn't just affect one turn — it's written to `Task.state` and
+  will be read back on every subsequent turn *and* would be visible to
+  anything that later inspects that task's row directly. `TaskState`'s
+  schema validation limits how wrong it can be, but a logic bug within
+  the allowed schema (e.g. attributing the wrong `last_customer_id`) is
+  now a persistence-layer bug, not just a display bug.
+- **The `agent_instances`/`tasks`/`sessions` tables are new, unencrypted,
+  un-access-controlled SQLite state**, same caveat as v0.1's trace files:
+  anyone with filesystem access to `data/agentlab.db` can read every
+  human's session/task history directly, bypassing the ownership checks
+  entirely (those checks are enforced in `sessions.py`/`tasks.py`'s
+  Python code, not by the database itself — there's no row-level
+  security in SQLite here). This was already true of `data/traces/`
+  in v0.1; it now also applies to the new tables.
+
+None of this is fixed in v0.2 on purpose, same as v0.1 — see
+`labs/README.md`'s "do not build yet" list. They're what the next round
+of security work has to account for now that state outlives a request.
+
+---
+
+## v0.3 addendum: the Agent Registry
+
+v0.1/v0.2 let any caller construct `AgentIdentity(agent_id="support-agent")`
+by hand and hand it to `AgentRunner` — the string was never checked
+against anything. v0.3 replaces that with real, persisted registrations
+(`agents.py`, table `agents`): an `agent_id` now always refers to a row
+someone actually registered, owns, and can disable.
+
+```
+HumanIdentity
+      ↓ owns
+AgentIdentity
+      ↓ creates
+AgentInstance
+      ↓ performs
+Task
+      ↓
+Model + Tools
+```
+
+### Agent vs. model
+
+These are not the same thing, and this addendum's single most important
+point is that nothing in this codebase is allowed to conflate them:
+
+```
+AgentIdentity
+    support-agent v0.1.0        (agt_3f9a... — registered, owned by alice)
+        ↓ uses
+    Claude / another model       (execution-time choice, made in cli.py /
+                                   model_provider.py — carries no identity)
+```
+
+`AgentIdentity` is *the registered software application* — a name,
+version, and owner, persisted once at registration time. The model
+(Claude, or whatever `ModelProvider` a run is configured with) is
+*infrastructure the agent happens to use for one execution* — configured
+per `AgentRunner` construction (`build_model_provider` in `cli.py`), not
+persisted anywhere as part of the agent's identity. **Swapping the model
+provider behind an agent does not create a new AgentIdentity, and does
+not require re-registering anything** — `test_model_provider_metadata_is_not_agent_identity`
+proves this directly: two runs against the identical registered
+`agent_id`, using two different `FakeModelProvider` scripts (standing in
+for "different providers"), resolve to the exact same `agent_name`/
+`agent_version`/`agent_id` every time. The only thing that *would*
+create a new `AgentIdentity` is a new `register_agent(...)` call — e.g.
+if the agent *application itself* changes enough that its owner decides
+it's now "support-agent v0.2.0," that's a deliberate, explicit
+registration, not something that happens automatically because a model
+was swapped.
+
+### AgentIdentity vs. AgentInstance (recap, now with a registry underneath)
+
+Same distinction as v0.1 §7, sharpened: `AgentIdentity` (the row in
+`agents`) is the *application* — one registration, reused across many
+runs. `AgentInstance` (the row in `agent_instances`) is *one execution*
+of it — a fresh one every `AgentRunner.run()` call, always referencing a
+real, currently-active, correctly-owned `AgentIdentity` (never a
+dangling or foreign one — see "why disabled agents cannot instantiate"
+below). Multiple `AgentInstance` rows may, and normally will, reference
+the same `AgentIdentity` over that agent's lifetime.
+
+### AgentIdentity vs. model (why this needs its own heading)
+
+To state the negative property explicitly, since it's one of the
+security requirements this addendum has to satisfy: a model's name
+(`"claude-sonnet-5"`) or provider (`"anthropic"`) is never read, checked,
+or stored anywhere `agent_id` is used for identity or authorization.
+`ModelProvider`/`AnthropicModelProvider`/`FakeModelProvider`
+(`model_provider.py`) were not touched by this change at all — they have
+no awareness that an Agent Registry exists, and nothing in `agents.py`
+or `agent.py`'s identity-resolution path (`require_active_agent`) takes
+a model or provider as input. There is no code path where "the model
+says its name is X" could influence which `AgentIdentity` a run uses.
+
+### Why names aren't secure identities
+
+The one non-obvious design choice in this addendum: `authz.REGISTRY`
+(the static tool-permission table from v0.1) is keyed by agent *name*
+(`"support-agent"`, `"read-only-agent"`), not by canonical `agent_id`.
+This looks, at first glance, like exactly the thing this addendum is
+supposed to prevent — so it's worth being precise about why it's safe.
+
+`authz.py` is unchanged from v0.1/v0.2 — it still just does
+`REGISTRY.get(x)`. What changed is *what `x` is allowed to be* at the one
+call site, in `agent.py`'s `_handle_tool_call`. It is never a value a
+caller or model supplied directly. The only way to reach that call site
+at all is: present a canonical `agent_id` → `agents.require_active_agent`
+verifies it exists, is owned by the calling human, and is active →
+*only then* is `identity.name` read off that already-verified database
+row and used to pick a policy bucket. A model cannot "claim" a name to
+get support-agent's permissions; it would need to have caused a real,
+owned, active `agt_...` row to exist first, and that row's *name* is
+whatever its owner registered it as, not whatever string shows up later
+in a tool call. This is why `test_agent_name_cannot_substitute_for_agent_id`
+constructs `AgentRunner(agent_id="support-agent", ...)` (the bare name,
+not a real ID) and asserts it raises `AgentAccessError` — a name is
+never, on its own, a valid way to select or authenticate as an agent.
+
+The pragmatic reason `REGISTRY` has to be name-keyed rather than
+`agent_id`-keyed: `REGISTRY` is static code, written by a developer ahead
+of time, but registration generates a fresh random `agent_id` *per
+owner* — there is no single canonical ID a static dict could reference
+for "the support-agent policy" across every human who registers their
+own copy of it. Name is the only stable thing available to write in code
+ahead of time. A consequence worth being honest about: a newly
+registered agent whose name isn't `"support-agent"` or `"read-only-agent"`
+gets **zero** tool permissions by default (fail-closed) until a developer
+adds a `REGISTRY` entry for that name — this is a real limitation of
+keeping authorization static in v0.3 (explicitly permitted by the spec:
+"current authorization may still be static"), not an oversight. A
+dynamic, per-agent permission system is future work, not this chunk.
+
+### Why canonical IDs are generated by Crypton
+
+`agents.register_agent` has no `agent_id` parameter at all —
+`_new_agent_id()` (`f"agt_{uuid.uuid4().hex}"`) is the only place an ID
+is produced, and it runs entirely inside `register_agent`, after
+validating `name`/`version`, with no way for a caller to influence the
+result. This matters because an ID a caller (or, transitively, a model
+whose output somehow reached a registration call — it doesn't, in this
+codebase) could choose would be an ID a caller could *predict or
+collide with*. A random, server-generated ID means presenting a valid
+`agent_id` is only possible by having actually registered it (or been
+told it by whoever did) — the ID itself carries no information an
+attacker could compute in advance.
+
+### Why disabled agents cannot instantiate
+
+`AgentRunner.run()` calls `agents.require_active_agent` as literally its
+first action after minting the trace correlator — before any
+Session/Task/AgentInstance is created. This ordering is deliberate: an
+agent that can't run shouldn't leave behind a half-started Task sitting
+in `running` forever, or a Session created for a launch that was always
+going to fail. `require_active_agent` raises (`AgentNotActiveError` for
+disabled, `AgentAccessError` for unknown/foreign) and `run()` lets that
+exception propagate — no `AgentResult` is returned, no `AgentInstance`
+row is ever written for a rejected launch. `test_disabled_agent_cannot_run`
+and `test_unknown_agent_cannot_run` both confirm zero `sessions` rows get
+created for a rejected attempt. Disabling an agent (`agents.disable_agent`)
+is therefore an *immediate, unconditional* kill switch on new executions
+— it does not stop an `AgentInstance` already mid-run (there is no such
+thing as a currently-running instance in this synchronous, one-loop-at-
+a-time lab), but it guarantees no *new* one can start.
+
+### Why persistent registration matters for audit/accountability
+
+Before v0.3, "which agent did this" was answered by an arbitrary string
+nobody could verify — `"support-agent"` might have meant anything,
+supplied by whoever constructed the `AgentIdentity`. After v0.3, every
+`Task.agent_id` and `AgentInstance.agent_id` resolves to a real row with
+a real `owner_user_id`, a registration timestamp, and a status history
+(`agent_registered`/`agent_disabled`/`agent_enabled` trace events, when a
+tracer is passed to those functions). This is what makes "who is
+accountable for this agent's actions" answerable at all: not just "a
+human was authenticated" (that was already true) but "a specific human
+*registered this specific agent application*, and it has been active
+this whole time" — the missing link between an authenticated human and
+an actually-trustworthy claim about which software was running on their
+behalf. `test_task_references_canonical_agent_id` and
+`test_agent_instance_references_task_session_human` both verify this
+link is real (a genuine foreign-key-shaped reference to a row that
+exists), not just a string that happens to look like an ID.
+
+None of this is fixed further in v0.3 on purpose — delegation (one human
+authorizing another human's agent, or an agent acting for someone other
+than its registrant) is explicitly out of scope; see the task spec's
+"do not build" list. An `Agent`'s `owner_user_id` is fixed at
+registration and nothing in v0.3 changes it after the fact.
+
+---
+
+## v0.4 addendum: Delegation and deterministic pre-execution authorization
+
+v0.3 fixed *identity* (a real, owned, canonical `agent_id`) but left
+*authorization* static: `authz.REGISTRY` was a dict written by a
+developer ahead of time, keyed by agent **name**, granting a whole named
+role standing access to a fixed set of tools forever. v0.4 replaces that
+with **Delegation** — a persisted record of one human principal
+explicitly, and temporarily, authorizing one canonical agent to use
+specific tools against specific resources — and a deterministic
+pipeline, `authorization.authorize_tool_call`, that checks every tool
+call against it immediately before execution. `authz.py` is deleted; a
+Delegation is the only source of tool authority now.
+
+```
+HumanIdentity (principal)
+      ↓ owns
+AgentIdentity
+      ↓ grants Delegation to ─────────► Delegation
+      ↓ creates                            │ agent_id, task_id?, allowed_tools,
+AgentInstance                              │ resource_constraints, expires_at,
+      ↓ performs                          │ status (active|revoked)
+    Task                                   │
+      ↓                                    ▼
+ Model asks for a tool call ──► authorization.authorize_tool_call()
+                                    │
+                          ALLOW ────┼──── DENY
+                            │       │       │
+                      tool runs     │  AuthorizationDecision persisted,
+                                    │  zero tool side effects
+                                    ▼
+                     AuthorizationDecision persisted either way
+```
+
+### What Delegation is
+
+`delegation.py`'s `Delegation`: `delegation_id` (`dlg_<uuid>`, minted
+only by `grant_delegation`, never caller-supplied — same discipline as
+`agent_id`/`session_id`/`task_id`), `principal_user_id`, `agent_id`
+(canonical, never a name), an optional `task_id` (task-binding — see
+below), `allowed_tools` (a flat set of tool names), `resource_constraints`
+(a flat dict of `resource_type -> {ids}`, e.g.
+`{"customer_ids": {"cust_1"}}`), `issued_at`/`expires_at` (a delegation
+**must** have a finite lifetime — `grant_delegation` rejects a
+non-positive or excessively long `ttl_seconds`), and `status`
+(`active`/`revoked`). Granting one requires the principal to already own
+the target `agent_id` (`agents.get_agent` enforces this) — you can only
+delegate authority over an agent you actually control.
+
+It is deliberately not a policy engine: no wildcards, no expression
+language, no resource hierarchy, just flat allow-lists checked with `in`.
+If richer policy is ever needed, that should be a new, deliberate,
+versioned decision (see `DECISIONS.md`), not something that grows here
+incrementally.
+
+### Why authentication ≠ authorization
+
+These answer two completely different questions, and v0.3 already kept
+them procedurally separate without fully naming it: **authentication**
+is "is this really human X, and is this really registered agent Y" —
+answered once, by `verify_human_identity` and `agents.require_active_agent`,
+both of which only ever confirm *identity*. **Authorization** is "is
+this specific human, through this specific agent, allowed to do this
+specific thing, right now" — a completely separate question that a
+correct identity says nothing about on its own. Before v0.4, that second
+question was answered by a static label lookup with no expiry, no
+per-grant scope, and no revocation. v0.4 makes the separation structural:
+`agents.require_active_agent` (identity) and
+`authorization.authorize_tool_call` (authorization) are two different
+functions, in two different modules, called at two different points in
+`agent.py`'s `run()` — resolving *who this is* never implies *what they
+may do*, and nothing in `delegation.py` or `authorization.py` re-verifies
+identity claims that were already established elsewhere (it takes the
+already-verified `agent_id`/`HumanIdentity`/`AgentInstance` as given and
+checks authority on top of them).
+
+### Why agent names cannot define authority (the v0.3 bug, and the fix)
+
+The bug: `agent.py`'s boundary 2 called
+`authz.check_authorized(identity.name, call.name)` — keyed by
+`AgentIdentity.name`, a descriptive label, not `agent_id`. Two of the
+same human's own registrations can legitimately share a name (e.g.
+`register_agent(..., name="support-agent", version="0.1.0")` and again
+with `version="0.2.0")` — the uniqueness constraint on `agents` is
+`(owner_user_id, name, version)`, not `(owner_user_id, name)`). Both get
+different, unrelated canonical `agent_id`s, but a name-keyed permission
+map cannot tell them apart: whatever authority "support-agent" carried,
+*both* registrations got it, automatically, with no separate grant. A
+compromised, buggy, or simply newer version of an agent would silently
+inherit whatever the original version was allowed to do, forever, just by
+sharing a label.
+
+v0.4's fix is structural, not a patched comparison: `Delegation.agent_id`
+is the only thing `authorize_tool_call` ever compares against the
+resolved, canonical `agent_id` (pipeline step 7 — "delegation canonical
+agent matches"). `identity.name` does not appear anywhere in
+`authorization.py` or `delegation.py` at all. Granting authority to
+`agt_...v1` never grants it to `agt_...v2`, even same-named, even same
+owner, even registered seconds apart — a new registration always starts
+with zero delegations and needs its own, explicit grant.
+`tests/test_agent.py::test_same_name_different_version_does_not_inherit_authority`
+is the regression test: it registers `support-agent` v0.1.0 and v0.2.0
+for the same human, delegates only to v0.1.0, and proves running v0.2.0
+with v0.1.0's `delegation_id` is denied `AGENT_MISMATCH` with zero tool
+side effects — while v0.1.0 itself, using that same delegation, still
+works.
+
+### Why tool existence ≠ permission
+
+`tools.TOOL_FUNCTIONS` and `models.TOOL_ARG_MODELS` answer "what tools
+exist in this system, and what do their arguments look like" — the Tool
+Registry, in the spec's terms. `Delegation.allowed_tools` answers a
+completely different question: "which of those tools is *this specific
+agent, right now, under this specific grant of authority* allowed to
+call." These are kept as two separate concepts on purpose (see the
+module docstrings in `tools.py`/`models.py` vs. `delegation.py`):
+registering a new tool in `TOOL_FUNCTIONS` does not grant anyone
+authority to call it — every existing Delegation's `allowed_tools` is
+still whatever it was explicitly granted, and a new tool is unreachable
+by any agent until a principal explicitly delegates it. There is
+deliberately no single global place that conflates "tools that exist"
+with "tools this agent may use" — that conflation is exactly what made
+the v0.3 bug possible (a static permission map living at the same
+"global, code-level" altitude as the tool registry itself).
+
+### Why authorization must occur immediately before execution
+
+`authorization.authorize_tool_call` is called from `_handle_tool_call`
+as the last thing to happen before `tools.TOOL_FUNCTIONS[call.name]` is
+ever invoked — after the unknown-tool check, immediately before argument
+validation, with nothing else (no caching, no earlier "pre-approval" step
+whose result might go stale) in between. This matters because every
+input to the decision — the agent's active/disabled status, the
+delegation's revoked/expired status — can change at any moment between
+two calls in the *same* run, let alone across runs. A decision made once
+at the start of a `run()` and reused for every subsequent tool call in
+that loop would be a snapshot that could be wrong by the third or fourth
+tool call if, say, a human revoked the delegation mid-run in response to
+something the agent already did. Checking fresh, every single call,
+against the live database row, is what makes "revoke a delegation" mean
+"the very next tool call fails," not "the next *run* fails."
+
+### Why DENY must be recorded
+
+An `AuthorizationDecision` is persisted for **every** attempted
+consequential tool call — `ALLOW` and `DENY` alike (`record_decision`,
+called from both branches of `authorize_tool_call`, plus a third call
+site in `agent.py` for an `INVALID_ARGUMENTS` denial after a call passes
+delegation checks but fails schema validation). A `DENY` is the
+security-relevant event, not the exception: it is evidence that
+something — a model, or whoever/whatever is driving it — attempted an
+action it wasn't authorized for. Without a persisted record, a denied
+attempt is indistinguishable from an attempt that never happened at all,
+which makes it impossible to answer "did anything ever try to use this
+expired/revoked/foreign delegation" after the fact. Every `DENY` decision
+still carries the full evidence set — `principal_user_id`, `agent_id`,
+`instance_id`, `task_id`, `delegation_id`, `tool_name`, `resource`,
+`reason_code`, `timestamp` — specifically so it stands on its own during
+an audit, without needing to cross-reference the trace file to know who
+attempted what and why it failed. And critically: a `DENY` decision is
+recorded *and nothing else happens* — `_handle_tool_call` returns before
+`tools.TOOL_FUNCTIONS` is ever reached, so the evidence exists but the
+side effect never does (`tests/test_agent.py::test_unauthorized_tool_rejected`
+and every DENY-path test in `tests/test_authorization.py` assert both
+halves of this: the decision is `DENY`, and the would-be side effect
+— a row insert, a state change — did not happen).
+
+### How revocation and expiry work
+
+Both are read live, off the database row, on every single call — never
+cached, never checked once and remembered:
+
+- **Expiry** (`delegation.expires_at`, always finite —
+  `grant_delegation` refuses a non-positive or unbounded `ttl_seconds`):
+  `authorize_tool_call` compares `time.time() > delegation.expires_at`
+  fresh, every call. There is no background sweep that "expires" a
+  delegation at the deadline — an expired-but-still-`active`-status row
+  simply starts failing every check with `DELEGATION_EXPIRED` the instant
+  the clock passes `expires_at`.
+- **Revocation** (`delegation.revoke_delegation`): the *only* function
+  that changes `delegations.status`, and the transition is one-way —
+  `active -> revoked` is valid, `revoked -> revoked` raises
+  `LifecycleError` (see `lifecycle.validate_delegation_transition`).
+  Revoking never deletes the row: it is retained forever, exactly as
+  granted, as evidence of what authority once existed and when it
+  stopped — the same "history accumulates, nothing is erased" principle
+  `TERMINAL_STATUSES` already uses for tasks. There is no "re-activate a
+  revoked delegation" path; regranting authority always means calling
+  `grant_delegation` again for a brand new `delegation_id`.
+
+Task-binding (`Delegation.task_id`) is optional, checked at step 8 only
+"when task-bound" — a delegation with `task_id=None` authorizes its agent
+for any task; one with a real `task_id` is refused (`TASK_MISMATCH`) for
+every other task, even ones run by the exact same agent for the exact
+same principal. Task-bound delegation is the tighter, preferred shape
+where a caller already has a specific task in hand (least standing
+privilege — authority that dies with the task it was meant for, not
+authority that outlives it); it is not mandatory, since not every caller
+can pre-create a task before deciding what to authorize.
+
+### Where v0.4 can still be attacked
+
+Recording these honestly, same as every prior version's addendum:
+
+- **The `JWT_SECRET` shared-secret problem is explicitly not solved
+  here.** crypton-id and Agent Lab both verify (and, in Agent Lab's dev
+  path, *mint*) tokens with the same HS256 symmetric key. Anyone who can
+  read Agent Lab's environment can mint a token claiming to be any human,
+  and from there `grant_delegation`/`revoke_delegation` are only as
+  trustworthy as that token. The intended fix — asymmetric signing with
+  Agent Lab holding only a public verification key (or full OIDC/JWKS) —
+  is deliberately out of scope for v0.4; see the task spec's "do not
+  solve" list.
+- **A principal can still over-grant.** Nothing stops a human from
+  delegating `allowed_tools={"get_customer","get_order","add_case_note"}`
+  with `resource_constraints` covering every id they own, for the maximum
+  allowed TTL, to every agent they register — v0.4 makes narrow,
+  temporary, revocable grants *possible*, it does not make broad ones
+  *impossible*. The pipeline enforces whatever was actually granted;
+  it has no opinion on whether a grant was wise.
+- **Resource constraints are a flat allow-list of ids, not a live
+  ownership check.** `RESOURCE_NOT_ALLOWED` only checks "is this id in
+  the set that was granted," not "does this id currently belong to this
+  principal" — if a `customer_id` were reassigned to a different owner
+  after a delegation was granted (nothing in this lab does that today,
+  but nothing prevents it structurally), a stale grant could still
+  authorize touching it at the delegation layer; `tools.py`'s independent
+  `owner_user_id` check is what actually catches that case today, as a
+  second, unrelated layer of defense — it is not redundant with the
+  authorization pipeline, it is the thing standing in for a "resource
+  ownership can drift" gap in this pipeline.
+- **No approval step bound to a specific call's exact arguments.** A
+  delegation authorizes *a tool against a resource id*, but nothing yet
+  asks the human, at the moment of a specific consequential call, "do you
+  approve *this exact action*" — see "Next" below (v0.5, human approval
+  bound to exact action arguments via WebAuthn step-up). v0.4 is
+  standing, revocable authority; it is not per-action confirmation.
+- **The static-permission attack surface named in v0.1's LEARNING.md
+  §10** ("the allowlist is static and coarse... standing access to
+  everything its entry lists, all the time") **is now substantially
+  narrowed but not eliminated**: delegations are per-agent-id, scoped,
+  and finite-lived rather than a permanent global grant by name — but a
+  long-TTL, broadly-scoped delegation is still standing access for its
+  lifetime. The improvement is bounding *how* standing access can be
+  granted (explicitly, scoped, expiring, revocable, evidenced), not
+  removing the concept of standing access altogether.
+- **`authorization_decisions` and `delegations` are unencrypted,
+  un-access-controlled SQLite rows**, same caveat as every other table in
+  this lab (`instances.py`'s v0.2/v0.3 note applies identically here):
+  anyone with filesystem access to `data/agentlab.db` can read every
+  delegation ever granted and every decision ever made, bypassing the
+  ownership checks entirely, since those checks are enforced in Python,
+  not by the database.
+
+None of the above is fixed in v0.4 on purpose — MCP, multi-agent
+delegation, WebAuthn-bound approval, a policy language, LLM-assisted
+authorization, and a security scanner are all explicitly out of scope;
+see the task spec's "do not add" list. They are the concrete starting
+point for v0.5 and beyond.
+
+---
+
+## v0.5 addendum: Human Approval bound to the exact consequential action
+
+v0.4 answers "does this agent possess delegated authority?" — a standing,
+revocable, but otherwise generic grant ("this agent may call
+`add_case_note` against these customer ids, until this time"). It has no
+way to ask a narrower question: *for this one specific call, right now,
+did the correct human actually agree to this exact action?* v0.5 adds
+that as a second, independent check — **Approval** (`approval.py`) — that
+some tools require on top of (never instead of) a valid Delegation.
+
+```
+HumanIdentity (principal)
+      │
+      │ WebAuthn step-up, challenge = approval_id + argument_hash
+      ▼
+Approval ──bound to──► AgentInstance? + Task? + Delegation + tool_name
+      │                + resource + sha256(canonical validated arguments)
+      │ status: pending → approved → consumed
+      │                        ↘ cancelled / expired
+      ▼
+verify_and_consume_approval() ── runs immediately before execution,
+      │                          strictly AFTER authorize_tool_call()
+      │                          has already returned ALLOW
+ ALLOW┼────DENY
+   │  │      │
+ tool │  AuthorizationDecision persisted (APPROVAL_* reason code),
+ runs │  zero tool side effects, approval untouched or left as-is
+      ▼
+ approval atomically flips approved → consumed (one use, ever)
+```
+
+### Authorization vs. approval
+
+Delegation and Approval answer different questions, and v0.5 keeps that
+difference structural, not just conceptual:
+
+| | Delegation (v0.4) | Approval (v0.5) |
+|---|---|---|
+| Question | "does this agent have standing authority?" | "did a human confirm *this* call?" |
+| Scope | a tool + a resource *type* (any id in the granted set) | one tool call with one exact, hashed argument set |
+| Lifetime | up to 30 days, reusable for every matching call | up to 15 minutes, **one use** |
+| Who acts | the principal, once, ahead of time | the principal, per consequential call, via WebAuthn |
+| Failure mode | `AGENT_MISMATCH`, `DELEGATION_EXPIRED`, etc. | `APPROVAL_*` reason codes (own vocabulary) |
+
+Both are checked by `agent.py`'s `_handle_tool_call`, in a fixed order:
+`authorization.authorize_tool_call` (delegation) first, then — only for a
+tool where `models.requires_human_approval(tool_name)` is `True` —
+`approval.verify_and_consume_approval`. Neither can substitute for the
+other: a `DENY` from either stops execution outright (see "authorization
+independence" below), and `models.REQUIRES_HUMAN_APPROVAL` is Tool
+Registry metadata (what the tool *is*), not an authority grant — setting
+it to `True` doesn't hand out any authority by itself, it only adds a gate
+that authority alone can't pass through.
+
+### Why approval must bind to exact structured arguments
+
+A "human approved this tool" checkbox is close to meaningless as a
+security control: it says nothing about *which* call. The entire point of
+Approval is `compute_argument_hash(tool_name, resource, validated_arguments)`
+— a deterministic sha256 over the tool name, the resource identity, and a
+canonically-encoded (sorted keys, no whitespace ambiguity) dump of
+**already-Pydantic-validated** arguments, never raw model JSON. This
+mirrors `authorization.py`'s existing rule that a resource id is only ever
+read from validated structured data, never trusted text — applied here to
+the entire argument set, not just one field.
+
+A human approving `add_case_note(customer_id="cust_1", note="refund
+approved")` is approving *that exact call* — the hash changes if the
+note's text changes, if the customer_id changes, or even if the identical
+arguments were pointed at a different tool. `verify_and_consume_approval`
+recomputes the digest from what's actually about to execute and compares
+it to what was approved; any mismatch is `APPROVAL_ARGUMENT_MISMATCH`
+(argument substitution) or `APPROVAL_RESOURCE_MISMATCH` (resource
+substitution, checked slightly earlier as its own explicit step since a
+resource swap is common and deserves its own reason code even though a
+changed resource would also change the hash).
+
+### TOCTOU and argument substitution risk
+
+The risk this defends against is exactly the classic time-of-check/
+time-of-use gap: a human reviews and approves one proposed action, but
+something between approval and execution — a manipulated or simply
+confused model, a bug, a replayed/edited request — causes a *different*
+action to actually run under that approval's cover. Without exact-argument
+binding, "approved" would only ever mean "approved calling this tool at
+some point," which a valid Delegation already permits on its own — making
+the approval step security theater. Binding the approval to a hash of the
+precise arguments closes that gap: the check at execution time is not
+"was something like this approved," it's "was *this exact byte-identical
+action* approved," recomputed fresh, never trusted from an earlier
+decision cached anywhere.
+
+### Why replay risk demands one-shot approvals
+
+An approval that could back more than one execution would let a single
+human confirmation get silently amplified — click "approve" once,
+somehow have it authorize the same withdrawal, note, or send twice (or
+more). `verify_and_consume_approval`'s last step is an atomic
+conditional update:
+
+```sql
+UPDATE approvals SET status = 'consumed', consumed_at = ?
+WHERE approval_id = ? AND status = 'approved'
+```
+
+If the row is not `approved` at that exact moment (already consumed by
+an earlier call, expired, cancelled), the `WHERE` clause matches zero
+rows and the caller falls back to a normal `APPROVAL_ALREADY_CONSUMED`
+denial — there is no window where two concurrent executions could both
+see `rowcount == 1` and both proceed. `tests/test_agent_approval.py::
+test_replayed_approval_denies_the_second_execution` proves this across
+two entirely separate `AgentRunner.run()` calls (separate `AgentInstance`/
+`Task`, same `approval_id`): the first consumes it, the second sees
+`APPROVAL_ALREADY_CONSUMED` and writes nothing.
+
+### Why approvals are short-lived
+
+`request_approval` caps `ttl_seconds` at `MAX_APPROVAL_TTL_SECONDS` (15
+minutes) — an order of magnitude tighter than Delegation's 30-day cap.
+The reasoning is different for each: a Delegation is *standing* authority
+a principal consciously chooses to grant for a while; an Approval is a
+confirmation of *specific intent at a specific moment*, and intent that
+old is not the same intent anymore — the resource might have changed
+state, the human might not even remember approving it, and a long-lived
+pending or approved-but-unconsumed approval is just a wider window for
+something to go wrong before it's used. Expiry, like Delegation's, is
+checked live (`_load_and_maybe_expire`, called at the top of every
+pipeline run) and lazily persisted as an explicit `expired` status the
+first time anything looks at an overdue row — never a background sweep,
+never cached.
+
+### Why WebAuthn proves human authentication but still needs action binding
+
+`approve()` requires a `WebAuthnVerifier` to succeed before a pending
+approval becomes approved — this proves *a human with the right passkey
+is present, right now*, the same guarantee crypton-id's own login flow
+already provides (`identity.verify_human_identity` trusts the same
+underlying ceremony for the JWT it verifies). But WebAuthn authenticates a
+**person**, not an **action** — a raw "user completed a passkey ceremony"
+signal says nothing about which of the user's pending approvals they
+meant to confirm. That's why `approve()` never accepts a caller-supplied
+challenge: it derives one deterministically from
+`f"{approval_id}:{argument_hash}"` and passes *that* to
+`verifier.verify_step_up`. In a real integration, the authenticator's
+signed assertion would cover this exact challenge, so completing the
+ceremony is inseparable from confirming *this* approval's exact digest —
+not "some approval or other belonging to this human." WebAuthn supplies
+the "a human is really here" half; the challenge-binding supplies the
+"and they meant this one" half. Neither half alone is the security
+property; both are required.
+
+### Real integration vs. Lab simulation (be explicit about this)
+
+`webauthn.py` defines the `WebAuthnVerifier` interface and
+`WebAuthnEvidence` — this is the real, intended integration boundary:
+what a live `CryptonIdWebAuthnVerifier` would need to satisfy to swap in
+for real ceremonies without approval.py or agent.py changing at all,
+exactly the role `model_provider.ModelProvider` already plays for LLM
+vendors. **What's actually implemented is `FakeWebAuthnVerifier`** — a
+deterministic, Lab-only stand-in that never talks to an authenticator or
+to crypton-id. It:
+
+- computes a fake `reference` (`sha256(user_id:cred_id:challenge)`,
+  prefixed `fake:`) instead of returning a real credential/assertion id,
+- sets `WebAuthnEvidence.is_simulated=True` unconditionally, so nothing
+  downstream can mistake it for real evidence without checking,
+- and supports a sentinel `FAIL_CHALLENGE` so tests can exercise
+  `WEBAUTHN_VERIFICATION_FAILED` deterministically, without a real
+  authenticator that could actually refuse.
+
+What's real about the design even though the ceremony is faked: the
+*shape* of the security property — approval requires step-up,
+immediately before the state transition, with a challenge bound to the
+exact action — is exactly what a live integration would also have to do.
+Swapping in a real verifier is a new class implementing one method
+(`verify_step_up`), not a redesign of `approval.py`. Wiring an actual
+`CryptonIdWebAuthnVerifier` (calling crypton-id's real step-up endpoint
+over HTTP, the way `identity.verify_human_identity` already trusts
+crypton-id's JWTs without re-implementing WebAuthn) is real, deliberately
+deferred integration work — not a v0.5 deliverable.
+
+### Why approval cannot increase delegated authority
+
+`_handle_tool_call`'s ordering makes this true by construction, not by
+convention: `authorization.authorize_tool_call` runs first and returns
+before the approval check is ever reached. If it denies (disabled agent,
+revoked/expired delegation, tool not in `allowed_tools`, resource out of
+scope), `_handle_tool_call` returns immediately — `approval_module` is
+never imported into the call stack for that request at all, and a fully
+valid, human-approved Approval sitting in the database is never even
+loaded. `tests/test_agent_approval.py::
+test_valid_approval_never_overrides_a_revoked_delegation` proves this
+directly: approve an action, then revoke the delegation backing it, then
+run — the result is `DELEGATION_REVOKED`, the approval is still
+`approved` (not `consumed`) afterward, and no note is written. Symmetrically,
+a valid Delegation never bypasses a *required* approval either — a tool
+with `requires_human_approval=True` and no `approval_id` on the runner
+denies with `APPROVAL_REQUIRED` regardless of how permissive the
+delegation is. Approval only ever *narrows* what a valid delegation
+already permits; it can never widen it.
+
+### Why the LLM never decides any of this
+
+Every input to every check in `verify_and_consume_approval` — `approval_id`,
+`agent_id`, `instance_id`, `task_id`, `delegation_id` — comes from the
+runner's own already-authenticated state (`AgentRunner.approval_id` is a
+constructor-level constant, exactly like `delegation_id`) or from
+already-Pydantic-validated tool arguments. The model's raw tool-call JSON
+never supplies an approval id, an instance id, or a resource id used for
+the *comparison itself* (only, indirectly, the proposed arguments that
+get validated and hashed) — the same "model proposes, deterministic code
+disposes" discipline `authorization.py` already established for
+Delegation. There is no code path where a model's output decides ALLOW or
+DENY; it can only ever cause a DENY by proposing something that doesn't
+match what a human actually approved.
+
+### Where v0.5 can still be attacked
+
+- **The `JWT_SECRET` shared-secret problem still isn't solved** — same
+  caveat as v0.4's addendum; approval doesn't make it better or worse.
+- **`FakeWebAuthnVerifier` is exactly that — fake.** Nothing in this Lab
+  today calls a real authenticator or crypton-id's step-up endpoint. Until
+  `CryptonIdWebAuthnVerifier` exists and is wired in, "approval" in a real
+  deployment of this code would be exactly as trustworthy as whatever
+  verifier is actually configured — the interface makes a real one
+  pluggable, it does not supply one.
+- **A principal can still over-request.** Nothing stops a human from
+  approving an overly broad or poorly-considered action within the rules
+  (15-minute TTL, one resource, one tool) — v0.5 makes exact-argument
+  confirmation *possible*, it has no opinion on whether a human should
+  have approved a given request in the first place.
+- **No approval-request review surface.** There is no UI/CLI flow yet
+  where a human actually *sees* the proposed action before calling
+  `approve()` — a caller could technically call `request_approval` then
+  `approve` back-to-back without a real human ever reading `note`'s text.
+  Building that review surface is integration work, not something
+  `approval.py` can enforce from the data-model side.
+- **Instance/task binding is optional, not mandatory.** Like Delegation's
+  `task_id`, `Approval.instance_id`/`task_id` are nullable — an approval
+  requested without them authorizes its exact argument-hash against *any*
+  instance/task run by the same agent/delegation/principal, not just one
+  specific run. This is a deliberate looseness (an approval usually has to
+  be requested before the instance it will be used in exists — see
+  `tests/test_agent_approval.py`'s module docstring), not an oversight,
+  but it does mean instance/task binding is defense-in-depth on top of the
+  argument hash, not a mandatory third leg of the exact-match property.
+- **Approval evidence lives in the same unencrypted, un-access-controlled
+  SQLite file as everything else** — same caveat as v0.4's `delegations`/
+  `authorization_decisions` note, now also true of `approvals` and its
+  `webauthn_reference` column (an opaque reference, never a secret, but
+  still only as protected as the file it's stored in).
+- **MCP, multi-agent delegation, a policy language, LLM-assisted
+  authorization, model training, and a security scanner remain explicitly
+  out of scope** — see the task spec's "do not add" list. The next
+  concrete step is v0.6: one minimal MCP server, with one existing tool
+  moved across that boundary.
+
+---
+
+## v0.5.1 addendum: Ground Truth + Security Baseline
+
+Not a new capability — a reconciliation-and-hardening pass across the
+whole repo (crypton-id, crypton-sdk, and Agent Lab) before v0.6's
+multi-hop delegation-chain work starts. Two things changed in Agent Lab
+specifically; everything else in this document above is otherwise still
+accurate as written.
+
+### The `JWT_SECRET` shared-secret problem is now closed
+
+Every addendum above (v0.1 §10, v0.4, v0.5) named the same tracked gap:
+`crypton-id` signed JWTs with HS256, a symmetric algorithm, so the same
+`JWT_SECRET` that let Agent Lab *verify* a token also let it *mint* one —
+`issue_dev_token` did exactly that, deliberately, for local dev. Per
+DECISIONS.md's invariant 5, a service that only needs to verify identity
+should not also be able to act as a root authority. That is now
+structurally true, not just operationally mitigated:
+
+- `crypton-id` signs with **Ed25519 (EdDSA)** — an asymmetric algorithm.
+  It holds the private key (`JWT_SIGNING_KEY_PEM`); every verifier,
+  Agent Lab included, is handed only the public key
+  (`JWT_PUBLIC_KEY_PEM`). See `services/crypton-id/src/jwt.rs` and
+  DECISIONS.md's "JWT: asymmetric signing replaces the shared HS256
+  secret."
+- `identity.verify_human_identity` now verifies with `pyjwt.decode(...,
+  algorithms=["EdDSA"])` against `JWT_PUBLIC_KEY_PEM` — there is no
+  parameter, env var, or code path anywhere in this module that reads or
+  requires crypton-id's private key.
+- `identity.issue_dev_token` still exists, for the same local-dev reason
+  it always has, but its signature changed: `private_key` is now a
+  **required** argument with no env-var fallback. The CLI's `--dev-user`
+  path (`cli.py`'s `build_human_identity`) calls
+  `identity.generate_dev_keypair()` to mint a fresh, ephemeral Ed25519
+  keypair *per invocation*, signs a dev token with its private half, and
+  verifies it with its public half in the same breath — a self-contained
+  round trip that never touches, derives from, or is interchangeable with
+  crypton-id's real key material. This is what makes the property
+  structural rather than a promise: even if every line of `cli.py` were
+  read by an attacker, there is no key material reachable from this
+  process that would let it forge a token crypton-id's real
+  `JWT_PUBLIC_KEY_PEM` would accept.
+- `tests/test_identity.py` proves this directly:
+  `test_token_signed_by_a_different_private_key_is_rejected` and
+  `test_public_key_cannot_be_used_to_mint_a_token` are the Agent-Lab-side
+  half of the property; `services/crypton-id/src/jwt.rs`'s
+  `public_key_pem_cannot_be_used_as_a_signing_key` and
+  `token_signed_by_a_different_private_key_is_rejected` are the
+  crypton-id-side half.
+
+### The WebAuthn "duplication" was investigated and found not to be one
+
+The Technical SOT (graphify-reconstructed, INFERRED edges only) flagged a
+`semantically_similar_to` connection between crypton-sdk's WebAuthn-backed
+`Actions` module and this lab's `Approval` step-up. Read from source, not
+from the graph: these are not two implementations of the same thing.
+
+- `services/crypton-id/src/routes/actions.rs` (`/actions/challenge`,
+  `/actions/execute`) is the one and only real, production WebAuthn
+  verification path for step-up in this repo — it shares the exact same
+  `AppState.webauthn` (`webauthn_rs::Webauthn`) instance that
+  `auth_webauthn.rs` uses for login/registration. There is no second
+  `Webauthn` instance anywhere in production code (the `WebauthnBuilder`
+  calls in `devices.rs`/`recovery.rs`/`admin.rs` are inside `#[cfg(test)]`
+  modules, building local test fixtures, not a second production
+  verifier).
+- `webauthn.py` in this lab defines an interface (`WebAuthnVerifier`) and
+  exactly one implementation of it: `FakeWebAuthnVerifier`, a
+  deterministic, Lab-only simulation that never calls a real
+  authenticator or crypton-id's real `/actions/*` endpoints — this was
+  already documented honestly in the v0.5 addendum above and remains
+  true.
+- crypton-id's step-up binds to a caller-supplied, audit-log-friendly
+  `intent` label (any string up to 64 chars); this lab's `Approval` binds
+  to `compute_argument_hash(tool_name, resource, validated_arguments)` — a
+  *stricter*, more specific binding than crypton-id's general-purpose
+  primitive. A real `CryptonIdWebAuthnVerifier` would pass
+  `f"{approval_id}:{argument_hash}"` as that intent string — the shapes
+  are compatible, not identical, and nothing about that integration
+  requires touching crypton-id's step-up code.
+
+**Conclusion: no unification was needed or done.** There is one canonical
+production WebAuthn implementation (crypton-id's), and Agent Lab already
+follows the correct shape for consuming it later — an interface plus a
+clearly-marked fake, the exact pattern `model_provider.ModelProvider`
+already established for LLM vendors. Wiring a real
+`CryptonIdWebAuthnVerifier` remains real, deliberately deferred
+integration work: it needs a way to get a browser-completed WebAuthn
+assertion into this synchronous, headless CLI tool, which is a genuinely
+different problem than "these two things are the same code twice." Not
+solved here — tracked as a bounded follow-up, not a v0.5.1 blocker (see
+`docs/CRYPTON_TECHNICAL_SOT_v1.1.md`).
+
+### Closure (2026-09-02): the crypton-id side is now compiled and tested
+
+The Ed25519 migration described above was written and reasoned through in
+the same pass that produced this addendum, but `services/crypton-id`
+itself could not be compiled in that session (a Windows OpenSSL dev-package
+gap — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §10). That gap is now fixed
+(a pre-existing local vcpkg install with OpenSSL already built; setting
+`VCPKG_ROOT` was sufficient — no code change). `cargo check` and
+`cargo test` both pass clean: 38/38, including every JWT test named above.
+Agent Lab's own suite (185/185) and the 9 enforcement-boundary regression
+tests were re-run against this now-compiled crypton-id and remain
+unaffected — full record in `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §10.
+**v0.5.1 is certified complete as of this closure.**
+
+---
+
+## v0.6 addendum: Provable Multi-Hop Delegation with Scope Attenuation
+
+v0.4 answered "does this agent possess delegated authority?" for exactly
+one hop: a human grants it directly. v0.6 answers the question this whole
+lab exists to eventually prove: can an action performed several hops down
+a delegation chain — `Human -> Agent A -> Agent B -> Agent C` — be traced
+back to a human, with every hop cryptographically attributable and
+authority guaranteed to only ever narrow, never widen, as it passes
+downstream? Full design record and reasoning:
+`../../DECISIONS.md`'s v0.6 section and
+`../../docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 — this addendum is the
+shorter, "how it actually works" companion to those.
+
+```
+HumanIdentity (alice)
+      |
+      | D0: root grant (exactly like v0.4 — no change)
+      v
+   Agent A ---has a signing key (signing_keys.py)---
+      |
+      | D1: grant_chained_delegation() — Agent A signs it,
+      |     narrower than D0, bound to D0 by hash
+      v
+   Agent B ---has a signing key---
+      |
+      | D2: Agent B signs it, narrower than D1, bound to D1 by hash
+      v
+   Agent C ---no signing key needed; never issues anything---
+      |
+      | requests get_customer(cust_1)
+      v
+chain.verify_delegation_chain() — walks D2 -> D1 -> D0, checking every
+hop, before authorization.py's decision is ever trusted as final
+```
+
+### Why `Agent`, not `AgentInstance`, holds the signing key
+
+The one design decision this addendum has to justify from scratch:
+`Delegation` has been `agent_id`-scoped since v0.4, reused across every
+run of that agent — it was never `instance_id`-scoped, because an
+`AgentInstance` is minted fresh every single `AgentRunner.run()` call
+(§7's original identity table). If signing lived on `AgentInstance`
+instead, a chain would need every hop re-signed on every single run,
+turning a standing grant into something re-established per execution —
+exactly the property v0.4 deliberately built Delegation *not* to have.
+Making the durable `Agent` the signing principal keeps one identity
+concept answering "who does this authority belong to" across ownership,
+delegation subject, and now signing key — not two. Concretely:
+`signing_keys.create_signing_key(conn, human, agent_id)` is a new,
+separate call (mirroring how `grant_delegation` has always been separate
+from `register_agent`) — most agents never need one; only an agent that
+will *issue* a child delegation does. Agent C in the diagram above never
+calls it.
+
+### What actually changed in `Delegation`
+
+Nothing was removed or renamed. Seven columns were added (`format_version`,
+`issuer_type`, `issuer_id`, `parent_delegation_id`, `parent_hash`,
+`signing_key_id`, `signature`), applied via idempotent `ALTER TABLE`
+(`db.py`) rather than a rewritten schema — a database that predates v0.6
+gets these columns added the next time `connect()` runs, and every
+existing row reads back as a valid *root* delegation (`Delegation.is_root`
+== `parent_delegation_id is None`). `grant_delegation` — the exact
+function every v0.4/v0.5 caller already used — is unchanged in signature
+and behavior; it now also stamps these new columns with root-shaped
+defaults (`issuer_type="human"`, `issuer_id=principal.user_id`, no
+parent, no signature). A brand-new function, `grant_chained_delegation`,
+issues the *non-root* case: an agent (never a human) delegating a
+narrowed subset of authority it itself holds.
+
+### The canonical-bytes problem, and why it matters here specifically
+
+A signature can only cover bytes, not a live Python object — the same
+problem `approval.compute_argument_hash` already solved for tool-call
+arguments (sorted keys, no whitespace, deterministic) is solved the same
+way here for an entire delegation's security-relevant fields
+(`delegation.canonical_delegation_bytes`). One deliberate choice worth
+naming: `status`/`revoked_at` are **not** part of what's signed. A
+delegation's signature attests to the terms it was issued with — tools,
+resources, expiry, parent — which must never legitimately change after
+the fact; whether it's *currently usable* is a different, time-varying
+question, checked live on every verification, the same way
+`Delegation.expires_at`/`.status` have been checked live (never cached)
+since v0.4, and the same way crypton-id's own JWTs don't encode "is this
+session still valid" — the Redis denylist answers that live, every time.
+
+### The attenuation engine, and what "safe default deny" means for it
+
+`chain.verify_attenuation(parent, child)` is called from exactly two
+places — issuance time (`grant_chained_delegation`, so an obviously
+invalid child is rejected immediately) and verification time (`chain.py`,
+which never assumes issuance-time validation actually happened) — never
+duplicated a third time anywhere. Three dimensions, all "child must be a
+subset of parent, never narrower rejected, never broader allowed":
+`allowed_tools` (frozenset subset), `resource_constraints` (subset per
+resource_type — a type the parent never scoped at all is *not* read as
+"unconstrained," it denies, mirroring the exact rule `authorization.py`'s
+own resource-scope check has used since v0.4), `expires_at` (`child <=
+parent`). No prefix/wildcard resource matching was built — the existing
+model has always been exact id sets (`{"customer_ids": {"cust_1"}}`), and
+subset-of-exact-sets is the only interpretation of "narrower" that can't
+be tricked by a string that merely *looks* like a narrowing (`"cust_1"`
+is not a prefix-match narrowing of `"cust_123"` — it's simply absent from
+that set, full stop).
+
+### The chain verifier, and the four-layer defense on `expires_at` this design turned out to have
+
+`chain.verify_delegation_chain` is the one authoritative entry point —
+it does not trust a caller-supplied chain, does not duplicate
+`authorization.authorize_tool_call`'s leaf-level checks (it calls that
+function directly, exactly as `agent.py` already did before v0.6), and
+walks upward through however many `parent_delegation_id` links exist,
+checking at each hop: signature (against the delegation's own registered,
+non-revoked signing key), issuer/subject continuity (`current.issuer_id
+== parent.agent_id` — an agent cannot mint a child off a delegation whose
+*subject* is a different agent, even knowing that delegation's ID),
+parent-hash match (`current.parent_hash == delegation_digest(parent)`,
+recomputed live — this is what makes swapping a `parent_delegation_id` to
+point at a different, otherwise-valid delegation fail: that field is
+itself part of the signed envelope, so re-pointing it without re-signing
+breaks the signature check first), and attenuation. A root-only
+delegation has nothing to walk — this is the whole reason a v0.5-shaped
+`Delegation` behaves identically before and after v0.6, proven directly
+by `tests/test_delegation_chain.py::test_root_only_delegation_verifies_identically_to_v05`.
+
+One property worth calling out because it wasn't designed in on purpose —
+it fell out of the design and the test suite caught it while proving
+ancestor-expiry: **`expires_at` ended up defended by four independent
+layers at once.** It's part of the signed envelope (tamper it, the
+signature breaks). It's part of what a child's `parent_hash` binds to
+(tamper an *ancestor's* copy after a child already captured its hash, the
+hash breaks). It's part of attenuation's ordering rule (shorten an
+ancestor's expiry out of step with children already narrower than it, and
+the ordering itself is violated). And only *then*, live against the
+clock. Writing the test for "an ancestor is expired but its descendant
+still looks locally valid" surfaced that this state is unreachable in an
+honestly-issued chain at all — attenuation's `child.expires_at <=
+parent.expires_at` rule guarantees the *leaf* always expires first, never
+an ancestor while a descendant remains valid. The live clock check exists
+as defense-in-depth for exactly the scenario where the first three layers
+have somehow already been defeated — the test suite proves it that way
+explicitly, not by accident.
+
+### Integration: one authorization system, not two running side by side
+
+`agent.py`'s boundary 2 changed from calling
+`authorization.authorize_tool_call` directly to calling
+`chain.verify_delegation_chain` — but that function's first action is
+calling `authorization.authorize_tool_call` itself, by the same
+module-attribute reference agent.py always used. This is not a second
+gate bolted beside the first; v0.6 strictly extends what "authorization"
+already meant. Approval (v0.5) is completely untouched, still strictly
+after this step, still only for tools that require it — a fully valid
+3-hop chain can still need a human's exact-argument-bound confirmation on
+top; a valid approval sitting in the database can never rescue a chain
+that fails at any hop, because the code path that would consult it is
+never reached otherwise
+(`tests/test_delegation_chain.py::test_valid_approval_cannot_rescue_an_invalid_chain`).
+
+One honest, deliberate behavior change: an *unexpected internal error*
+during authorization now becomes a persisted `CHAIN_VERIFICATION_ERROR`
+DENY instead of an uncaught crash out of `AgentRunner.run()`. The tool is
+equally unreachable either way — only the shape of the failure changed,
+and the new shape (graceful, evidenced DENY) is what this milestone's own
+fail-closed requirement actually asks for.
+
+### RAT-6, proven
+
+`tests/test_delegation_chain.py`'s `three_hop_chain` fixture builds
+exactly the scenario above with real tools (`get_customer`/`get_order`/
+`add_case_note` — not invented `customer.read`-style names) and real
+Ed25519 signatures. Agent C requesting `get_customer(cust_1)`: **ALLOW**,
+depth 3, full `Human -> A -> B -> C` authority path — proven both at the
+verifier level and by driving the real `AgentRunner.run()` loop with a
+call-count spy proving the tool executed exactly once. Every attack case
+the milestone asked for is a separate, passing test: permission
+amplification, an undelegated tool, resource escape, ancestor revocation,
+ancestor expiry, a tampered child, parent substitution, an unauthorized
+issuer (rejected both at issuance and, defensively, again at
+verification against a forged row), a retroactively revoked signing key,
+a cycle, and depth overflow — all denied, all with zero tool execution.
+Reproducible live, outside pytest, via the CLI:
+
+```bash
+python -m agentlab.cli --chain-verify <D2> --requested-tool get_customer \
+    --requested-resource-type customer_ids --requested-resource-id cust_1 --dev-user user-alice
+```
+
+prints the same ROOT PRINCIPAL / ACTING PRINCIPAL / DELEGATION DEPTH /
+AUTHORITY PATH / DECISION report the milestone's spec asked for, calling
+the real verifier — the CLI formats a `ChainVerificationResult`, it does
+not reimplement any check.
+
+### Where v0.6 is honest about what it didn't build
+
+- **The human root isn't cryptographically signed.** `HumanIdentity`
+  doesn't hold an Ed25519 keypair in this milestone — a root delegation is
+  attributed by the same "an authenticated JWT-verified human made this
+  call" mechanism every write in this lab has always used, not a new,
+  second signing identity invented for humans. crypton-id's real WebAuthn
+  already proves human presence for that JWT; duplicating it here would
+  add nothing RAT-6 needs.
+- **Agent-key custody is prototype-grade, deliberately.** Private keys
+  are generated in-process and handed back once; there is no KMS/HSM, no
+  hardware attestation, no certificate infrastructure. Real Ed25519, not
+  fake — just not production custody.
+- **`CryptonIdWebAuthnVerifier` still doesn't exist** (unchanged from
+  v0.5/v0.5.1) — Approval's ceremony remains simulated. Orthogonal to the
+  delegation-chain proof above, which doesn't depend on it.
+- **`crypton-gateway` still does not enforce anything agent-related.**
+  The RAT-6 proof lives entirely inside Agent Lab — deliberately; the
+  research question was chain correctness, not deployment topology.
+- **No key rotation-with-overlap, no JWKS-style discovery.**
+  Create/resolve/revoke only, same as `DelegationStatus`'s shape.
+
+None of the above are solved by RAT-6's proof, and this addendum does not
+claim they are — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11.17 for the
+same list recorded as the source of truth.

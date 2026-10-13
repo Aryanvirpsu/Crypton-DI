@@ -1,0 +1,66 @@
+{
+  "approval_decision": {
+    "first_delivery": "approve - completed the cycle, executed once",
+    "second_delivery": "the IDENTICAL response object, re-submitted against the SAME checkpoint_id, on the SAME live Workflow object, after the first cycle had already completed"
+  },
+  "approval_request": {
+    "note": "one pending request, approved once"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": false,
+    "delegation_match": true,
+    "notes": [
+      "checkpoint_match=False: the second delivery targeted a checkpoint_id that no longer represented live pending state (the cycle had already completed), yet was accepted anyway."
+    ],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "ONE human approval decision resulted in TWO executions of transfer_funds with identical arguments, on a minimal, realistic reproducer: (1) propose+pause, (2) approve+resume to completion, (3) re-submit the SAME approval response against the SAME checkpoint_id on the SAME still-live Workflow object. No exception, no warning specific to the replay was observed - the framework's own log only showed a generic 'pending requests will be overwritten' warning during the FIRST resume, not the second.",
+    "Meets most of the task's CANDIDATE FINDING bar: reproducible (deterministic), clean baseline (B1-B3 all pass), realistic/public lifecycle (Runner-level API only, no private internals touched), a stated authorization invariant this violates ('one approval occurrence should not silently authorize another distinct occurrence' - task section 11), a real authority mismatch (1 decision -> 2 executions), meaningful side-effect potential (duplicate financial transaction pattern), affected version (agent-framework==1.18.0), and a minimal reproducer (this test).",
+    "RULED OUT one hedge: this is NOT specific to reusing the same live Workflow object. Re-tested with a SECOND, FRESHLY RECONSTRUCTED Agent/Workflow object graph (the exact same reconstruction pattern used throughout this lab's passing B3/H1/H2/H6 tests) restoring the same checkpoint_id and re-delivering the same already-consumed response: duplicate execution occurred again, with no exception. This means the gap (such as it is) lives in the checkpoint/response bookkeeping itself, not in object-lifetime misuse - strengthening this as a CANDIDATE_FINDING rather than a test-harness artifact.",
+    "STILL NOT CONFIRMED (why this stays CANDIDATE_FINDING, not a rated vulnerability): whether upstream documentation states that a checkpoint_id/response pair is expected to be single-use, and whether InMemoryCheckpointStorage specifically (vs. FileCheckpointStorage or a real deployment's storage backend) is representative here. Also not established: real-world exploitability (an attacker would need the ability to redeliver a response against a stale checkpoint_id, which is itself an application-level access-control question outside this SDK's scope). See README and the final report's Phase-2 recommendation."
+  ],
+  "outcome": "CANDIDATE_FINDING",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "call_id": "stale_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "replay_stale_response_after_completion",
+  "state_boundary": {
+    "checkpoint": "same checkpoint_id delivered twice to the same live Workflow object",
+    "session": null,
+    "workflow": "replay_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

@@ -1,0 +1,955 @@
+CRYPTON BIG IDEA 2026 - RAW TEST OUTPUT (concatenated; bodies are unedited tool output)
+Verification date: 2026-10-12   Commit: ca2f52f0f5e10fc9c809cfd04bf3bd2d9890476d (+ dirty working tree, see repo-version.txt)
+
+COMMANDS (run from each directory, tests unmodified):
+ [1] labs/agent-lab                      : .venv/Scripts/python.exe -m pytest -v -rs -p no:cacheprovider      -> 453 passed
+ [2] labs/exp-007-principal-continuity   : ../agent-lab/.venv/Scripts/python.exe -m pytest -v                  -> 16 passed
+ [3] labs/exp-003c-langgraph             : .venv/Scripts/python.exe -m pytest -v                               -> 12 passed
+ [4] labs/exp-003-openai-agents-sdk, labs/exp-003-microsoft-agent-framework:
+       FIRST ATTEMPT used agent-lab's venv by mistake: 7 collection errors each (ModuleNotFoundError) -- RETAINED below
+       RERUN with each lab's own .venv (no installs, no edits): 17 passed / 12 passed
+ [5] services/crypton-id  : cargo test --no-fail-fast  -> 22 passed, 16 failed (all 16: 'DATABASE_URL must be set'; no Postgres available)
+ [6] services/crypton-gateway : cargo test --no-fail-fast -> 0 tests exist
+ [7] libs/crypton-sdk     : npx jest                   -> 10 passed
+ NOT RUN: labs/validation-benchmark/* (needs per-case venvs pinning third-party package versions; not installed this session)
+
+======================================================================
+[1] agent-lab
+======================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\agent-lab\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\agent-lab
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 453 items
+
+tests/test_agent.py::test_valid_tool_call_flow PASSED                    [  0%]
+tests/test_agent.py::test_unknown_tool_rejected PASSED                   [  0%]
+tests/test_agent.py::test_malformed_arguments_rejected PASSED            [  0%]
+tests/test_agent.py::test_unauthorized_tool_rejected PASSED              [  0%]
+tests/test_agent.py::test_max_step_termination PASSED                    [  1%]
+tests/test_agent.py::test_model_error_marks_task_failed PASSED           [  1%]
+tests/test_agent.py::test_separate_user_data_stays_isolated_through_agent PASSED [  1%]
+tests/test_agent.py::test_trace_created_for_each_action PASSED           [  1%]
+tests/test_agent.py::test_trace_events_correlate_session_task_instance PASSED [  1%]
+tests/test_agent.py::test_agent_instance_references_task_session_human PASSED [  2%]
+tests/test_agent.py::test_task_references_canonical_agent_id PASSED      [  2%]
+tests/test_agent.py::test_model_cannot_override_agent_id PASSED          [  2%]
+tests/test_agent.py::test_agent_name_cannot_substitute_for_agent_id PASSED [  2%]
+tests/test_agent.py::test_unknown_agent_cannot_run PASSED                [  3%]
+tests/test_agent.py::test_disabled_agent_cannot_run PASSED               [  3%]
+tests/test_agent.py::test_wrong_owner_cannot_launch_agent PASSED         [  3%]
+tests/test_agent.py::test_model_provider_metadata_is_not_agent_identity PASSED [  3%]
+tests/test_agent.py::test_trace_contains_canonical_agent_id PASSED       [  3%]
+tests/test_agent.py::test_same_name_different_version_does_not_inherit_authority PASSED [  4%]
+tests/test_agent_approval.py::test_approved_action_executes_and_consumes_the_approval PASSED [  4%]
+tests/test_agent_approval.py::test_missing_approval_denies_and_writes_nothing PASSED [  4%]
+tests/test_agent_approval.py::test_replayed_approval_denies_the_second_execution PASSED [  4%]
+tests/test_agent_approval.py::test_argument_substitution_denies_execution PASSED [  5%]
+tests/test_agent_approval.py::test_valid_approval_never_overrides_a_revoked_delegation PASSED [  5%]
+tests/test_agent_approval.py::test_reads_never_require_approval PASSED   [  5%]
+tests/test_agents.py::test_register_agent PASSED                         [  5%]
+tests/test_agents.py::test_registration_persists_across_reconnect PASSED [  5%]
+tests/test_agents.py::test_generated_agent_id_is_canonical_and_unique PASSED [  6%]
+tests/test_agents.py::test_registration_rejects_empty_name PASSED        [  6%]
+tests/test_agents.py::test_registration_rejects_empty_version PASSED     [  6%]
+tests/test_agents.py::test_duplicate_registration_rejected PASSED        [  6%]
+tests/test_agents.py::test_same_name_different_owners_allowed PASSED     [  7%]
+tests/test_agents.py::test_same_owner_different_versions_allowed PASSED  [  7%]
+tests/test_agents.py::test_get_own_agent PASSED                          [  7%]
+tests/test_agents.py::test_list_own_agents PASSED                        [  7%]
+tests/test_agents.py::test_list_agents_excludes_other_users PASSED       [  7%]
+tests/test_agents.py::test_cross_user_agent_read_rejected PASSED         [  8%]
+tests/test_agents.py::test_unknown_agent_read_rejected PASSED            [  8%]
+tests/test_agents.py::test_disable_agent PASSED                          [  8%]
+tests/test_agents.py::test_enable_agent_after_disable PASSED             [  8%]
+tests/test_agents.py::test_cross_user_disable_rejected PASSED            [  9%]
+tests/test_agents.py::test_require_active_agent_succeeds_when_active PASSED [  9%]
+tests/test_agents.py::test_require_active_agent_rejects_disabled PASSED  [  9%]
+tests/test_agents.py::test_require_active_agent_rejects_unknown PASSED   [  9%]
+tests/test_agents.py::test_require_active_agent_rejects_wrong_owner PASSED [  9%]
+tests/test_agents.py::test_bootstrap_support_agent_is_idempotent PASSED  [ 10%]
+tests/test_agents.py::test_bootstrap_support_agent_is_owner_scoped PASSED [ 10%]
+tests/test_approval.py::test_request_approval PASSED                     [ 10%]
+tests/test_approval.py::test_argument_hash_is_deterministic_regardless_of_key_order PASSED [ 10%]
+tests/test_approval.py::test_argument_hash_changes_with_argument_value PASSED [ 11%]
+tests/test_approval.py::test_argument_hash_changes_with_resource PASSED  [ 11%]
+tests/test_approval.py::test_argument_hash_changes_with_tool PASSED      [ 11%]
+tests/test_approval.py::test_request_approval_requires_owning_the_agent PASSED [ 11%]
+tests/test_approval.py::test_request_approval_rejects_delegation_for_a_different_agent PASSED [ 11%]
+tests/test_approval.py::test_request_approval_rejects_unknown_tool PASSED [ 12%]
+tests/test_approval.py::test_request_approval_rejects_wrong_resource_type_for_tool PASSED [ 12%]
+tests/test_approval.py::test_request_approval_rejects_malformed_arguments PASSED [ 12%]
+tests/test_approval.py::test_request_approval_rejects_nonpositive_ttl[0] PASSED [ 12%]
+tests/test_approval.py::test_request_approval_rejects_nonpositive_ttl[-1] PASSED [ 13%]
+tests/test_approval.py::test_request_approval_rejects_nonpositive_ttl[-300] PASSED [ 13%]
+tests/test_approval.py::test_request_approval_rejects_long_ttl PASSED    [ 13%]
+tests/test_approval.py::test_approve_transitions_pending_to_approved PASSED [ 13%]
+tests/test_approval.py::test_approve_wrong_principal_rejected PASSED     [ 13%]
+tests/test_approval.py::test_approve_fails_webauthn_leaves_approval_pending PASSED [ 14%]
+tests/test_approval.py::test_double_approve_rejected PASSED              [ 14%]
+tests/test_approval.py::test_cancel_pending_approval PASSED              [ 14%]
+tests/test_approval.py::test_cancel_approved_approval PASSED             [ 14%]
+tests/test_approval.py::test_double_cancel_rejected PASSED               [ 15%]
+tests/test_approval.py::test_get_approval_ownership_enforced PASSED      [ 15%]
+tests/test_approval.py::test_get_approval_unknown_rejected PASSED        [ 15%]
+tests/test_approval_pipeline.py::test_valid_approval_allows_and_consumes PASSED [ 15%]
+tests/test_approval_pipeline.py::test_argument_substitution_denied PASSED [ 15%]
+tests/test_approval_pipeline.py::test_resource_substitution_denied PASSED [ 16%]
+tests/test_approval_pipeline.py::test_wrong_principal_denied PASSED      [ 16%]
+tests/test_approval_pipeline.py::test_wrong_agent_denied PASSED          [ 16%]
+tests/test_approval_pipeline.py::test_wrong_instance_denied PASSED       [ 16%]
+tests/test_approval_pipeline.py::test_wrong_task_denied PASSED           [ 16%]
+tests/test_approval_pipeline.py::test_unbound_instance_and_task_match_anything PASSED [ 17%]
+tests/test_approval_pipeline.py::test_wrong_delegation_denied PASSED     [ 17%]
+tests/test_approval_pipeline.py::test_wrong_tool_denied PASSED           [ 17%]
+tests/test_approval_pipeline.py::test_not_found_denied PASSED            [ 17%]
+tests/test_approval_pipeline.py::test_pending_approval_denied PASSED     [ 18%]
+tests/test_approval_pipeline.py::test_expired_approval_denied PASSED     [ 18%]
+tests/test_approval_pipeline.py::test_cancelled_approval_denied PASSED   [ 18%]
+tests/test_approval_pipeline.py::test_replay_after_consumption_denied PASSED [ 18%]
+tests/test_approval_pipeline.py::test_every_denial_persists_evidence PASSED [ 18%]
+tests/test_assessment_evidence.py::test_added_evidence_resolves_by_id PASSED [ 19%]
+tests/test_assessment_evidence.py::test_unknown_evidence_id_resolves_to_none PASSED [ 19%]
+tests/test_assessment_evidence.py::test_manifest_preserves_insertion_order PASSED [ 19%]
+tests/test_assessment_evidence.py::test_duplicate_evidence_id_on_add_is_rejected PASSED [ 19%]
+tests/test_assessment_evidence.py::test_duplicate_evidence_id_on_construction_is_rejected PASSED [ 20%]
+tests/test_assessment_evidence.py::test_validate_findings_passes_when_all_references_resolve PASSED [ 20%]
+tests/test_assessment_evidence.py::test_validate_findings_rejects_a_dangling_reference PASSED [ 20%]
+tests/test_assessment_evidence.py::test_validate_findings_allows_findings_with_no_evidence PASSED [ 20%]
+tests/test_assessment_evidence.py::test_manifest_round_trips_through_json_file PASSED [ 20%]
+tests/test_assessment_evidence.py::test_manifest_load_rejects_duplicate_ids_in_file PASSED [ 21%]
+tests/test_assessment_models.py::test_evidence_reference_rejects_empty_required_fields[evidence_id] PASSED [ 21%]
+tests/test_assessment_models.py::test_evidence_reference_rejects_empty_required_fields[evidence_type] PASSED [ 21%]
+tests/test_assessment_models.py::test_evidence_reference_rejects_empty_required_fields[description] PASSED [ 21%]
+tests/test_assessment_models.py::test_finding_rejects_empty_required_fields[finding_id] PASSED [ 22%]
+tests/test_assessment_models.py::test_finding_rejects_empty_required_fields[title] PASSED [ 22%]
+tests/test_assessment_models.py::test_finding_rejects_empty_required_fields[observation] PASSED [ 22%]
+tests/test_assessment_models.py::test_finding_rejects_empty_required_fields[expected_control] PASSED [ 22%]
+tests/test_assessment_models.py::test_enforced_or_violated_without_evidence_is_rejected[ENFORCED] PASSED [ 22%]
+tests/test_assessment_models.py::test_enforced_or_violated_without_evidence_is_rejected[VIOLATED] PASSED [ 23%]
+tests/test_assessment_models.py::test_enforced_or_violated_without_gate_status_is_rejected[ENFORCED] PASSED [ 23%]
+tests/test_assessment_models.py::test_enforced_or_violated_without_gate_status_is_rejected[VIOLATED] PASSED [ 23%]
+tests/test_assessment_models.py::test_enforced_or_violated_with_any_unsatisfied_gate_is_rejected[incomplete_gates0] PASSED [ 23%]
+tests/test_assessment_models.py::test_enforced_or_violated_with_any_unsatisfied_gate_is_rejected[incomplete_gates1] PASSED [ 24%]
+tests/test_assessment_models.py::test_violated_requires_gate7_true_not_just_g1_through_g6 PASSED [ 24%]
+tests/test_assessment_models.py::test_enforced_or_violated_with_fully_satisfied_gates_is_valid[ENFORCED] PASSED [ 24%]
+tests/test_assessment_models.py::test_enforced_or_violated_with_fully_satisfied_gates_is_valid[VIOLATED] PASSED [ 24%]
+tests/test_assessment_models.py::test_unrepresentable_or_unverifiable_without_limitations_is_rejected[UNREPRESENTABLE] PASSED [ 24%]
+tests/test_assessment_models.py::test_unrepresentable_or_unverifiable_without_limitations_is_rejected[UNVERIFIABLE] PASSED [ 25%]
+tests/test_assessment_models.py::test_unrepresentable_or_unverifiable_with_limitations_and_no_evidence_is_allowed[UNREPRESENTABLE] PASSED [ 25%]
+tests/test_assessment_models.py::test_unrepresentable_or_unverifiable_with_limitations_and_no_evidence_is_allowed[UNVERIFIABLE] PASSED [ 25%]
+tests/test_assessment_models.py::test_not_applicable_requires_neither_evidence_nor_limitations PASSED [ 25%]
+tests/test_assessment_models.py::test_enforced_finding_has_no_severity_by_default PASSED [ 26%]
+tests/test_assessment_models.py::test_violated_finding_may_carry_a_severity PASSED [ 26%]
+tests/test_assessment_models.py::test_severity_construction_does_not_require_a_particular_status PASSED [ 26%]
+tests/test_assessment_models.py::test_all_five_outcomes_exist_and_are_distinct PASSED [ 26%]
+tests/test_assessment_models.py::test_all_five_severities_exist PASSED   [ 26%]
+tests/test_assessment_models.py::test_all_eight_areas_exist_with_labels PASSED [ 27%]
+tests/test_assessment_models.py::test_all_four_evidence_classifications_exist PASSED [ 27%]
+tests/test_assessment_models.py::test_gate_status_all_satisfied_requires_every_gate_true PASSED [ 27%]
+tests/test_assessment_models.py::test_gate_status_unsatisfied_gates_lists_exactly_the_non_true_ones PASSED [ 27%]
+tests/test_assessment_models.py::test_gate_status_round_trips_through_dict PASSED [ 28%]
+tests/test_assessment_models.py::test_gate_status_none_is_distinct_from_false PASSED [ 28%]
+tests/test_assessment_models.py::test_migrate_pass_always_migrates_to_enforced PASSED [ 28%]
+tests/test_assessment_models.py::test_migrate_not_applicable_always_migrates_to_not_applicable PASSED [ 28%]
+tests/test_assessment_models.py::test_migrate_fail_without_gate7_requires_assessor_resolution PASSED [ 28%]
+tests/test_assessment_models.py::test_migrate_fail_with_gate7_false_requires_assessor_resolution PASSED [ 29%]
+tests/test_assessment_models.py::test_migrate_fail_with_gate7_true_migrates_to_violated PASSED [ 29%]
+tests/test_assessment_models.py::test_migrate_inconclusive_without_reason_requires_assessor_resolution PASSED [ 29%]
+tests/test_assessment_models.py::test_migrate_inconclusive_missing_semantic_state_migrates_to_unrepresentable PASSED [ 29%]
+tests/test_assessment_models.py::test_migrate_inconclusive_insufficient_evidence_migrates_to_unverifiable PASSED [ 30%]
+tests/test_assessment_models.py::test_migrate_rejects_an_unknown_legacy_status PASSED [ 30%]
+tests/test_assessment_models.py::test_migrate_is_case_insensitive_and_strips_whitespace PASSED [ 30%]
+tests/test_assessment_models.py::test_evidence_reference_round_trips_through_dict PASSED [ 30%]
+tests/test_assessment_models.py::test_evidence_reference_round_trips_with_optional_fields_omitted PASSED [ 30%]
+tests/test_assessment_models.py::test_finding_round_trips_through_dict PASSED [ 31%]
+tests/test_assessment_models.py::test_finding_round_trips_with_optional_fields_omitted PASSED [ 31%]
+tests/test_assessment_models.py::test_finding_to_dict_uses_outcome_key_not_status PASSED [ 31%]
+tests/test_assessment_models.py::test_finding_from_dict_accepts_legacy_status_key_name_with_a_canonical_value PASSED [ 31%]
+tests/test_assessment_models.py::test_finding_from_dict_refuses_to_silently_load_an_ambiguous_legacy_outcome_value[PASS] PASSED [ 32%]
+tests/test_assessment_models.py::test_finding_from_dict_refuses_to_silently_load_an_ambiguous_legacy_outcome_value[FAIL] PASSED [ 32%]
+tests/test_assessment_models.py::test_finding_from_dict_refuses_to_silently_load_an_ambiguous_legacy_outcome_value[INCONCLUSIVE] PASSED [ 32%]
+tests/test_assessment_models.py::test_finding_from_dict_accepts_not_applicable_directly_without_migration PASSED [ 32%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_builds_successfully PASSED [ 32%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_covers_four_of_the_five_outcomes PASSED [ 33%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_covers_all_eight_areas PASSED [ 33%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_enforced_and_violated_findings_have_evidence_and_satisfied_gates PASSED [ 33%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_renders_without_error PASSED [ 33%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_populates_structured_metadata PASSED [ 33%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_is_labeled_as_synthetic PASSED [ 34%]
+tests/test_assessment_reference_dryrun.py::test_rendered_report_states_it_is_not_an_external_result PASSED [ 34%]
+tests/test_assessment_reference_dryrun.py::test_rendered_report_never_claims_customer_validation_language PASSED [ 34%]
+tests/test_assessment_reference_dryrun.py::test_evidence_descriptions_cite_real_decision_ids PASSED [ 34%]
+tests/test_assessment_reference_dryrun.py::test_violated_finding_evidence_shows_the_over_broad_grant_is_real PASSED [ 35%]
+tests/test_assessment_reference_dryrun.py::test_evidence_entries_carry_classification PASSED [ 35%]
+tests/test_assessment_reference_dryrun.py::test_reference_engagement_round_trips_through_save_and_load PASSED [ 35%]
+tests/test_assessment_report.py::test_report_contains_all_ten_canonical_sections PASSED [ 35%]
+tests/test_assessment_report.py::test_report_header_shows_the_engagement_label_prominently PASSED [ 35%]
+tests/test_assessment_report.py::test_report_renders_structured_engagement_metadata PASSED [ 36%]
+tests/test_assessment_report.py::test_report_states_when_no_structured_metadata_was_recorded PASSED [ 36%]
+tests/test_assessment_report.py::test_finding_evidence_citation_shows_the_evidence_description PASSED [ 36%]
+tests/test_assessment_report.py::test_evidence_index_lists_every_manifest_entry_with_classification PASSED [ 36%]
+tests/test_assessment_report.py::test_all_five_outcomes_render_distinctly PASSED [ 37%]
+tests/test_assessment_report.py::test_findings_summary_counts_are_correct PASSED [ 37%]
+tests/test_assessment_report.py::test_violated_severity_is_shown_but_enforced_severity_is_not PASSED [ 37%]
+tests/test_assessment_report.py::test_finding_card_renders_evidence_gate_status_when_present PASSED [ 37%]
+tests/test_assessment_report.py::test_decision_sheet_shows_executive_summary_and_outcome_counts PASSED [ 37%]
+tests/test_assessment_report.py::test_authority_map_states_not_populated_when_absent PASSED [ 38%]
+tests/test_assessment_report.py::test_authority_map_renders_the_given_text_when_present PASSED [ 38%]
+tests/test_assessment_report.py::test_action_queue_lists_violated_findings_with_recommendation_and_retest_condition PASSED [ 38%]
+tests/test_assessment_report.py::test_action_queue_states_no_outstanding_actions_when_nothing_violated PASSED [ 38%]
+tests/test_assessment_report.py::test_verified_controls_lists_enforced_findings PASSED [ 39%]
+tests/test_assessment_report.py::test_retest_record_states_none_when_no_finding_has_a_retest_condition PASSED [ 39%]
+tests/test_assessment_report.py::test_retest_record_lists_findings_with_a_retest_condition PASSED [ 39%]
+tests/test_assessment_report.py::test_technical_appendix_includes_all_recommendations PASSED [ 39%]
+tests/test_assessment_report.py::test_technical_appendix_includes_scope_and_workflow_prose PASSED [ 39%]
+tests/test_assessment_report.py::test_render_is_deterministic PASSED     [ 40%]
+tests/test_assessment_report.py::test_render_does_not_depend_on_finding_construction_order PASSED [ 40%]
+tests/test_assessment_report.py::test_engagement_construction_rejects_dangling_evidence_reference PASSED [ 40%]
+tests/test_attenuation.py::test_child_equal_authority_is_valid PASSED    [ 40%]
+tests/test_attenuation.py::test_child_removing_a_tool_is_valid PASSED    [ 41%]
+tests/test_attenuation.py::test_child_adding_a_tool_is_invalid PASSED    [ 41%]
+tests/test_attenuation.py::test_empty_child_tool_set_is_a_valid_but_useless_narrowing PASSED [ 41%]
+tests/test_attenuation.py::test_child_narrowing_resource_ids_is_valid PASSED [ 41%]
+tests/test_attenuation.py::test_child_broadening_resource_ids_is_invalid PASSED [ 41%]
+tests/test_attenuation.py::test_child_resource_id_not_prefix_matched PASSED [ 42%]
+tests/test_attenuation.py::test_child_resource_type_parent_never_scoped_is_invalid PASSED [ 42%]
+tests/test_attenuation.py::test_child_may_narrow_to_a_subset_of_resource_types PASSED [ 42%]
+tests/test_attenuation.py::test_child_shorter_expiry_is_valid PASSED     [ 42%]
+tests/test_attenuation.py::test_child_equal_expiry_is_valid PASSED       [ 43%]
+tests/test_attenuation.py::test_child_longer_expiry_is_invalid PASSED    [ 43%]
+tests/test_authority_model_diff.py::test_compute_diff_detects_approval_scope_expansion_explicit_binding PASSED [ 43%]
+tests/test_authority_model_diff.py::test_compute_diff_detects_approval_scope_expansion_ambiguous_scope PASSED [ 43%]
+tests/test_authority_model_diff.py::test_compute_diff_detects_no_divergence_correctly PASSED [ 43%]
+tests/test_authority_model_diff.py::test_compute_diff_ambiguous_scope_with_exactly_one_action_is_not_a_divergence PASSED [ 44%]
+tests/test_authority_model_diff.py::test_compute_diff_missing_evidence_does_not_create_a_false_divergence PASSED [ 44%]
+tests/test_authority_model_diff.py::test_compute_diff_unrepresentable_scope_with_no_actions_remains_a_semantic_gap_not_a_divergence PASSED [ 44%]
+tests/test_authority_model_diff.py::test_compute_diff_action_with_unknowable_real_id_is_not_silently_cleared PASSED [ 44%]
+tests/test_authority_model_diff.py::test_compute_diff_scope_expansion_outside_allowed_tools PASSED [ 45%]
+tests/test_authority_model_diff.py::test_compute_diff_first_divergence_point_is_stable_across_repeated_calls PASSED [ 45%]
+tests/test_authority_model_diff.py::test_diff_round_trips_through_dict PASSED [ 45%]
+tests/test_authority_model_envelope.py::test_derive_envelope_only_populates_dimensions_the_ledger_supports PASSED [ 45%]
+tests/test_authority_model_envelope.py::test_derive_envelope_with_only_approval_leaves_grant_dimensions_unset PASSED [ 45%]
+tests/test_authority_model_envelope.py::test_derive_envelope_narrower_child_grant_wins_over_broader_parent PASSED [ 46%]
+tests/test_authority_model_envelope.py::test_derive_envelope_revoked_grant_is_not_active PASSED [ 46%]
+tests/test_authority_model_envelope.py::test_derive_envelope_unrevoked_grant_with_no_revocation_evidence_is_active PASSED [ 46%]
+tests/test_authority_model_envelope.py::test_derive_envelope_approval_scope_is_populated_from_explicit_binding PASSED [ 46%]
+tests/test_authority_model_envelope.py::test_derive_envelope_ambiguous_approval_scope_propagates_as_unrepresentable_not_allowed PASSED [ 47%]
+tests/test_authority_model_envelope.py::test_derive_envelope_unknown_grant_id_leaves_dimensions_unset_not_guessed PASSED [ 47%]
+tests/test_authority_model_envelope.py::test_derive_envelope_never_claims_the_target_implements_an_envelope PASSED [ 47%]
+tests/test_authority_model_fixtures.py::test_agentlab_ad02_produces_scope_expansion_divergence PASSED [ 47%]
+tests/test_authority_model_fixtures.py::test_agentlab_ad02_principal_is_honestly_unknown PASSED [ 47%]
+tests/test_authority_model_fixtures.py::test_agentlab_ad02_renders_without_error PASSED [ 48%]
+tests/test_authority_model_fixtures.py::test_agentlab_ad02_ledger_envelope_diff_round_trip PASSED [ 48%]
+tests/test_authority_model_fixtures.py::test_building_the_agentlab_fixture_does_not_modify_the_source_evidence_files PASSED [ 48%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_produces_approval_scope_mismatch PASSED [ 48%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_approver_identity_is_honestly_unknown_not_inferred PASSED [ 49%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_action_ids_are_unverifiable_not_fabricated PASSED [ 49%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_approval_scope_is_unrepresentable_not_allowed PASSED [ 49%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_evidence_is_classified_crypton_proprietary PASSED [ 49%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_classification_survives_serialization PASSED [ 49%]
+tests/test_authority_model_fixtures.py::test_building_the_mastra_fixture_does_not_modify_the_source_evidence_file PASSED [ 50%]
+tests/test_authority_model_fixtures.py::test_mastra_candidate_4a_renders_without_error PASSED [ 50%]
+tests/test_authority_model_fixtures.py::test_mastra_evidence_unavailable_raises_a_clear_error PASSED [ 50%]
+tests/test_authority_model_fixtures.py::test_exp003a_h1a_produces_no_divergence PASSED [ 50%]
+tests/test_authority_model_fixtures.py::test_exp003a_h1a_approver_identity_is_honestly_unknown PASSED [ 50%]
+tests/test_authority_model_fixtures.py::test_exp003a_h1a_action_arguments_match_what_was_approved PASSED [ 51%]
+tests/test_authority_model_fixtures.py::test_exp003a_h1a_renders_without_error PASSED [ 51%]
+tests/test_authority_model_fixtures.py::test_building_the_exp003a_fixture_does_not_modify_the_source_evidence_file PASSED [ 51%]
+tests/test_authority_model_fixtures.py::test_exp003a_h1a_ledger_envelope_diff_round_trip PASSED [ 51%]
+tests/test_authority_model_ledger.py::test_ledger_event_round_trips_through_dict PASSED [ 52%]
+tests/test_authority_model_ledger.py::test_ledger_event_round_trips_through_json_text PASSED [ 52%]
+tests/test_authority_model_ledger.py::test_execution_context_identifiers_remain_individually_distinct PASSED [ 52%]
+tests/test_authority_model_ledger.py::test_ledger_event_never_fabricates_an_absent_reference PASSED [ 52%]
+tests/test_authority_model_ledger.py::test_missing_principal_identity_remains_missing_through_round_trip PASSED [ 52%]
+tests/test_authority_model_ledger.py::test_provenance_is_preserved_across_round_trip PASSED [ 53%]
+tests/test_authority_model_ledger.py::test_evidence_references_are_preserved_across_round_trip PASSED [ 53%]
+tests/test_authority_model_ledger.py::test_ledger_save_and_load_round_trips PASSED [ 53%]
+tests/test_authority_model_ledger.py::test_events_of_filters_by_type PASSED [ 53%]
+tests/test_authority_model_ledger.py::test_fact_rejects_a_value_alongside_non_available_status PASSED [ 54%]
+tests/test_authority_model_ledger.py::test_fact_rejects_available_status_with_no_value PASSED [ 54%]
+tests/test_authority_model_ledger.py::test_fact_requires_a_note_for_unrepresentable_and_unverifiable[unrepresentable] PASSED [ 54%]
+tests/test_authority_model_ledger.py::test_fact_requires_a_note_for_unrepresentable_and_unverifiable[unverifiable] PASSED [ 54%]
+tests/test_authority_model_ledger.py::test_fact_unknown_does_not_require_a_note PASSED [ 54%]
+tests/test_authority_model_presentation.py::test_enforced_case_renders_no_divergence_grammar PASSED [ 55%]
+tests/test_authority_model_presentation.py::test_enforced_case_is_not_empty_looking PASSED [ 55%]
+tests/test_authority_model_presentation.py::test_violated_case_renders_both_expected_and_observed_paths PASSED [ 55%]
+tests/test_authority_model_presentation.py::test_unknown_values_remain_visible_where_material PASSED [ 55%]
+tests/test_authority_model_presentation.py::test_unrepresentable_values_remain_visible PASSED [ 56%]
+tests/test_authority_model_presentation.py::test_unverifiable_values_remain_visible PASSED [ 56%]
+tests/test_authority_model_presentation.py::test_evidence_ids_render_correctly PASSED [ 56%]
+tests/test_authority_model_presentation.py::test_first_divergence_point_renders_correctly PASSED [ 56%]
+tests/test_authority_model_presentation.py::test_agentlab_renders_richer_authority_map_without_approval_requirement PASSED [ 56%]
+tests/test_authority_model_presentation.py::test_system_path_does_not_create_authority_edges PASSED [ 57%]
+tests/test_authority_model_presentation.py::test_authority_path_uses_only_authority_model_relationships PASSED [ 57%]
+tests/test_authority_model_presentation.py::test_missing_principal_does_not_become_generic_user PASSED [ 57%]
+tests/test_authority_model_presentation.py::test_missing_approver_does_not_become_requester PASSED [ 57%]
+tests/test_authority_model_presentation.py::test_missing_action_id_does_not_receive_a_generated_display_identity PASSED [ 58%]
+tests/test_authority_model_presentation.py::test_outcome_never_prints_violated_without_a_finding_or_explicit_override PASSED [ 58%]
+tests/test_authority_model_presentation.py::test_report_contains_authority_diff_produced_from_the_model PASSED [ 58%]
+tests/test_authority_model_presentation.py::test_building_views_does_not_modify_finding_or_evidence_source_files PASSED [ 58%]
+tests/test_authority_model_presentation.py::test_action_strip_uses_real_finding_fields_not_invented_text PASSED [ 58%]
+tests/test_authority_model_presentation.py::test_authority_view_round_trips_through_dict PASSED [ 59%]
+tests/test_authority_model_presentation.py::test_authority_view_json_is_a_projection_not_a_duplicate_of_raw_evidence PASSED [ 59%]
+tests/test_authority_model_presentation.py::test_clean_case_action_strip_is_absent_not_fabricated PASSED [ 59%]
+tests/test_authority_model_property_mapping.py::test_exp003a_h1_resolves_to_argument_binding PASSED [ 59%]
+tests/test_authority_model_property_mapping.py::test_h3_means_different_properties_in_exp003a_vs_exp003b PASSED [ 60%]
+tests/test_authority_model_property_mapping.py::test_h5_means_different_properties_in_exp003b_vs_exp003a_and_c PASSED [ 60%]
+tests/test_authority_model_property_mapping.py::test_unmapped_local_label_resolves_to_none_not_a_guess PASSED [ 60%]
+tests/test_authority_model_property_mapping.py::test_exp003a_fixture_view_renders_the_stable_property_not_approval_scope PASSED [ 60%]
+tests/test_authority_model_property_mapping.py::test_mastra_fixture_correctly_uses_the_generic_fallback_not_an_exp003_mapping PASSED [ 60%]
+tests/test_authority_model_property_mapping.py::test_mastra_expected_side_states_the_invariant_not_a_representation_gap PASSED [ 61%]
+tests/test_authority_model_property_mapping.py::test_mastra_observed_side_states_the_target_representation_gap PASSED [ 61%]
+tests/test_authority_model_property_mapping.py::test_mastra_semantic_gaps_distinguish_expected_scope_from_target_representation PASSED [ 61%]
+tests/test_authority_model_property_mapping.py::test_mastra_evidence_strip_has_separate_invariant_and_representation_rows PASSED [ 61%]
+tests/test_authority_model_property_mapping.py::test_mastra_divergence_and_first_divergence_point_are_unchanged_by_the_semantic_fix PASSED [ 62%]
+tests/test_authority_model_property_mapping.py::test_mastra_rendered_text_keeps_invariant_and_gap_visually_separate PASSED [ 62%]
+tests/test_authority_model_property_mapping.py::test_exp003a_has_no_action_strip PASSED [ 62%]
+tests/test_authority_model_property_mapping.py::test_mastra_has_no_action_strip_either_since_it_has_no_formal_finding PASSED [ 62%]
+tests/test_authorization.py::test_valid_delegation_allows PASSED         [ 62%]
+tests/test_authorization.py::test_disabled_agent_denied PASSED           [ 63%]
+tests/test_authorization.py::test_unknown_agent_denied PASSED            [ 63%]
+tests/test_authorization.py::test_instance_agent_mismatch_denied PASSED  [ 63%]
+tests/test_authorization.py::test_instance_principal_mismatch_denied PASSED [ 63%]
+tests/test_authorization.py::test_delegation_not_found_denied PASSED     [ 64%]
+tests/test_authorization.py::test_delegation_wrong_principal_denied PASSED [ 64%]
+tests/test_authorization.py::test_delegation_wrong_agent_denied PASSED   [ 64%]
+tests/test_authorization.py::test_delegation_wrong_task_denied PASSED    [ 64%]
+tests/test_authorization.py::test_task_bound_delegation_allows_matching_task PASSED [ 64%]
+tests/test_authorization.py::test_revoked_delegation_denied PASSED       [ 65%]
+tests/test_authorization.py::test_expired_delegation_denied PASSED       [ 65%]
+tests/test_authorization.py::test_tool_not_allowed_denied PASSED         [ 65%]
+tests/test_authorization.py::test_resource_in_scope_succeeds PASSED      [ 65%]
+tests/test_authorization.py::test_resource_outside_scope_denied PASSED   [ 66%]
+tests/test_authorization.py::test_resource_type_absent_from_constraints_is_safe_default_deny PASSED [ 66%]
+tests/test_authorization.py::test_tool_with_no_resource_scope_skips_resource_check PASSED [ 66%]
+tests/test_authorization.py::test_every_denial_is_persisted_as_evidence PASSED [ 66%]
+tests/test_authorization.py::test_resource_for_tool_call_ignores_wrong_typed_argument PASSED [ 66%]
+tests/test_authorization.py::test_resource_for_tool_call_unscoped_tool PASSED [ 67%]
+tests/test_cli_chain_verify_output.py::test_allow_output_is_pure_ascii_and_shows_full_path PASSED [ 67%]
+tests/test_cli_chain_verify_output.py::test_deny_output_is_pure_ascii_and_shows_failure_reason PASSED [ 67%]
+tests/test_cli_stdout_encoding.py::test_reconfigure_fixes_unicode_encode_error_on_narrow_console PASSED [ 67%]
+tests/test_cli_stdout_encoding.py::test_reconfigure_is_best_effort_when_stream_lacks_reconfigure PASSED [ 67%]
+tests/test_cli_stdout_encoding.py::test_reconfigure_is_best_effort_when_reconfigure_raises_value_error PASSED [ 68%]
+tests/test_cli_stdout_encoding.py::test_reconfigure_defaults_to_sys_stdout PASSED [ 68%]
+tests/test_delegation.py::test_grant_delegation PASSED                   [ 68%]
+tests/test_delegation.py::test_grant_delegation_is_task_bound_when_task_id_given PASSED [ 68%]
+tests/test_delegation.py::test_grant_delegation_requires_owning_the_agent PASSED [ 69%]
+tests/test_delegation.py::test_grant_delegation_rejects_empty_tools PASSED [ 69%]
+tests/test_delegation.py::test_grant_delegation_rejects_nonpositive_ttl[0] PASSED [ 69%]
+tests/test_delegation.py::test_grant_delegation_rejects_nonpositive_ttl[-1] PASSED [ 69%]
+tests/test_delegation.py::test_grant_delegation_rejects_nonpositive_ttl[-3600] PASSED [ 69%]
+tests/test_delegation.py::test_grant_delegation_rejects_excessive_ttl PASSED [ 70%]
+tests/test_delegation.py::test_get_own_delegation PASSED                 [ 70%]
+tests/test_delegation.py::test_get_delegation_ownership_enforced PASSED  [ 70%]
+tests/test_delegation.py::test_get_delegation_unknown_rejected PASSED    [ 70%]
+tests/test_delegation.py::test_get_delegation_unchecked_has_no_ownership_gate PASSED [ 71%]
+tests/test_delegation.py::test_revoke_delegation PASSED                  [ 71%]
+tests/test_delegation.py::test_revoke_delegation_wrong_principal_rejected PASSED [ 71%]
+tests/test_delegation.py::test_double_revoke_rejected PASSED             [ 71%]
+tests/test_delegation.py::test_bootstrap_delegation_mints_a_fresh_grant_each_time PASSED [ 71%]
+tests/test_delegation.py::test_delegation_persists_across_reconnect PASSED [ 72%]
+tests/test_delegation_chain.py::test_rat6_allowed_action_verifies PASSED [ 72%]
+tests/test_delegation_chain.py::test_rat6_allowed_action_executes_exactly_once_through_the_real_loop PASSED [ 72%]
+tests/test_delegation_chain.py::test_rat6_permission_amplification_denied PASSED [ 72%]
+tests/test_delegation_chain.py::test_rat6_permission_amplification_denied_through_real_loop PASSED [ 73%]
+tests/test_delegation_chain.py::test_rat6_undelegated_action_denied PASSED [ 73%]
+tests/test_delegation_chain.py::test_rat6_resource_escape_denied PASSED  [ 73%]
+tests/test_delegation_chain.py::test_rat6_ancestor_revocation_denied PASSED [ 73%]
+tests/test_delegation_chain.py::test_rat6_leaf_revocation_denied PASSED  [ 73%]
+tests/test_delegation_chain.py::test_rat6_root_expiry_denied_even_though_leaf_unexpired PASSED [ 74%]
+tests/test_delegation_chain.py::test_rat6_intermediate_expiry_denied PASSED [ 74%]
+tests/test_delegation_chain.py::test_ancestor_content_tampered_after_issuance_denied PASSED [ 74%]
+tests/test_delegation_chain.py::test_rat6_tampered_child_denied PASSED   [ 74%]
+tests/test_delegation_chain.py::test_rat6_parent_substitution_denied PASSED [ 75%]
+tests/test_delegation_chain.py::test_rat6_unauthorized_issuer_rejected_at_issuance PASSED [ 75%]
+tests/test_delegation_chain.py::test_rat6_unauthorized_issuer_denied_defensively_at_verification PASSED [ 75%]
+tests/test_delegation_chain.py::test_revoked_signing_key_denies_every_delegation_it_signed PASSED [ 75%]
+tests/test_delegation_chain.py::test_cycle_is_denied PASSED              [ 75%]
+tests/test_delegation_chain.py::test_depth_limit_exceeded_is_denied PASSED [ 76%]
+tests/test_delegation_chain.py::test_valid_approval_cannot_rescue_an_invalid_chain PASSED [ 76%]
+tests/test_delegation_chain.py::test_valid_chain_plus_required_approval_executes_once PASSED [ 76%]
+tests/test_delegation_chain.py::test_root_only_delegation_verifies_identically_to_v05 PASSED [ 76%]
+tests/test_delegation_chain.py::test_issuance_rejects_broadened_tools PASSED [ 77%]
+tests/test_delegation_chain.py::test_issuance_rejects_broadened_resources PASSED [ 77%]
+tests/test_delegation_chain.py::test_issuance_rejects_extended_expiry PASSED [ 77%]
+tests/test_delegation_chain.py::test_issuance_rejects_a_revoked_parent PASSED [ 77%]
+tests/test_delegation_chain.py::test_issuance_rejects_an_expired_parent PASSED [ 77%]
+tests/test_delegation_signing.py::test_same_logical_delegation_same_bytes PASSED [ 78%]
+tests/test_delegation_signing.py::test_canonical_bytes_are_deterministic_across_repeated_calls PASSED [ 78%]
+tests/test_delegation_signing.py::test_canonical_bytes_include_format_version PASSED [ 78%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[delegation_id-dlg_other] PASSED [ 78%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[issuer_type-human] PASSED [ 79%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[issuer_id-agt_someone_else] PASSED [ 79%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[principal_user_id-user-bob] PASSED [ 79%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[agent_id-agt_different_subject] PASSED [ 79%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[task_id-task_123] PASSED [ 79%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[allowed_tools-new_value6] PASSED [ 80%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[resource_constraints-new_value7] PASSED [ 80%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[issued_at-9999.0] PASSED [ 80%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[expires_at-9999.0] PASSED [ 80%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[parent_delegation_id-dlg_other_parent] PASSED [ 81%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[parent_hash-cafebabe] PASSED [ 81%]
+tests/test_delegation_signing.py::test_any_protected_field_change_changes_digest[signing_key_id-ask_other] PASSED [ 81%]
+tests/test_delegation_signing.py::test_status_and_revoked_at_are_deliberately_not_signed PASSED [ 81%]
+tests/test_delegation_signing.py::test_valid_signature_verifies PASSED   [ 81%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[issuer_id-agt_attacker] PASSED [ 82%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[agent_id-agt_different_subject] PASSED [ 82%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[allowed_tools-new_value2] PASSED [ 82%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[resource_constraints-new_value3] PASSED [ 82%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[expires_at-999999.0] PASSED [ 83%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[parent_delegation_id-dlg_a_different_parent] PASSED [ 83%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[parent_hash-0000000000000000000000000000000000000000000000000000000000000000] PASSED [ 83%]
+tests/test_delegation_signing.py::test_mutated_field_invalidates_signature[resource_constraints-new_value7] PASSED [ 83%]
+tests/test_delegation_signing.py::test_wrong_key_fails_verification PASSED [ 83%]
+tests/test_delegation_signing.py::test_malformed_signature_fails_verification PASSED [ 84%]
+tests/test_delegation_signing.py::test_missing_signature_fails_verification PASSED [ 84%]
+tests/test_delegation_signing.py::test_malformed_public_key_fails_verification PASSED [ 84%]
+tests/test_enforcement_boundary.py::test_authorization_deny_prevents_execution PASSED [ 84%]
+tests/test_enforcement_boundary.py::test_authorization_error_prevents_execution PASSED [ 84%]
+tests/test_enforcement_boundary.py::test_missing_delegation_prevents_execution PASSED [ 85%]
+tests/test_enforcement_boundary.py::test_expired_delegation_prevents_execution PASSED [ 85%]
+tests/test_enforcement_boundary.py::test_revoked_delegation_prevents_execution PASSED [ 85%]
+tests/test_enforcement_boundary.py::test_missing_required_approval_prevents_execution PASSED [ 85%]
+tests/test_enforcement_boundary.py::test_cancelled_approval_prevents_execution PASSED [ 86%]
+tests/test_enforcement_boundary.py::test_webauthn_verification_failure_prevents_execution PASSED [ 86%]
+tests/test_enforcement_boundary.py::test_fully_authorized_call_executes_exactly_once PASSED [ 86%]
+tests/test_identity.py::test_verify_roundtrip PASSED                     [ 86%]
+tests/test_identity.py::test_wrong_public_key_rejected PASSED            [ 86%]
+tests/test_identity.py::test_token_signed_by_a_different_private_key_is_rejected PASSED [ 87%]
+tests/test_identity.py::test_public_key_cannot_be_used_to_mint_a_token PASSED [ 87%]
+tests/test_identity.py::test_tampered_token_rejected PASSED              [ 87%]
+tests/test_identity.py::test_expired_token_rejected PASSED               [ 87%]
+tests/test_identity.py::test_garbage_token_rejected PASSED               [ 88%]
+tests/test_identity.py::test_missing_public_key_rejected PASSED          [ 88%]
+tests/test_identity.py::test_missing_required_claims_rejected PASSED     [ 88%]
+tests/test_identity.py::test_generate_dev_keypair_produces_unique_keys_each_call PASSED [ 88%]
+tests/test_lifecycle.py::test_valid_transitions[created-running] PASSED  [ 88%]
+tests/test_lifecycle.py::test_valid_transitions[created-cancelled] PASSED [ 89%]
+tests/test_lifecycle.py::test_valid_transitions[running-completed] PASSED [ 89%]
+tests/test_lifecycle.py::test_valid_transitions[running-failed] PASSED   [ 89%]
+tests/test_lifecycle.py::test_valid_transitions[running-cancelled] PASSED [ 89%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[created-completed] PASSED [ 90%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[created-failed] PASSED [ 90%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[completed-running] PASSED [ 90%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[failed-running] PASSED [ 90%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[cancelled-running] PASSED [ 90%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[completed-failed] PASSED [ 91%]
+tests/test_lifecycle.py::test_invalid_transitions_rejected[running-created] PASSED [ 91%]
+tests/test_lifecycle.py::test_parse_known_status PASSED                  [ 91%]
+tests/test_lifecycle.py::test_parse_unknown_status_rejected PASSED       [ 91%]
+tests/test_models.py::test_missing_required_field_rejected PASSED        [ 92%]
+tests/test_models.py::test_unexpected_field_rejected PASSED              [ 92%]
+tests/test_models.py::test_wrong_type_rejected PASSED                    [ 92%]
+tests/test_sessions.py::test_create_session PASSED                       [ 92%]
+tests/test_sessions.py::test_session_persists_across_reconnect PASSED    [ 92%]
+tests/test_sessions.py::test_get_session_owner_succeeds PASSED           [ 93%]
+tests/test_sessions.py::test_cross_user_session_access_rejected PASSED   [ 93%]
+tests/test_sessions.py::test_unknown_session_rejected PASSED             [ 93%]
+tests/test_sessions.py::test_touch_session_bumps_updated_at PASSED       [ 93%]
+tests/test_signing_keys.py::test_create_signing_key_returns_key_and_private_pem PASSED [ 94%]
+tests/test_signing_keys.py::test_create_signing_key_requires_ownership PASSED [ 94%]
+tests/test_signing_keys.py::test_get_signing_key_unchecked_resolves_by_id PASSED [ 94%]
+tests/test_signing_keys.py::test_get_signing_key_unchecked_returns_none_for_unknown_id PASSED [ 94%]
+tests/test_signing_keys.py::test_get_signing_key_enforces_ownership PASSED [ 94%]
+tests/test_signing_keys.py::test_revoke_signing_key_is_one_way PASSED    [ 95%]
+tests/test_signing_keys.py::test_revoke_signing_key_requires_ownership PASSED [ 95%]
+tests/test_signing_keys.py::test_agent_may_hold_multiple_keys_over_its_lifetime PASSED [ 95%]
+tests/test_tasks.py::test_create_task PASSED                             [ 95%]
+tests/test_tasks.py::test_task_ownership_get_succeeds_for_owner PASSED   [ 96%]
+tests/test_tasks.py::test_multiple_tasks_in_one_session PASSED           [ 96%]
+tests/test_tasks.py::test_cross_user_task_access_rejected PASSED         [ 96%]
+tests/test_tasks.py::test_cross_user_task_modification_rejected PASSED   [ 96%]
+tests/test_tasks.py::test_task_state_persists PASSED                     [ 96%]
+tests/test_tasks.py::test_update_task_state_rejects_unknown_field PASSED [ 97%]
+tests/test_tasks.py::test_update_task_state_rejects_wrong_type PASSED    [ 97%]
+tests/test_tasks.py::test_running_to_completed PASSED                    [ 97%]
+tests/test_tasks.py::test_invalid_transition_via_update_task_status_rejected PASSED [ 97%]
+tests/test_tasks.py::test_completed_task_cannot_silently_resume PASSED   [ 98%]
+tests/test_tasks.py::test_unknown_lifecycle_status_rejected_at_db_boundary PASSED [ 98%]
+tests/test_tasks.py::test_cancel_task PASSED                             [ 98%]
+tests/test_tasks.py::test_cross_user_cancel_rejected PASSED              [ 98%]
+tests/test_tools.py::test_get_customer_returns_own_record PASSED         [ 98%]
+tests/test_tools.py::test_get_customer_isolated_from_other_user PASSED   [ 99%]
+tests/test_tools.py::test_get_order_isolated_from_other_user PASSED      [ 99%]
+tests/test_tools.py::test_get_customer_unknown_id PASSED                 [ 99%]
+tests/test_tools.py::test_add_case_note_persists_for_owner PASSED        [ 99%]
+tests/test_tools.py::test_add_case_note_blocked_for_other_users_customer PASSED [100%]
+
+============================ 453 passed in 32.43s =============================
+
+======================================================================
+[2][3][4] exp-007 / exp-003c / exp-003 openai+msaf (includes retained first-attempt errors)
+======================================================================
+### exp-007 (agent-lab venv)
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\agent-lab\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-007-principal-continuity
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 16 items
+
+tests/test_scenario_007a.py::test_vulnerable_policy_fails_and_executes_every_substitution_leg PASSED [  6%]
+tests/test_scenario_007a.py::test_secure_policy_passes_and_blocks_every_substitution_leg PASSED [ 12%]
+tests/test_scenario_007a.py::test_authenticated_substitute_precondition_everything_valid_except_continuity PASSED [ 18%]
+tests/test_scenario_007a.py::test_authenticated_substitute_reason_is_continuity_specific PASSED [ 25%]
+tests/test_scenario_007a.py::test_four_reason_codes_are_distinct PASSED  [ 31%]
+tests/test_scenario_007a.py::test_vulnerable_trace_does_not_claim_b_is_u_and_shows_unchecked_authority PASSED [ 37%]
+tests/test_scenario_007a.py::test_unauthenticated_substitution_vulnerable_trace_misattributes_to_u PASSED [ 43%]
+tests/test_scenario_007a.py::test_gate_passes_for_reference_policies PASSED [ 50%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[vulnerable_policy] PASSED [ 56%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[authenticated_only_policy] PASSED [ 62%]
+tests/test_scenario_007a.py::test_authenticated_only_mutant_fails_specifically_on_authenticated_substitute PASSED [ 68%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_for_broken_secure_policy PASSED [ 75%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_if_secure_policy_never_evaluated_authority_chain PASSED [ 81%]
+tests/test_scenario_007a.py::test_evidence_has_all_fields PASSED         [ 87%]
+tests/test_scenario_007a.py::test_deterministic_across_repeated_in_process_runs PASSED [ 93%]
+tests/test_scenario_007a.py::test_deterministic_across_processes_and_hash_seeds PASSED [100%]
+
+============================= 16 passed in 0.44s ==============================
+### exp-003c (own venv)
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, langsmith-0.12.5, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_exp003c.py::test_baseline_a_approve PASSED                    [  8%]
+tests/test_exp003c.py::test_baseline_b_reject PASSED                     [ 16%]
+tests/test_exp003c.py::test_baseline_c_persist_reload_resume_sqlite PASSED [ 25%]
+tests/test_exp003c.py::test_h1a_state_sourced_execution_is_immune_to_resume_payload_drift PASSED [ 33%]
+tests/test_exp003c.py::test_h1b_resume_sourced_execution_is_not_protected_by_the_framework PASSED [ 41%]
+tests/test_exp003c.py::test_h1c_update_state_public_api_can_mutate_pending_state_before_resume PASSED [ 50%]
+tests/test_exp003c.py::test_h2_delegation_approval_does_not_satisfy_child_approval PASSED [ 58%]
+tests/test_exp003c.py::test_h3_not_applicable_no_standing_approval_primitive_exists PASSED [ 66%]
+tests/test_exp003c.py::test_h4_resuming_an_already_completed_thread_does_not_reexecute PASSED [ 75%]
+tests/test_exp003c.py::test_h5_application_built_policy_recheck_blocks_stale_authorization PASSED [ 83%]
+tests/test_exp003c.py::test_h6a_resume_against_a_thread_with_its_own_distinct_pending_interrupt PASSED [ 91%]
+tests/test_exp003c.py::test_h6b_resume_against_a_thread_id_with_no_checkpoint_at_all PASSED [100%]
+
+============================= 12 passed in 1.31s ==============================
+### exp-003-openai-agents-sdk (agent-lab venv, no own venv)
+
+=================================== ERRORS ====================================
+_________ ERROR collecting tests/test_approval_guardrail_lifecycle.py _________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_approval_guardrail_lifecycle.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_approval_guardrail_lifecycle.py:24: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_argument_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_argument_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_argument_binding.py:28: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+___________________ ERROR collecting tests/test_baseline.py ___________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_baseline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_baseline.py:20: in <module>
+    from scenarios.baseline_approval import PROPOSED_ARGS, run_baseline_a, run_baseline_b, run_baseline_c
+scenarios\baseline_approval.py:17: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_nested_authority.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_nested_authority.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_nested_authority.py:24: in <module>
+    from scenarios.nested_agent import DELETE_ARGS, run_h2_same_tool_name_both_levels, run_h2_two_boundaries
+scenarios\nested_agent.py:25: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+________________ ERROR collecting tests/test_resume_binding.py ________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_resume_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_resume_binding.py:18: in <module>
+    from scenarios.resume_state import (
+scenarios\resume_state.py:26: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+___________ ERROR collecting tests/test_shared_context_approval.py ____________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_shared_context_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_shared_context_approval.py:21: in <module>
+    from scenarios.shared_context_approval import RUN_A_ARGS, RUN_B_ARGS, run_shared_context_probe
+scenarios\shared_context_approval.py:28: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_sticky_approval.py ________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_sticky_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_sticky_approval.py:25: in <module>
+    from scenarios.sticky_approval import (
+scenarios\sticky_approval.py:22: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+=========================== short test summary info ===========================
+ERROR tests/test_approval_guardrail_lifecycle.py
+ERROR tests/test_argument_binding.py
+ERROR tests/test_baseline.py
+ERROR tests/test_nested_authority.py
+ERROR tests/test_resume_binding.py
+ERROR tests/test_shared_context_approval.py
+ERROR tests/test_sticky_approval.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!
+7 errors in 0.18s
+### exp-003-microsoft-agent-framework (agent-lab venv, no own venv)
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/test_argument_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_argument_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_argument_binding.py:16: in <module>
+    from scenarios.approval_binding import APPROVED_ARGS, DRIFTED_ARGS, run_h1_mutate_after_approval_decision
+scenarios\approval_binding.py:20: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+___________________ ERROR collecting tests/test_baseline.py ___________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_baseline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_baseline.py:16: in <module>
+    from scenarios.baseline_tool_approval import TRANSFER_ARGS, run_b1_approve, run_b2_reject, run_b3_checkpoint_reconstruct
+scenarios\baseline_tool_approval.py:18: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+______________ ERROR collecting tests/test_checkpoint_binding.py ______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_checkpoint_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_checkpoint_binding.py:23: in <module>
+    from scenarios.checkpoint_approval import ARGS, run_h3_restore_same_checkpoint_twice, run_replay_stale_response_after_completion
+scenarios\checkpoint_approval.py:23: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+___________________ ERROR collecting tests/test_handoff.py ____________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_handoff.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_handoff.py:30: in <module>
+    from scenarios.handoff_delegation import run_h2_as_tool_delegation_boundary
+scenarios\handoff_delegation.py:27: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+_______________ ERROR collecting tests/test_identity_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_identity_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_identity_binding.py:16: in <module>
+    from scenarios.identity_binding import run_h6_cross_agent_response_injection
+scenarios\identity_binding.py:18: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+________________ ERROR collecting tests/test_multi_pending.py _________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_multi_pending.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_multi_pending.py:16: in <module>
+    from scenarios.multi_pending import X_ARGS, Y_ARGS, run_h4_approve_x_reject_y
+scenarios\multi_pending.py:19: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+______________ ERROR collecting tests/test_standing_approval.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_standing_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_standing_approval.py:16: in <module>
+    from scenarios.standing_approval import (
+scenarios\standing_approval.py:22: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+=========================== short test summary info ===========================
+ERROR tests/test_argument_binding.py
+ERROR tests/test_baseline.py
+ERROR tests/test_checkpoint_binding.py
+ERROR tests/test_handoff.py
+ERROR tests/test_identity_binding.py
+ERROR tests/test_multi_pending.py
+ERROR tests/test_standing_approval.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!
+7 errors in 0.16s
+### validation-benchmark
+
+### RERUN exp-003-openai-agents-sdk with its own .venv (intended env)
+.................                                                        [100%]
+17 passed in 4.18s
+
+### RERUN exp-003-microsoft-agent-framework with its own .venv (intended env)
+............                                                             [100%]
+12 passed in 2.59s
+
+### validation-benchmark case-01 (pytest, agent-lab venv)
+
+======================================================================
+[5] crypton-id (Rust)
+======================================================================
+warning: fields `cred_id` and `role` are never read
+   --> src\jwt.rs:120:9
+    |
+117 | pub struct AdminUser {
+    |            --------- fields in this struct
+...
+120 |     pub cred_id: Uuid,
+    |         ^^^^^^^
+121 |     pub role: String,
+    |         ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `crypton-identity` (bin "crypton-identity" test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.15s
+warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src\main.rs (target\debug\deps\crypton_identity-598d6633a7992338.exe)
+
+running 38 tests
+test routes::admin::tests::map_login_success ... ok
+test routes::admin::tests::map_login_failure ... ok
+test jwt::tests::public_key_pem_cannot_be_used_as_a_signing_key ... ok
+test routes::admin::tests::map_register ... ok
+test routes::admin::tests::map_unknown_action ... ok
+test routes::admin::tests::map_recovery_started ... ok
+test redis::sessions::tests::deny_token_makes_is_denied_true_until_it_would_have_expired ... ok
+test jwt::tests::issue_jwt_roundtrips_claims ... ok
+test jwt::tests::tampered_claims_are_rejected ... ok
+test jwt::tests::token_signed_by_a_different_private_key_is_rejected ... ok
+test routes::admin::tests::relative_time_hours ... ok
+test routes::admin::tests::relative_time_minutes ... ok
+test routes::admin::tests::relative_time_days ... ok
+test routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists ... FAILED
+test jwt::tests::decode_rejects_expired_token ... ok
+test routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment ... FAILED
+test routes::admin::tests::patch_user_role_updates_the_role ... FAILED
+test routes::admin::tests::relative_time_seconds ... ok
+test routes::admin::tests::list_users_returns_real_rows_from_the_database ... FAILED
+test jwt::tests::decode_accepts_token_at_the_expiry_boundary ... ok
+test routes::admin::tests::patch_user_role_rejects_invalid_role_strings ... FAILED
+test routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin ... FAILED
+test jwt::tests::decode_fails_with_wrong_public_key ... ok
+test routes::admin::tests::security_score_clamps_at_zero ... ok
+test routes::admin::tests::security_score_combined ... ok
+test routes::admin::tests::security_score_failures_only ... ok
+test routes::admin::tests::security_score_one_lost_device ... ok
+test routes::admin::tests::security_score_perfect ... ok
+test routes::devices::tests::list_devices_returns_only_the_caller_own_devices ... FAILED
+test routes::devices::tests::mark_lost_succeeds_from_active ... FAILED
+test routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe ... FAILED
+test routes::devices::tests::mark_lost_refuses_when_not_currently_active ... FAILED
+test routes::recovery::tests::complete_recovery_refuses_when_not_approved ... FAILED
+test routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id ... FAILED
+test routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call ... FAILED
+test routes::recovery::tests::public_start_recovery_rejects_unknown_username ... FAILED
+test routes::recovery::tests::full_authenticated_recovery_state_machine ... FAILED
+test routes::recovery::tests::reject_recovery_cancels_a_pending_request ... FAILED
+
+failures:
+
+---- routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists stdout ----
+
+thread 'routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists' (8436) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment stdout ----
+
+thread 'routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment' (42396) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- routes::admin::tests::patch_user_role_updates_the_role stdout ----
+
+thread 'routes::admin::tests::patch_user_role_updates_the_role' (64712) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::list_users_returns_real_rows_from_the_database stdout ----
+
+thread 'routes::admin::tests::list_users_returns_real_rows_from_the_database' (60132) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::patch_user_role_rejects_invalid_role_strings stdout ----
+
+thread 'routes::admin::tests::patch_user_role_rejects_invalid_role_strings' (52576) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin stdout ----
+
+thread 'routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin' (64316) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::list_devices_returns_only_the_caller_own_devices stdout ----
+
+thread 'routes::devices::tests::list_devices_returns_only_the_caller_own_devices' (49404) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::mark_lost_succeeds_from_active stdout ----
+
+thread 'routes::devices::tests::mark_lost_succeeds_from_active' (36072) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe stdout ----
+
+thread 'routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe' (33304) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::devices::tests::mark_lost_refuses_when_not_currently_active stdout ----
+
+thread 'routes::devices::tests::mark_lost_refuses_when_not_currently_active' (36236) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::complete_recovery_refuses_when_not_approved stdout ----
+
+thread 'routes::recovery::tests::complete_recovery_refuses_when_not_approved' (8912) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id stdout ----
+
+thread 'routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id' (2184) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call stdout ----
+
+thread 'routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call' (59704) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::public_start_recovery_rejects_unknown_username stdout ----
+
+thread 'routes::recovery::tests::public_start_recovery_rejects_unknown_username' (54356) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::full_authenticated_recovery_state_machine stdout ----
+
+thread 'routes::recovery::tests::full_authenticated_recovery_state_machine' (43440) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+---- routes::recovery::tests::reject_recovery_cancels_a_pending_request stdout ----
+
+thread 'routes::recovery::tests::reject_recovery_cancels_a_pending_request' (23048) panicked at C:\Users\aryan vir\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlx-postgres-0.7.4\src\testing\mod.rs:81:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+
+
+failures:
+    routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment
+    routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists
+    routes::admin::tests::list_users_returns_real_rows_from_the_database
+    routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin
+    routes::admin::tests::patch_user_role_rejects_invalid_role_strings
+    routes::admin::tests::patch_user_role_updates_the_role
+    routes::devices::tests::list_devices_returns_only_the_caller_own_devices
+    routes::devices::tests::mark_lost_refuses_when_not_currently_active
+    routes::devices::tests::mark_lost_succeeds_from_active
+    routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe
+    routes::recovery::tests::complete_recovery_refuses_when_not_approved
+    routes::recovery::tests::full_authenticated_recovery_state_machine
+    routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id
+    routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call
+    routes::recovery::tests::public_start_recovery_rejects_unknown_username
+    routes::recovery::tests::reject_recovery_cancels_a_pending_request
+
+test result: FAILED. 22 passed; 16 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--bin crypton-identity`
+error: 1 target failed:
+    `--bin crypton-identity`
+
+======================================================================
+[6] crypton-gateway (Rust)
+======================================================================
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.12s
+     Running unittests src\main.rs (target\debug\deps\crypton_gateway-f6ea57f419754697.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+======================================================================
+[7] crypton-sdk (jest)
+======================================================================
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in C:/Users/aryan vir/Aryan vir/projectsnstuff/Crypton-DI/libs/crypton-sdk/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+PASS src/__tests__/sdk.test.ts
+  @crypton/sdk
+    auth.register / auth.login happy path
+      √ registers with a real WebAuthn create() call and the right request shapes (5 ms)
+      √ sends enrollment_token when re-enrolling on an existing account (1 ms)
+      √ logs in with a real WebAuthn get() call against the right endpoint (1 ms)
+    error mapping
+      √ maps NotAllowedError → webauthn_cancelled (1 ms)
+      √ maps HTTP 401 → session_expired and clears the stored token
+      √ passes through a non-401 backend error code+message unchanged (1 ms)
+    devices
+      √ revokes via POST /devices/:id/revoke (not the removed DELETE /devices/:id)
+    recovery — public flow request shapes
+      √ claimRecovery sends {username, recovery_token}, not {request_id}
+      √ requestRecovery surfaces the one-time recovery_token from the response (1 ms)
+    admin
+      √ updateUserRole PATCHes /admin/users/:id/role with the role in the body
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        2.089 s
+Ran all test suites.
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

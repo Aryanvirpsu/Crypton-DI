@@ -1,11 +1,10 @@
 use axum::{
-    async_trait,
+    Json, async_trait,
     extract::{FromRequest, Request, rejection::JsonRejection},
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 // ── AppJson<T> — JSON extractor that maps deserialization errors to AppError ──
 
@@ -23,14 +22,18 @@ where
         match Json::<T>::from_request(req, state).await {
             Ok(Json(v)) => Ok(AppJson(v)),
             Err(e) => match e {
-                JsonRejection::MissingJsonContentType(_) =>
-                    Err(AppError::bad_request("content_type_must_be_json")),
-                JsonRejection::JsonDataError(_) =>
-                    Err(AppError::bad_request(format!("invalid_json_body: {e}"))),
-                JsonRejection::JsonSyntaxError(_) =>
-                    Err(AppError::bad_request(format!("json_syntax_error: {e}"))),
-                JsonRejection::BytesRejection(_) =>
-                    Err(AppError::bad_request("failed_to_read_body")),
+                JsonRejection::MissingJsonContentType(_) => {
+                    Err(AppError::bad_request("content_type_must_be_json"))
+                }
+                JsonRejection::JsonDataError(_) => {
+                    Err(AppError::bad_request(format!("invalid_json_body: {e}")))
+                }
+                JsonRejection::JsonSyntaxError(_) => {
+                    Err(AppError::bad_request(format!("json_syntax_error: {e}")))
+                }
+                JsonRejection::BytesRejection(_) => {
+                    Err(AppError::bad_request("failed_to_read_body"))
+                }
                 _ => Err(AppError::bad_request("bad_request")),
             },
         }
@@ -46,7 +49,10 @@ pub struct ApiResponse<T> {
 
 impl<T> ApiResponse<T> {
     pub fn success(data: T) -> Self {
-        Self { success: true, data: Some(data) }
+        Self {
+            success: true,
+            data: Some(data),
+        }
     }
 }
 
@@ -71,23 +77,38 @@ pub struct AppError {
 
 impl AppError {
     pub fn bad_request(msg: impl Into<String>) -> Self {
-        Self { status: StatusCode::BAD_REQUEST, message: msg.into() }
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: msg.into(),
+        }
     }
 
     pub fn unauthorized(msg: impl Into<String>) -> Self {
-        Self { status: StatusCode::UNAUTHORIZED, message: msg.into() }
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            message: msg.into(),
+        }
     }
 
     pub fn forbidden(msg: impl Into<String>) -> Self {
-        Self { status: StatusCode::FORBIDDEN, message: msg.into() }
+        Self {
+            status: StatusCode::FORBIDDEN,
+            message: msg.into(),
+        }
     }
 
     pub fn not_found(msg: impl Into<String>) -> Self {
-        Self { status: StatusCode::NOT_FOUND, message: msg.into() }
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message: msg.into(),
+        }
     }
 
     pub fn internal(msg: impl Into<String>) -> Self {
-        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: msg.into() }
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: msg.into(),
+        }
     }
 }
 
@@ -95,7 +116,10 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (code, msg) = if self.status.is_server_error() {
             tracing::error!(detail = %self.message, status = %self.status, "internal error");
-            ("internal_server_error".to_string(), "An unexpected internal error occurred.".to_string())
+            (
+                "internal_server_error".to_string(),
+                "An unexpected internal error occurred.".to_string(),
+            )
         } else {
             let readable = self.message.replace("_", " ");
             let mut chars = readable.chars();

@@ -1,0 +1,339 @@
+{
+  "assessment_id": null,
+  "events": [
+    {
+      "event_id": "c4a-evt-1-approval-granted",
+      "event_type": "APPROVAL_GRANTED",
+      "assessment_id": null,
+      "test_id": "candidate-4a",
+      "timestamp": "2026-10-01T00:06:04.708Z",
+      "sequence": 1,
+      "execution_context": null,
+      "principal_id": "c4a-principal",
+      "actor_id": "c4a-actor-sub-agent",
+      "grant_id": null,
+      "approval_id": "c4a-approval",
+      "action_id": null,
+      "resource_id": null,
+      "effect_id": null,
+      "before_state": null,
+      "after_state": null,
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    {
+      "event_id": "c4a-evt-2-action-executed",
+      "event_type": "ACTION_EXECUTED",
+      "assessment_id": null,
+      "test_id": "candidate-4a",
+      "timestamp": "1790813168277",
+      "sequence": 2,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": "c4a-actor-sub-agent",
+      "grant_id": null,
+      "approval_id": "c4a-approval",
+      "action_id": "c4a-action-1",
+      "resource_id": null,
+      "effect_id": "c4a-effect-1",
+      "before_state": null,
+      "after_state": {
+        "amount": 20,
+        "to": "approved_vendor"
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    {
+      "event_id": "c4a-evt-2-effect-observed",
+      "event_type": "EFFECT_OBSERVED",
+      "assessment_id": null,
+      "test_id": "candidate-4a",
+      "timestamp": "1790813168277",
+      "sequence": 2,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": null,
+      "grant_id": null,
+      "approval_id": null,
+      "action_id": "c4a-action-1",
+      "resource_id": null,
+      "effect_id": "c4a-effect-1",
+      "before_state": null,
+      "after_state": {
+        "amount": 20,
+        "to": "approved_vendor"
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    {
+      "event_id": "c4a-evt-3-action-executed",
+      "event_type": "ACTION_EXECUTED",
+      "assessment_id": null,
+      "test_id": "candidate-4a",
+      "timestamp": "1790813168286",
+      "sequence": 3,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": "c4a-actor-sub-agent",
+      "grant_id": null,
+      "approval_id": "c4a-approval",
+      "action_id": "c4a-action-2",
+      "resource_id": null,
+      "effect_id": "c4a-effect-2",
+      "before_state": null,
+      "after_state": {
+        "amount": 2000,
+        "to": "attacker_sink"
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    {
+      "event_id": "c4a-evt-3-effect-observed",
+      "event_type": "EFFECT_OBSERVED",
+      "assessment_id": null,
+      "test_id": "candidate-4a",
+      "timestamp": "1790813168286",
+      "sequence": 3,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": null,
+      "grant_id": null,
+      "approval_id": null,
+      "action_id": "c4a-action-2",
+      "resource_id": null,
+      "effect_id": "c4a-effect-2",
+      "before_state": null,
+      "after_state": {
+        "amount": 2000,
+        "to": "attacker_sink"
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  ],
+  "principals": {
+    "c4a-principal": {
+      "principal_type": null,
+      "principal_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "No human/organization identity is captured anywhere in this evidence — the call is a scripted harness invocation, not an authenticated human session."
+      },
+      "authenticated_identity": null,
+      "claimed_identity": null,
+      "tenant_org": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  },
+  "actors": {
+    "c4a-actor-sub-agent": {
+      "actor_type": "SUB_AGENT",
+      "actor_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "preconditions describe a 'sub-agent' executing the transfer tool by role only — no concrete framework-internal actor id is captured in this evidence."
+      },
+      "framework_identity": null,
+      "acts_for_principal": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  },
+  "grants": {},
+  "approvals": {
+    "c4a-approval": {
+      "approval_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "approveToolCall({runId}) has no discrete approval-record id in the captured evidence — only the runId scoping the call is recorded."
+      },
+      "requested_by": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "approved_by": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Scripted harness call (no toolCallId supplied) — not an authenticated human approver."
+      },
+      "target_action_ids": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNREPRESENTABLE",
+        "note": "approveToolCall({runId}) with toolCallId omitted has no parameter capable of binding to one specific pending action — the API call shape itself cannot represent a single-action binding in this form, independent of what was or wasn't observed."
+      },
+      "target_resource_ids": null,
+      "approval_scope": null,
+      "granted_at": null,
+      "expires_at": null,
+      "state": "granted",
+      "consumed_at": null,
+      "execution_context_id": "7ab08647-f513-402e-9b7b-78ebe47df8e1",
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  },
+  "actions": {
+    "c4a-action-1": {
+      "action_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNVERIFIABLE",
+        "note": "The sink ledger recorded callId as the literal string 'unknown' for this entry — Mastra's own effect-ledger did not expose a resolvable call/action id for this capture."
+      },
+      "actor_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "tool": "transfer",
+      "operation": null,
+      "arguments": {
+        "value": {
+          "amount": 20,
+          "to": "approved_vendor"
+        },
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "argument_hash": null,
+      "intended_resource": null,
+      "actual_resource": "approved_vendor",
+      "state": "executed",
+      "execution_context_id": "7ab08647-f513-402e-9b7b-78ebe47df8e1",
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    "c4a-action-2": {
+      "action_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNVERIFIABLE",
+        "note": "The sink ledger recorded callId as the literal string 'unknown' for this entry — Mastra's own effect-ledger did not expose a resolvable call/action id for this capture."
+      },
+      "actor_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "tool": "transfer",
+      "operation": null,
+      "arguments": {
+        "value": {
+          "amount": 2000,
+          "to": "attacker_sink"
+        },
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "argument_hash": null,
+      "intended_resource": null,
+      "actual_resource": "attacker_sink",
+      "state": "executed",
+      "execution_context_id": "7ab08647-f513-402e-9b7b-78ebe47df8e1",
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  },
+  "resources": {},
+  "effects": {
+    "c4a-effect-1": {
+      "effect_id": "c4a-effect-1",
+      "action_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNVERIFIABLE",
+        "note": "Same limitation as the originating action — sink recorded callId='unknown'."
+      },
+      "effect_type": "transfer",
+      "target_resource": "approved_vendor",
+      "before_state": null,
+      "after_state": {
+        "amount": 20,
+        "to": "approved_vendor"
+      },
+      "observed_at": "1790813168277",
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    },
+    "c4a-effect-2": {
+      "effect_id": "c4a-effect-2",
+      "action_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNVERIFIABLE",
+        "note": "Same limitation as the originating action — sink recorded callId='unknown'."
+      },
+      "effect_type": "transfer",
+      "target_resource": "attacker_sink",
+      "before_state": null,
+      "after_state": {
+        "amount": 2000,
+        "to": "attacker_sink"
+      },
+      "observed_at": "1790813168286",
+      "evidence_ids": [
+        "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "CRYPTON_PROPRIETARY"
+    }
+  }
+}

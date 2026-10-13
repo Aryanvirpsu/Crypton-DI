@@ -1,0 +1,40 @@
+{
+  "approval_decision": {
+    "resume": {
+      "approved": true
+    },
+    "submitted_against": "thread_id=h6b_thread_never_used (no checkpoint)"
+  },
+  "approval_request": {
+    "note": "no pending interrupt exists - thread_id was never invoked"
+  },
+  "authorization_binding": {
+    "argument_match": null,
+    "delegation_match": null,
+    "interrupt_id_match": false,
+    "notes": [
+      "raised KeyError: KeyError('tool_name')"
+    ],
+    "thread_match": false,
+    "tool_match": null
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003C",
+  "notes": [
+    "No execution occurred (no security bypass). However, the actual observed behavior differs from the naive expectation of a silent no-op: langgraph runs the entry node against an EMPTY state when resuming a thread_id with no checkpoint, so any node function that unconditionally reads expected state keys will raise. This is an APPLICATION robustness concern (nodes should guard against missing/partial state), not a langgraph authorization defect - langgraph never fabricated or reused another thread's state to satisfy the empty one."
+  ],
+  "outcome": "PASS_WITH_CAVEAT",
+  "proposal": {
+    "note": "no proposal was ever made on this thread_id"
+  },
+  "scenario": "h6b_resume_unknown_thread_no_checkpoint",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h6b_thread_never_used"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

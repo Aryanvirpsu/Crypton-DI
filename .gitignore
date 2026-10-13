@@ -54,3 +54,14 @@ services/*/build*.log
 
 # ── Demo internal ─────────────────────────────────────
 .demo/
+
+# ── Local analysis tool output (not a build artifact of anything in-repo) ──
+graphify-out/
+
+# ── Python (labs/*, repo-wide) ────────────────────────
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+.ruff_cache/

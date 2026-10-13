@@ -1,0 +1,7 @@
+# EXP-003B target, pinned exactly - see target.json. Verified as the
+# actual current stable release via `pip index versions agent-framework`
+# before installing (the task prompt's assumed 1.17.0 was stale).
+agent-framework==1.18.0
+
+pytest
+pytest-asyncio

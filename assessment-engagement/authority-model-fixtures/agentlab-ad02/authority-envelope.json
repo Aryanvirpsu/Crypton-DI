@@ -1,0 +1,30 @@
+{
+  "envelope_id": "ad02-expected-envelope",
+  "assessment_id": "ENG-REFERENCE-AGENTLAB-DRYRUN",
+  "test_id": "AD-02",
+  "principal_id": "ad02-principal",
+  "actor_id": "ad02-actor-agent-a",
+  "execution_context_id": null,
+  "grant_chain": [],
+  "allowed_actions": null,
+  "allowed_tools": [
+    "add_case_note",
+    "get_customer"
+  ],
+  "allowed_resources": [
+    "customer_ids:cust_1"
+  ],
+  "argument_constraints": null,
+  "required_approval": null,
+  "approval_id": null,
+  "approval_scope": null,
+  "valid_from": null,
+  "expires_at": null,
+  "revocation_state": "ACTIVE",
+  "delegation_constraints": null,
+  "terminal_or_consumption_state": null,
+  "source_evidence_ids": [
+    "E-002"
+  ],
+  "derivation_notes": "Built directly from E-002's stated task need ('get_customer on cust_1 only, plus approved add_case_note') — not derived via the grant_chain walk, because Agent Lab's schema has no separate 'intended-grant' record distinct from the grant actually issued (E-001/ad02-grant-actual, whose allowed_tools/resources are the broader, observed side of this diff, not the expected side)."
+}

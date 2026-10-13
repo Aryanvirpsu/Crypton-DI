@@ -1,0 +1,61 @@
+{
+  "approval_decision": {
+    "decision": "approve",
+    "note": "approved via a RECONSTRUCTED workflow/agent object, not the original",
+    "request_id": "af-call-78785d602dea4c70a1b39ddc8ff637b6"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b3_1",
+    "id": "af-call-78785d602dea4c70a1b39ddc8ff637b6",
+    "tool_name": "transfer_funds"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": true,
+    "delegation_match": true,
+    "notes": [],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "Same logical request, same intended tool, same arguments, exactly-once execution, confirmed across a checkpoint save -> reconstruct (fresh Agent/client/Workflow objects, not the originals) -> restore -> approve -> resume cycle."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b3_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "b3_checkpoint_reconstruct",
+  "state_boundary": {
+    "checkpoint": "saved -> reconstructed workflow -> restored",
+    "session": null,
+    "workflow": "b3_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

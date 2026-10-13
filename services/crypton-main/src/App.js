@@ -1,6 +1,4 @@
-import { useState } from "react";
 import Landing from './Landing';
-import AttackSim from './AttackSim';
 import { DEMO_URL } from './config';
 
 const FontLink = () => (
@@ -25,8 +23,6 @@ const FontLink = () => (
 );
 
 function App() {
-  const [simOpen, setSimOpen] = useState(false);
-
   const handleGo = (action) => {
     const demoPorts = ['demo', 'register', 'login', 'dashboard'];
     const adminPorts = ['admin', 'risk', 'security', 'auditlogs', 'sessions', 'rbac', 'policy'];
@@ -42,12 +38,10 @@ function App() {
     <>
       <FontLink />
       <div className="grain" />
-      <Landing 
-        go={handleGo} 
-        toast={(m) => console.log(m)} 
-        openSim={() => setSimOpen(true)} 
+      <Landing
+        go={handleGo}
+        toast={(m) => console.log(m)}
       />
-      {simOpen && <AttackSim close={() => setSimOpen(false)} />}
     </>
   );
 }

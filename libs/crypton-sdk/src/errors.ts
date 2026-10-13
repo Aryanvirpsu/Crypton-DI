@@ -27,10 +27,10 @@ export const ERROR_CODES = {
   WEBAUTHN_ALREADY_REGISTERED: "webauthn_already_registered",
   /** Origin mismatch or insecure context (SecurityError). */
   WEBAUTHN_SECURITY_ERROR: "webauthn_security_error",
-  /** Backend rejected a stale or replayed challenge. */
-  CHALLENGE_EXPIRED: "challenge_expired",
-  /** Device ID not found (404 on revoke/markLost). */
-  DEVICE_NOT_FOUND: "device_not_found",
+  /** Backend rejected a stale, replayed, or already-consumed challenge. */
+  CHALLENGE_EXPIRED: "invalid_or_expired_challenge",
+  /** Device/credential ID not found or not owned by the caller (404). */
+  DEVICE_NOT_FOUND: "credential_not_found",
 } as const;
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];

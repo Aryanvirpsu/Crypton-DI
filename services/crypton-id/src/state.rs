@@ -1,11 +1,12 @@
 use crate::config::Config;
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use sqlx::PgPool;
 use url::Url;
 use uuid::Uuid;
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration, Webauthn, WebauthnBuilder};
 
 // ── Challenge state types (serialised to Redis) ──────────────────────────────
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct RegChallenge {
@@ -33,7 +34,14 @@ pub struct AppState {
     pub db: Option<PgPool>,
     pub redis: Option<::redis::Client>,
     pub webauthn: Webauthn,
-    pub jwt_secret: String,
+    // Asymmetric (Ed25519/EdDSA) — see jwt.rs and DECISIONS.md. Parsed once
+    // at startup, not per-request. crypton-id is the only service that ever
+    // constructs an EncodingKey (it is the signing authority); every
+    // verifier elsewhere only ever needs jwt_decoding_key's public half —
+    // see labs/agent-lab/src/agentlab/identity.py for the client-side
+    // mirror of this same split.
+    pub jwt_encoding_key: EncodingKey,
+    pub jwt_decoding_key: DecodingKey,
     pub cors_origin: String,
     // Note: Challenges are now strictly stored in Redis.
 }
@@ -61,11 +69,21 @@ impl AppState {
             .rp_name(&cfg.webauthn_rp_name)
             .build()?;
 
+        let jwt_encoding_key = EncodingKey::from_ed_pem(cfg.jwt_signing_key_pem.as_bytes())
+            .map_err(|e| {
+                anyhow::anyhow!("JWT_SIGNING_KEY_PEM is not a valid Ed25519 PKCS8 PEM key: {e}")
+            })?;
+        let jwt_decoding_key = DecodingKey::from_ed_pem(cfg.jwt_public_key_pem.as_bytes())
+            .map_err(|e| {
+                anyhow::anyhow!("JWT_PUBLIC_KEY_PEM is not a valid Ed25519 SPKI PEM key: {e}")
+            })?;
+
         Ok(Self {
             db,
             redis,
             webauthn,
-            jwt_secret: cfg.jwt_secret.clone(),
+            jwt_encoding_key,
+            jwt_decoding_key,
             cors_origin: cfg.webauthn_origin.clone(),
         })
     }

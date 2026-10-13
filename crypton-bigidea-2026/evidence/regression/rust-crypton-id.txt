@@ -1,0 +1,61 @@
+warning: fields `cred_id` and `role` are never read
+   --> src\jwt.rs:120:9
+    |
+117 | pub struct AdminUser {
+    |            --------- fields in this struct
+...
+120 |     pub cred_id: Uuid,
+    |         ^^^^^^^
+121 |     pub role: String,
+    |         ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `crypton-identity` (bin "crypton-identity" test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.34s
+warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src\main.rs (target\debug\deps\crypton_identity-598d6633a7992338.exe)
+
+running 38 tests
+test jwt::tests::public_key_pem_cannot_be_used_as_a_signing_key ... ok
+test routes::admin::tests::map_unknown_action ... ok
+test redis::sessions::tests::deny_token_makes_is_denied_true_until_it_would_have_expired ... ok
+test routes::admin::tests::map_login_failure ... ok
+test jwt::tests::issue_jwt_roundtrips_claims ... ok
+test jwt::tests::decode_fails_with_wrong_public_key ... ok
+test jwt::tests::token_signed_by_a_different_private_key_is_rejected ... ok
+test jwt::tests::decode_rejects_expired_token ... ok
+test jwt::tests::decode_accepts_token_at_the_expiry_boundary ... ok
+test routes::admin::tests::map_recovery_started ... ok
+test routes::admin::tests::map_register ... ok
+test routes::admin::tests::map_login_success ... ok
+test routes::admin::tests::relative_time_hours ... ok
+test routes::admin::tests::relative_time_minutes ... ok
+test routes::admin::tests::relative_time_days ... ok
+test routes::admin::tests::relative_time_seconds ... ok
+test routes::admin::tests::security_score_clamps_at_zero ... ok
+test routes::admin::tests::security_score_combined ... ok
+test routes::admin::tests::security_score_failures_only ... ok
+test routes::admin::tests::security_score_one_lost_device ... ok
+test routes::admin::tests::security_score_perfect ... ok
+test jwt::tests::tampered_claims_are_rejected ... ok
+test routes::admin::tests::admin_bootstrap_refuses_once_any_admin_exists ... ok
+test routes::devices::tests::list_devices_returns_only_the_caller_own_devices ... ok
+test routes::devices::tests::revoke_device_sets_status_and_is_idempotent_safe ... ok
+test routes::admin::tests::list_users_returns_real_rows_from_the_database ... ok
+test routes::recovery::tests::public_start_recovery_issues_a_token_only_on_the_first_call ... ok
+test routes::admin::tests::patch_user_role_updates_the_role ... ok
+test routes::admin::tests::patch_user_role_rejects_invalid_role_strings ... ok
+test routes::recovery::tests::public_start_recovery_rejects_unknown_username ... ok
+test routes::admin::tests::patch_user_role_refuses_to_demote_the_last_admin ... ok
+test routes::recovery::tests::full_authenticated_recovery_state_machine ... ok
+test routes::recovery::tests::complete_recovery_refuses_when_not_approved ... ok
+test routes::devices::tests::mark_lost_succeeds_from_active ... ok
+test routes::devices::tests::mark_lost_refuses_when_not_currently_active ... ok
+test routes::recovery::tests::public_get_recovery_reflects_status_without_leaking_the_id ... ok
+test routes::admin::tests::admin_bootstrap_promotes_the_only_caller_on_a_fresh_deployment ... ok
+test routes::recovery::tests::reject_recovery_cancels_a_pending_request ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+

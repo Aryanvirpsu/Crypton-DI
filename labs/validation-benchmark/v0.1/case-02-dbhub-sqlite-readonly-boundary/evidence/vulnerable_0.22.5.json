@@ -1,0 +1,10 @@
+{
+  "installed_version": "0.22.5",
+  "negative_control_ok": true,
+  "negative_control_value_after": "control-mutated",
+  "readonly_attempt_threw": false,
+  "readonly_value_before": "original-a",
+  "readonly_value_after": "readonly-mutated",
+  "verdict": "FAIL -- VULNERABLE (a write executed under { readonly: true } and the row actually changed; the readonly claim was never enforced)",
+  "notes": []
+}

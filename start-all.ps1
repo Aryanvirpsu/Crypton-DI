@@ -9,7 +9,7 @@
       2. crypton-id        - Rust identity backend :8080
       3. crypton-gateway   - Rust API gateway :8090
       4. crypton-main      - Marketing site :3000
-      5. crypton-demo      - SaaS demo app  :3001
+      5. crypton-console   - Product app (login/devices/recovery/admin) :3001
 
     PIDs saved to .run\pids.json for stop-all.ps1.
     Logs written to .run\logs\.
@@ -144,27 +144,26 @@ Write-Host "    CRYPTON  --  START ALL"                          -ForegroundColo
 Write-Host "    $((Get-Date -Format 'ddd dd MMM yyyy  HH:mm:ss'))" -ForegroundColor DarkGray
 Write-Host "  =================================================" -ForegroundColor Magenta
 Write-Host ""
-Write-Host "    :3000  crypton-main    marketing site"   -ForegroundColor DarkGray
-Write-Host "    :3001  crypton-demo    SaaS demo app"    -ForegroundColor DarkGray
-Write-Host "    :8080  crypton-id      identity backend" -ForegroundColor DarkGray
-Write-Host "    :8090  crypton-gateway API gateway"      -ForegroundColor DarkGray
+Write-Host "    :3000  crypton-main     marketing site"                     -ForegroundColor DarkGray
+Write-Host "    :3001  crypton-console  product app (login/devices/admin)"  -ForegroundColor DarkGray
+Write-Host "    :8080  crypton-id       identity backend"                  -ForegroundColor DarkGray
+Write-Host "    :8090  crypton-gateway  API gateway"                       -ForegroundColor DarkGray
 Write-Host ""
 Log "=== START-ALL $((Get-Date -f 'yyyy-MM-dd HH:mm:ss')) ==="
 
 # ---------------------------------------------------------------------------
 # Service paths
 # ---------------------------------------------------------------------------
-$IdDir    = Join-Path $Root "services\crypton-id"
-$GwDir    = Join-Path $Root "services\crypton-gateway"
-$MainDir  = Join-Path $Root "services\crypton-main"
-$DemoDir  = Join-Path $Root "services\crypton-demo"
-$AdminDir = Join-Path $Root "services\crypton-admin"
+$IdDir      = Join-Path $Root "services\crypton-id"
+$GwDir      = Join-Path $Root "services\crypton-gateway"
+$MainDir    = Join-Path $Root "services\crypton-main"
+$ConsoleDir = Join-Path $Root "services\crypton-console"
 
 $checks = @(
-    @{ path = Join-Path $IdDir    "Cargo.toml";   label = "crypton-id" },
-    @{ path = Join-Path $GwDir    "Cargo.toml";   label = "crypton-gateway" },
-    @{ path = Join-Path $MainDir  "package.json"; label = "crypton-main" },
-    @{ path = Join-Path $DemoDir  "package.json"; label = "crypton-demo" }
+    @{ path = Join-Path $IdDir      "Cargo.toml";   label = "crypton-id" },
+    @{ path = Join-Path $GwDir      "Cargo.toml";   label = "crypton-gateway" },
+    @{ path = Join-Path $MainDir    "package.json"; label = "crypton-main" },
+    @{ path = Join-Path $ConsoleDir "package.json"; label = "crypton-console" }
 )
 foreach ($c in $checks) {
     if (-not (Test-Path $c.path)) { FAIL "$($c.label) not found at $($c.path)" }
@@ -245,8 +244,32 @@ $pids = [ordered]@{}
 # (gateway also reads APP_PORT - must not inherit 8080)
 $devEnvPath = Join-Path $Root "dev.env"
 if (-not (Test-Path $devEnvPath)) {
-    FAIL "dev.env not found at $devEnvPath" "Copy dev.env.example to dev.env and fill in secrets"
+    $examplePath = Join-Path $Root "dev.env.example"
+    if (-not (Test-Path $examplePath)) { FAIL "Neither dev.env nor dev.env.example found at $Root" }
+    WARN "dev.env not found - bootstrapping one from dev.env.example"
+    Copy-Item $examplePath $devEnvPath
+    OK "Generated dev.env (never commit this file - it's gitignored)"
 }
+
+# JWT — asymmetric (Ed25519/EdDSA) since v0.5.1, see DECISIONS.md. Not
+# stored in dev.env (multi-line PEM doesn't fit its single-line format) —
+# generate a local dev keypair on first run and point crypton-id at it via
+# the *_FILE env-var convention (config.rs's read_pem_env).
+$jwtSigningKeyPath = Join-Path $Root "jwt_signing_key.local.pem"
+$jwtPublicKeyPath  = Join-Path $Root "jwt_public_key.local.pem"
+if (-not (Test-Path $jwtSigningKeyPath)) {
+    $opensslCmd = Get-Command openssl -ErrorAction SilentlyContinue
+    if (-not $opensslCmd) {
+        FAIL "openssl not found on PATH - required to generate the local dev JWT keypair (jwt_signing_key.local.pem / jwt_public_key.local.pem). Install it, or generate the pair manually and re-run."
+    }
+    WARN "No local dev JWT keypair found - generating a fresh Ed25519 pair"
+    & openssl genpkey -algorithm ed25519 -out $jwtSigningKeyPath | Out-Null
+    & openssl pkey -in $jwtSigningKeyPath -pubout -out $jwtPublicKeyPath | Out-Null
+    OK "Generated jwt_signing_key.local.pem / jwt_public_key.local.pem (never commit these - *.pem is gitignored)"
+}
+[System.Environment]::SetEnvironmentVariable('JWT_SIGNING_KEY_PEM_FILE', $jwtSigningKeyPath, 'Process')
+[System.Environment]::SetEnvironmentVariable('JWT_PUBLIC_KEY_PEM_FILE', $jwtPublicKeyPath, 'Process')
+
 $loadedVars = @()
 Get-Content $devEnvPath | ForEach-Object {
     $line = $_.Trim()
@@ -340,16 +363,16 @@ function Start-Frontend { param($Label, $Dir, $Port, $NpmScript = "start")
     return $proc
 }
 
-$mainProc  = Start-Frontend "crypton-main"  $MainDir  3000 "start"
-$demoProc  = Start-Frontend "crypton-demo"  $DemoDir  3001 "client:start"
+$mainProc    = Start-Frontend "crypton-main"    $MainDir    3000 "start"
+$consoleProc = Start-Frontend "crypton-console" $ConsoleDir 3001 "start"
 
-$pids["crypton-main"]  = $mainProc.Id
-$pids["crypton-demo"]  = $demoProc.Id
+$pids["crypton-main"]    = $mainProc.Id
+$pids["crypton-console"] = $consoleProc.Id
 
 Remove-Item Env:BROWSER -EA SilentlyContinue
 
-if (-not (Wait-Http "http://127.0.0.1:3000" "crypton-main  :3000" $FrontendTimeout)) { WARN "crypton-main  did not respond in time" }
-if (-not (Wait-Http "http://127.0.0.1:3001" "crypton-demo  :3001" $FrontendTimeout)) { WARN "crypton-demo  did not respond in time" }
+if (-not (Wait-Http "http://127.0.0.1:3000" "crypton-main     :3000" $FrontendTimeout)) { WARN "crypton-main     did not respond in time" }
+if (-not (Wait-Http "http://127.0.0.1:3001" "crypton-console  :3001" $FrontendTimeout)) { WARN "crypton-console  did not respond in time" }
 
 # ---------------------------------------------------------------------------
 # Save PIDs
@@ -365,8 +388,8 @@ Write-Host "  =================================================" -ForegroundColo
 Write-Host "    ALL SYSTEMS RUNNING"                             -ForegroundColor Green
 Write-Host "  =================================================" -ForegroundColor Magenta
 Write-Host ""
-Write-Host "    http://localhost:3000   crypton-main   (marketing)" -ForegroundColor Cyan
-Write-Host "    http://localhost:3001   crypton-demo   (SaaS demo & Panel)" -ForegroundColor Cyan
+Write-Host "    http://localhost:3000   crypton-main     (marketing)" -ForegroundColor Cyan
+Write-Host "    http://localhost:3001   crypton-console  (register / login / devices / admin)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "    status.ps1    -- health check all services" -ForegroundColor DarkGray
 Write-Host "    stop-all.ps1  -- stop everything"           -ForegroundColor DarkGray

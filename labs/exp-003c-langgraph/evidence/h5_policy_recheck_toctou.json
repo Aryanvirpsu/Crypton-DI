@@ -1,0 +1,44 @@
+{
+  "approval_decision": {
+    "note": "limit changed to 50 before resume completed",
+    "resume": {
+      "approved": true
+    }
+  },
+  "approval_request": {
+    "note": "approved while limit=1000"
+  },
+  "authorization_binding": {
+    "argument_match": null,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003C",
+  "notes": [
+    "LangGraph provides NO built-in guardrail/policy-recheck primitive (unlike openai-agents' tool_input_guardrails or agent-framework's ToolInputGuardrail) - this demonstrates the pattern IS constructible entirely in application code (a plain re-check after interrupt() returns, before the side effect), not that the framework provides it automatically."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "policy_limit_at_proposal": 1000,
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h5_policy_recheck_toctou",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h5"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

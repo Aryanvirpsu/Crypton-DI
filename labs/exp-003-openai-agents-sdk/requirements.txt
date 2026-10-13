@@ -1,0 +1,7 @@
+# EXP-003A target, pinned exactly - see target.json.
+openai-agents==0.22.2
+
+# Minimum test tooling. No real model provider / API key needed for
+# Phase 1 - every scenario uses agents.testing.ScriptedModel.
+pytest
+pytest-asyncio

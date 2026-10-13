@@ -1,0 +1,59 @@
+{
+  "approval_decision": {
+    "resume": {
+      "approved": true
+    },
+    "via": "fresh SqliteSaver connection + fresh compiled graph, not the originals"
+  },
+  "approval_request": {
+    "note": "pending interrupt persisted to a real SQLite file"
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "baseline_c",
+      "sequence": 2,
+      "thread_id": null,
+      "timestamp": 1791838890.0521047,
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "Same logical request/tool/arguments, exactly-once execution, confirmed across a genuine persist-to-disk -> fresh-connection-reload -> resume cycle."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "baseline_c_persist_reload_resume",
+  "state_boundary": {
+    "checkpointer": "SqliteSaver (real file)",
+    "thread_id": "bc"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

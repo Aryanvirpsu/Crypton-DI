@@ -1,0 +1,37 @@
+CRYPTON BIG IDEA 2026 — FROZEN REPOSITORY STATE (stabilization pass)
+
+Verification date:   2026-10-12
+Repository:          Crypton-DI (local; no remote consulted for code)
+Branch:              verification/big-idea-stabilization  (created from refactor/agent-identity-foundation @ ca2f52f)
+Original base:       ca2f52f0f5e10fc9c809cfd04bf3bd2d9890476d (2026-09-11) - "action-integrity exp-001 series"
+
+Commits on this branch (oldest first)
+  db31183  chore: preserve pre-stabilization working tree as baseline   (existing uncommitted work, no behavior change)
+  e7efbc3  docs: correct overstated claims and experiment environment docs
+  1b93abe  chore(cleanup): remove 14 unused imports (behavior-neutral)  <- CODE FREEZE: every test/benchmark result below was produced at this revision
+  (final)  evidence: BIG IDEA evidence package                          <- adds only crypton-bigidea-2026/ and one benchmark REPRODUCE.md; no code changes
+           The final full SHA is recorded in the final response and by `git rev-parse HEAD` on the branch tip.
+           Verify "evidence commit changed no code":  git diff --stat 1b93abe887c9e28f3217cb67e0e707a5a9f618f6 HEAD
+
+Code-freeze SHA (full): 1b93abe887c9e28f3217cb67e0e707a5a9f618f6
+Release/tag:            none. (Nearest tag agent-lab-v0.5.)
+Working tree:           clean at freeze (git status --short empty; ignored files are venvs, caches, local data and a local .env.local, none of which are in any commit)
+Pre-work snapshot:      ../Crypton-DI-snapshots/2026-10-12-pre-stabilization/ (outside the repo): tracked-changes.patch,
+                        working-tree-nonignored.tar.gz, and a local-only archive of ignored files (incl. .env.local) that must not be shared.
+
+Runtime
+  OS:       Windows 11 Home Single Language 10.0.26200 (Git Bash + PowerShell)
+  Python:   3.14.7        Node: v24.19.0 (npm 11.17)        Rust: rustc/cargo 1.97.1
+  Docker:   Server 29.7.2 (used only to run an ephemeral Postgres for the Rust tests)
+  Postgres: 16.15 (postgres:16-alpine), ephemeral container, bound to 127.0.0.1:55432, throwaway credentials, no volume
+  Redis:    not running; not needed by any test that ran
+
+Key dependency versions
+  labs/agent-lab:  pydantic 2.13.5, PyJWT 2.13.0, cryptography 50.0.1, pytest 9.1.1, pytest-asyncio 1.4.0
+  exp-003c:        langgraph 1.2.11, langgraph-checkpoint-sqlite 3.1.1, langchain 1.4.0
+  exp-003 OpenAI:  openai-agents 0.22.2         exp-003 MS: agent-framework 1.18.0
+  services/crypton-id: sqlx 0.7.4 (Cargo.lock)  libs/crypton-sdk: jest ^29.5.0, typescript ^5.0.0
+  Benchmark targets: mcp 1.27.1 / 1.27.2 (PyPI, sha256 in benchmark/pypi-artifact-sha256-mcp.txt);
+                     @bytebase/dbhub 0.22.5 / 0.22.6 (npm; lockfiles + integrity in benchmark/)
+
+This record identifies the exact Crypton implementation used to produce the accompanying BIG IDEA technical evidence.

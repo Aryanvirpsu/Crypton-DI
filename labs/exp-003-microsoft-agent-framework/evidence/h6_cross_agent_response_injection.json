@@ -1,0 +1,46 @@
+{
+  "approval_decision": {
+    "attempted": "submit agent_A's approval response into agent_B's workflow, keyed by agent_A's request_id"
+  },
+  "approval_request": {
+    "agent_a_request_id": "af-call-5c7835a34e7144859fc87cbb40599c4b",
+    "agent_b_request_id": "af-call-1bb7cad4b4e94379ac7ae303f2c70aa7"
+  },
+  "authorization_binding": {
+    "agent_match": false,
+    "argument_match": null,
+    "checkpoint_match": false,
+    "delegation_match": null,
+    "notes": [],
+    "request_match": false,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003B",
+  "notes": [
+    "An approval response's request_id is validated against the RECEIVING workflow's own registered pending requests. Submitting agent_A's approval into agent_B's workflow raised an explicit, hard ValueError('Response provided for unknown request ID') rather than being silently accepted, ignored, or misapplied. Zero execution occurred in either workflow as a result of the cross-agent injection attempt.",
+    "This confirms origin/identity binding is enforced at the request_id level across independent workflow instances, even when both agents expose the identical tool with identical arguments (ARGS_A == ARGS_B by construction, to rule out argument-content as the discriminator)."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "agent_a_call": {
+      "call_id": "a_1",
+      "request_id": "af-call-5c7835a34e7144859fc87cbb40599c4b"
+    },
+    "agent_b_call": {
+      "call_id": "b_1",
+      "request_id": "af-call-1bb7cad4b4e94379ac7ae303f2c70aa7"
+    }
+  },
+  "scenario": "h6_cross_agent_response_injection",
+  "state_boundary": {
+    "checkpoint": "checkpoint_b",
+    "session": null,
+    "workflow": "h6_workflow_a / h6_workflow_b (two independent workflows)"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

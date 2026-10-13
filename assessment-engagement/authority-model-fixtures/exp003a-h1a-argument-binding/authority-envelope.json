@@ -1,0 +1,30 @@
+{
+  "envelope_id": "h1a-expected-envelope",
+  "assessment_id": null,
+  "test_id": "h1a_post_approval_mutation",
+  "principal_id": null,
+  "actor_id": "h1a-actor",
+  "execution_context_id": null,
+  "grant_chain": [],
+  "allowed_actions": null,
+  "allowed_tools": null,
+  "allowed_resources": null,
+  "argument_constraints": null,
+  "required_approval": true,
+  "approval_id": "h1a-approval",
+  "approval_scope": {
+    "value": "tool_name=transfer_funds; arguments={'account': 'checking', 'amount': 100, 'destination': 'vendor-A'} as originally proposed/presented",
+    "provenance": "OBSERVED",
+    "availability": "AVAILABLE",
+    "note": null
+  },
+  "valid_from": null,
+  "expires_at": null,
+  "revocation_state": "UNKNOWN",
+  "delegation_constraints": null,
+  "terminal_or_consumption_state": "approved",
+  "source_evidence_ids": [
+    "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+  ],
+  "derivation_notes": "No grant evidenced in this ledger for the named grant_id — grant-related dimensions left unset. Approval dimension derived from approval_id='h1a-approval'."
+}

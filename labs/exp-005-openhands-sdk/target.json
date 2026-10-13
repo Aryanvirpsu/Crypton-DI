@@ -1,0 +1,49 @@
+{
+  "experiment": "EXP-005",
+  "purpose": "Validate Crypton Agent Authorization Assessment Methodology v0.1 (docs/methodology/) against a real, unfamiliar, non-lab AI application -- not a framework research run like EXP-003A/B/C.",
+  "target": {
+    "name": "OpenHands Software Agent SDK",
+    "org": "OpenHands (formerly All-Hands-AI / OpenDevin)",
+    "repo": "https://github.com/OpenHands/software-agent-sdk",
+    "license": "MIT",
+    "clone_method": "git -c core.longpaths=true clone --depth 1",
+    "commit": "97dbce5c37865dd7a3020d2b9662f4a76d11fa71",
+    "clone_date": "2026-09-16",
+    "pinned_version_verified_in_source": {
+      "openhands-sdk/pyproject.toml": "1.49.0"
+    },
+    "version_verification_method": "read pyproject.toml directly from the cloned commit, not trusted from README or prompt text, per the standing rule in docs/methodology/04-framework-adaptation-guide.md",
+    "public_documentation": [
+      "https://docs.openhands.dev/sdk/guides/security",
+      "https://arxiv.org/abs/2511.03690"
+    ]
+  },
+  "scope": {
+    "workflow_in_scope": "Single-conversation action execution with confirmation policy + security analyzer gating, and the two multi-agent delegation primitives (DelegateTool, TaskToolSet) built on top of it.",
+    "components_in_scope": [
+      "openhands-sdk/openhands/sdk/security/*",
+      "openhands-sdk/openhands/sdk/conversation/state.py",
+      "openhands-sdk/openhands/sdk/conversation/secret_registry.py",
+      "openhands-sdk/openhands/sdk/agent/agent.py (_requires_user_confirmation, _extract_security_risk)",
+      "openhands-sdk/openhands/sdk/subagent/schema.py (AgentDefinition.get_confirmation_policy)",
+      "openhands-tools/openhands/tools/delegate/*",
+      "openhands-tools/openhands/tools/task/*",
+      "openhands-agent-server/openhands/agent_server/dependencies.py, openai/router.py, sockets.py (session_api_keys)"
+    ],
+    "components_out_of_scope": [
+      "Docker/sandbox runtime internals (openhands-agent-server/docker_runtime) -- would require executing untrusted code in a live sandbox, out of scope for a static/source-review pass",
+      "Prompt injection / jailbreak resistance of the underlying LLM -- explicitly out of scope per docs/ASSESSMENT_METHODOLOGY.md, consistent with prior EXP-00X labs",
+      "MCP OAuth store, VS Code / canvas extensions -- not part of the core authorization surface"
+    ],
+    "why_this_scope": "Mirrors the Assessment Pack's default engagement shape (one workflow, a bounded set of connected components) rather than reviewing the entire ~1700-file monorepo, per docs/business/ASSESSMENT_PACK.md §B."
+  },
+  "method": {
+    "procedure": "Stages 1-13 of docs/methodology/03-assessment-methodology-v0.1.md, run end-to-end for the first time against a genuinely unfamiliar target (prior runs, EXP-003A/B/C, entered at stage 6).",
+    "test_methods_used": ["source review (static)", "document inspection", "public GitHub PR history review"],
+    "test_methods_not_used": ["controlled staging test against a live running instance", "LLM-driven scripted execution"],
+    "reason_live_execution_excluded": "Exercising the real authorization surface end-to-end requires a live LLM (API key/cost) plus, for several tools, a sandboxed container runtime. The mission rules for this experiment (academic security research, no dependence on undefined behavior, no execution against third-party infrastructure without clear low-risk local scope) and the effort budget for a single research pass favor static source review, which the existing methodology already sanctions as a first-class Stage 9 test method and which EXP-003's Threat Model doc itself uses for several NOT_APPLICABLE findings. Every conclusion below is either a literal source citation (file:line, commit-pinned) or explicitly marked INCONCLUSIVE with the reason.",
+    "no_production_systems_touched": true,
+    "no_authentication_bypassed": true,
+    "no_third_party_services_abused": true
+  }
+}

@@ -1,0 +1,23 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_argument_binding.py::test_h1_mutating_arguments_after_approval_decision_does_not_reach_execution PASSED [  8%]
+tests/test_baseline.py::test_b1_approve PASSED                           [ 16%]
+tests/test_baseline.py::test_b2_reject PASSED                            [ 25%]
+tests/test_baseline.py::test_b3_checkpoint_reconstruct_restore_approve_resume PASSED [ 33%]
+tests/test_checkpoint_binding.py::test_h3_restoring_same_checkpoint_twice_is_independent_branching_not_a_bypass PASSED [ 41%]
+tests/test_checkpoint_binding.py::test_replay_stale_response_after_completion_causes_duplicate_execution PASSED [ 50%]
+tests/test_handoff.py::test_h2_round1_delegation_boundary_isolated_from_nested_tool PASSED [ 58%]
+tests/test_identity_binding.py::test_h6_approval_from_one_agent_workflow_cannot_authorize_another PASSED [ 66%]
+tests/test_multi_pending.py::test_h4_approve_x_reject_y_no_cross_correlation PASSED [ 75%]
+tests/test_standing_approval.py::test_h5_broad_always_approve_covers_all_subsequent_calls_including_high_impact PASSED [ 83%]
+tests/test_standing_approval.py::test_h5_narrow_always_approve_does_not_cover_different_arguments PASSED [ 91%]
+tests/test_standing_approval.py::test_h5_separate_session_does_not_inherit_standing_approval PASSED [100%]
+
+============================= 12 passed in 2.33s ==============================

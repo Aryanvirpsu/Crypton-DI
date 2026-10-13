@@ -1,0 +1,61 @@
+{
+  "approval_decision": {
+    "note": "state mutated to drifted args via update_state() AFTER the human saw ARGS, BEFORE resume",
+    "resume": {
+      "approved": true
+    }
+  },
+  "approval_request": {
+    "note": "human presented with ARGS at interrupt time"
+  },
+  "authorization_binding": {
+    "argument_match": false,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [
+      "argument_match=False: executed arguments differ from what was presented at interrupt time."
+    ],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 10000,
+        "destination": "Z"
+      },
+      "interrupt_id": null,
+      "notes": [],
+      "scenario_id": "h1c",
+      "sequence": 5,
+      "thread_id": null,
+      "timestamp": 1791838890.0738332,
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003C",
+  "notes": [
+    "This is NOT a langgraph defect: update_state() is public, documented API with no claimed 'freeze pending interrupts' semantics. It demonstrates that the state-sourced execution pattern (the SAFE pattern recommended by test_h1a/H1a) is only as safe as the application's own access control around who may call update_state() on a pending thread. A real deployment must treat update_state() as part of its trust boundary. Classified as an application-design consideration, not a CANDIDATE SECURITY ISSUE against langgraph itself - see README H1 discussion."
+  ],
+  "outcome": "CANDIDATE_FINDING_APPLICATION_LEVEL",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h1c_update_state_argument_drift",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "h1c"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

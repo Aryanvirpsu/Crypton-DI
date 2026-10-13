@@ -71,13 +71,13 @@ if (Test-Path $PidFile) {
         $saved  = ([System.IO.StreamReader]::new($stream)).ReadToEnd() | ConvertFrom-Json
         $stream.Dispose()
         # Frontends first, then gateway, then identity
-        foreach ($label in @("crypton-admin", "crypton-demo", "crypton-main", "gateway", "identity")) {
+        foreach ($label in @("crypton-console", "crypton-main", "gateway", "identity")) {
             $savedPid = $saved.$label
             if ($savedPid) { Stop-Tree -Pid ([int]$savedPid) -Label $label }
         }
         # Any extras
         foreach ($prop in $saved.PSObject.Properties) {
-            if ($prop.Name -notin @("crypton-admin","crypton-demo","crypton-main","gateway","identity")) {
+            if ($prop.Name -notin @("crypton-console","crypton-main","gateway","identity")) {
                 Stop-Tree -Pid ([int]$prop.Value) -Label $prop.Name
             }
         }
@@ -97,8 +97,8 @@ if (Test-Path $PidFile) {
 # Port sweep (always)
 # ---------------------------------------------------------------------------
 Write-Host ""
-INFO "Port sweep :3000 :3001 :3002 :8080 :8090"
-foreach ($p in @(3000, 3001, 3002, 8080, 8090)) { Kill-Port $p }
+INFO "Port sweep :3000 :3001 :8080 :8090"
+foreach ($p in @(3000, 3001, 8080, 8090)) { Kill-Port $p }
 
 # ---------------------------------------------------------------------------
 # Docker infra (optional)

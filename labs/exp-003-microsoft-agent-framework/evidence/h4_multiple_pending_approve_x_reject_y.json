@@ -1,0 +1,63 @@
+{
+  "approval_decision": {
+    "submitted_together_in_one_resume_call": true,
+    "x": "approve",
+    "y": "reject"
+  },
+  "approval_request": {
+    "x_request_id": "af-call-83838b52547f4be3942ff594d7b6ce1b",
+    "y_request_id": "af-call-0f4238c9af5c40ceb80e96f18ecaf3a6"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": true,
+    "delegation_match": true,
+    "notes": [],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "amount": 50,
+        "customer": "alice"
+      },
+      "tool_name": "issue_refund"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "No correlation confusion observed: X's approval executed X's exact arguments; Y's rejection produced zero execution for Y. Decisions are submitted as a dict keyed by request_id (responses={request_id: response}), which is identity-based by API construction, not order-based - this structurally rules out the 'response for X accepted for Y based on ordering' failure mode the hypothesis worried about, rather than merely failing to trigger it by chance."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "x": {
+      "arguments": {
+        "amount": 50,
+        "customer": "alice"
+      },
+      "call_id": "x_1",
+      "tool_name": "issue_refund"
+    },
+    "y": {
+      "arguments": {
+        "amount": 5000,
+        "customer": "bob"
+      },
+      "call_id": "y_1",
+      "tool_name": "issue_refund"
+    }
+  },
+  "scenario": "h4_multiple_pending_approve_x_reject_y",
+  "state_boundary": {
+    "checkpoint": "single checkpoint held both pending requests",
+    "session": null,
+    "workflow": "h4_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

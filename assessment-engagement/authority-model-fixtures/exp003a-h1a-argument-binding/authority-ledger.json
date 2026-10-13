@@ -1,0 +1,208 @@
+{
+  "assessment_id": null,
+  "events": [
+    {
+      "event_id": "h1a-evt-1-approval-granted",
+      "event_type": "APPROVAL_GRANTED",
+      "assessment_id": null,
+      "test_id": "h1a_post_approval_mutation",
+      "timestamp": null,
+      "sequence": 1,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": "h1a-actor",
+      "grant_id": null,
+      "approval_id": "h1a-approval",
+      "action_id": null,
+      "resource_id": null,
+      "effect_id": null,
+      "before_state": null,
+      "after_state": null,
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    },
+    {
+      "event_id": "h1a-evt-2-action-executed",
+      "event_type": "ACTION_EXECUTED",
+      "assessment_id": null,
+      "test_id": "h1a_post_approval_mutation",
+      "timestamp": "1789533821.3422914",
+      "sequence": 2,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": "h1a-actor",
+      "grant_id": null,
+      "approval_id": "h1a-approval",
+      "action_id": "h1a-action",
+      "resource_id": null,
+      "effect_id": "h1a-effect",
+      "before_state": null,
+      "after_state": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    },
+    {
+      "event_id": "h1a-evt-3-effect-observed",
+      "event_type": "EFFECT_OBSERVED",
+      "assessment_id": null,
+      "test_id": "h1a_post_approval_mutation",
+      "timestamp": "1789533821.3422914",
+      "sequence": 3,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": null,
+      "grant_id": null,
+      "approval_id": null,
+      "action_id": "h1a-action",
+      "resource_id": null,
+      "effect_id": "h1a-effect",
+      "before_state": null,
+      "after_state": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  ],
+  "principals": {},
+  "actors": {
+    "h1a-actor": {
+      "actor_type": "AGENT",
+      "actor_id": {
+        "value": "root",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "framework_identity": null,
+      "acts_for_principal": null,
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  },
+  "grants": {},
+  "approvals": {
+    "h1a-approval": {
+      "approval_id": {
+        "value": "h1a_1",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": "the SDK's call_id is the only correlating key this evidence carries for the approval — no separate approval-record id exists in this framework's evidence shape"
+      },
+      "requested_by": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not evidenced."
+      },
+      "approved_by": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "approval_decision records decision='approve' but no approver identity — a scripted test decision, not an authenticated human approver."
+      },
+      "target_action_ids": {
+        "value": [
+          "h1a_1"
+        ],
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "target_resource_ids": null,
+      "approval_scope": "tool_name=transfer_funds; arguments={'account': 'checking', 'amount': 100, 'destination': 'vendor-A'} as originally proposed/presented",
+      "granted_at": null,
+      "expires_at": null,
+      "state": "approved",
+      "consumed_at": null,
+      "execution_context_id": null,
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  },
+  "actions": {
+    "h1a-action": {
+      "action_id": {
+        "value": "h1a_1",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "actor_id": {
+        "value": "root",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "tool": "transfer_funds",
+      "operation": null,
+      "arguments": {
+        "value": {
+          "account": "checking",
+          "amount": 100,
+          "destination": "vendor-A"
+        },
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "argument_hash": null,
+      "intended_resource": null,
+      "actual_resource": "vendor-A",
+      "state": "executed",
+      "execution_context_id": null,
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  },
+  "resources": {},
+  "effects": {
+    "h1a-effect": {
+      "effect_id": "h1a-effect",
+      "action_id": {
+        "value": "h1a_1",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "effect_type": "tool_invocation_recorded",
+      "target_resource": "vendor-A",
+      "before_state": null,
+      "after_state": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "observed_at": "1789533821.3422914",
+      "evidence_ids": [
+        "labs/exp-003-openai-agents-sdk/evidence/h1a_post_approval_mutation.json"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  }
+}
