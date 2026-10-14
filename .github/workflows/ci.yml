@@ -4,11 +4,16 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+  # New advisories appear without any code change, so audit weekly as well.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
 
 # Keep this fast and boring: format/check/test each crate and each frontend
 # package. No deployment steps here on purpose.
 jobs:
   rust:
+    if: github.event_name != 'schedule'  # the weekly run is for the advisory audit only
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -100,10 +105,37 @@ jobs:
           GATEWAY_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/gwtest
         run: cargo test -- --ignored
 
+  # RustSec audit of every Rust lockfile. Fails on any vulnerability that is not listed,
+  # with a justification and a reopen trigger, in scripts/rust-audit-ignore.txt;
+  # unmaintained/unsound/yanked warnings are printed but do not fail. See
+  # docs/dependency-audit.md.
+  rust-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo-audit
+        id: cache-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-0.22.2-${{ runner.os }}
+
+      - name: Install cargo-audit
+        if: steps.cache-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked --version 0.22.2
+
+      - name: Audit Rust dependencies
+        run: bash scripts/rust-audit.sh
+
   # The real services (crypton-id + gateway images built from source) with real
   # Postgres/Redis, driven end to end. This is the only job that exercises the
   # whole system; see docs/testing.md and docs/deployment-topology.md.
   runtime:
+    if: github.event_name != 'schedule'  # the weekly run is for the advisory audit only
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -117,6 +149,7 @@ jobs:
         run: bash tests/runtime/run.sh
 
   frontend:
+    if: github.event_name != 'schedule'  # the weekly run is for the advisory audit only
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
