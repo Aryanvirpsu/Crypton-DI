@@ -1,4 +1,5 @@
 import Landing from './Landing';
+import AgentFloor from './agent-floor/AgentFloor';
 import { DEMO_URL } from './config';
 
 const FontLink = () => (
@@ -33,6 +34,17 @@ function App() {
       window.location.href = DEMO_URL + '/admin/login';
     }
   };
+
+  // Agent Floor is an isolated experience served at /agent-floor (see src/agent-floor/README.md).
+  // The landing page is untouched; nothing links here yet.
+  if (typeof window !== 'undefined' && /^\/agent-floor\/?$/.test(window.location.pathname)) {
+    return (
+      <>
+        <FontLink />
+        <AgentFloor />
+      </>
+    );
+  }
 
   return (
     <>
