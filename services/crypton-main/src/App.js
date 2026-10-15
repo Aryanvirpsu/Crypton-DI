@@ -35,9 +35,10 @@ function App() {
     }
   };
 
-  // Agent Floor is an isolated experience served at /agent-floor (see src/agent-floor/README.md).
-  // The landing page is untouched; nothing links here yet.
-  if (typeof window !== 'undefined' && /^\/agent-floor\/?$/.test(window.location.pathname)) {
+  // The Agent Floor is the site: it is served at / and, for existing links, at /agent-floor
+  // (see src/agent-floor/README.md). The previous landing page stays reachable, unlinked, at /legacy.
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+  if (!/^\/legacy\/?$/.test(path)) {
     return (
       <>
         <FontLink />

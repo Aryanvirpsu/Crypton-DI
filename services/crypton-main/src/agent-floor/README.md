@@ -46,7 +46,7 @@ Four layers, each with one job:
 | Classic stage (2D) | `Stage.jsx`, `Robots.jsx` | SVG floor and Atlas. Fallback renderer and test harness. |
 | Story and forensic UI | `story.js`, `Panels.jsx`, `stageLabels.js`, `AssessmentForm.jsx`, `inquiryModel.js`, `leadClient.js` | Plain-language captions; inspector, evidence, event log, task vs grant (the details drawer); research; the assessment request and its single submission boundary. |
 
-`App.js` mounts it only for the path `/agent-floor`; the existing landing page is unchanged.
+`App.js` mounts it at `/` and `/agent-floor`; the previous landing page remains available, unlinked, at `/legacy`.
 
 ## What is real vs illustrative
 - Illustrative: every actor, grant, delegation, action, and the evidence in AF-001.

@@ -252,13 +252,12 @@ export default function AgentFloor() {
 
   const nav = (
     <header className="af-nav">
-      <a className="af-brand" href="/agent-floor" aria-label="Crypton Agent Floor home">
+      <a className="af-brand" href="/" aria-label="Crypton Agent Floor home">
         <span className="af-brand-mark" aria-hidden="true" />
         CRYPTON <span className="af-brand-sub">/ Agent Floor</span>
       </a>
       <nav aria-label="Primary" className="af-nav-links">
         <a href="#af-real">What’s real</a>
-        <a href="/" className="af-nav-back">Main site</a>
         <a href="#af-inquiry" className="af-nav-cta" onClick={goAssessment}>Get an assessment</a>
       </nav>
     </header>
