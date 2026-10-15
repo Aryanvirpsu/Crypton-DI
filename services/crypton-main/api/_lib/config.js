@@ -29,11 +29,15 @@ function parseOrigin(value, production) {
 }
 
 function loadConfig(env = process.env) {
-  const production = env.VERCEL_ENV === 'production' || env.NODE_ENV === 'production';
+  // On Vercel, NODE_ENV is "production" for Preview deployments too, so the platform's own
+  // environment name decides when it is present; NODE_ENV only decides off-platform.
+  const production = env.VERCEL_ENV ? env.VERCEL_ENV === 'production' : env.NODE_ENV === 'production';
   const missing = [];
+  // Why a setting failed ("unset" or "malformed"), for the log. Never a value.
+  const why = {};
 
   const masterKey = env.ASSESSMENT_MASTER_KEY || '';
-  if (!HEX64.test(masterKey)) missing.push('ASSESSMENT_MASTER_KEY');
+  if (!HEX64.test(masterKey)) { missing.push('ASSESSMENT_MASTER_KEY'); why.ASSESSMENT_MASTER_KEY = masterKey ? `malformed(length ${masterKey.length})` : 'unset'; }
 
   const databaseUrl = env.ASSESSMENT_DATABASE_URL || '';
   let host = '';
@@ -41,19 +45,19 @@ function loadConfig(env = process.env) {
     const url = new URL(databaseUrl);
     if (!/^postgres(ql)?:$/.test(url.protocol)) throw new Error('scheme');
     host = url.hostname;
-  } catch { missing.push('ASSESSMENT_DATABASE_URL'); }
+  } catch { missing.push('ASSESSMENT_DATABASE_URL'); why.ASSESSMENT_DATABASE_URL = databaseUrl ? 'malformed' : 'unset'; }
 
   const origins = new Set();
   for (const raw of (env.ASSESSMENT_ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)) {
     const origin = parseOrigin(raw, production);
-    if (origin) origins.add(origin); else missing.push('ASSESSMENT_ALLOWED_ORIGINS');
+    if (origin) origins.add(origin); else { missing.push('ASSESSMENT_ALLOWED_ORIGINS'); why.ASSESSMENT_ALLOWED_ORIGINS = 'malformed'; }
   }
   // A preview deployment is served from its own generated hostnames. Allow exactly those,
   // and never outside previews.
   if (!production) {
     for (const hostname of [env.VERCEL_URL, env.VERCEL_BRANCH_URL]) if (hostname) origins.add(`https://${hostname}`);
   }
-  if (!origins.size && !missing.includes('ASSESSMENT_ALLOWED_ORIGINS')) missing.push('ASSESSMENT_ALLOWED_ORIGINS');
+  if (!origins.size && !missing.includes('ASSESSMENT_ALLOWED_ORIGINS')) { missing.push('ASSESSMENT_ALLOWED_ORIGINS'); why.ASSESSMENT_ALLOWED_ORIGINS = 'unset'; }
 
   const mode = (env.ASSESSMENT_DATABASE_SSL || 'verify').toLowerCase();
   let ssl;
@@ -69,7 +73,7 @@ function loadConfig(env = process.env) {
     missing.push('ASSESSMENT_DATABASE_SSL');
   }
 
-  if (missing.length) return { ok: false, missing: [...new Set(missing)] };
+  if (missing.length) return { ok: false, missing: [...new Set(missing)], why };
   return { ok: true, production, masterKey, databaseUrl, origins, ssl, sslMode: mode, ca: env.ASSESSMENT_DATABASE_CA || '' };
 }
 

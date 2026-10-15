@@ -39,6 +39,23 @@ describe('configuration fails closed', () => {
     assert.ok(!prod.origins.has('https://crypton-abc.vercel.app'));
   });
 
+  test('on Vercel a Preview is not production even though NODE_ENV is "production"', () => {
+    const env = { ...good, NODE_ENV: 'production', VERCEL_URL: 'crypton-abc.vercel.app' };
+    delete env.ASSESSMENT_ALLOWED_ORIGINS;
+    assert.ok(config.loadConfig({ ...env, VERCEL_ENV: 'preview' }).origins.has('https://crypton-abc.vercel.app'));
+    assert.equal(config.loadConfig({ ...env, VERCEL_ENV: 'production' }).ok, false, 'production still requires explicit origins');
+    assert.equal(config.loadConfig({ ...env }).ok, false, 'off-platform NODE_ENV=production is still production');
+  });
+
+  test('the reason a setting failed is reported without its value', () => {
+    const r = config.loadConfig({ ASSESSMENT_MASTER_KEY: 'topsecret-not-hex', ASSESSMENT_DATABASE_URL: 'mysql://x:SECRETPW@h/db' });
+    assert.match(r.why.ASSESSMENT_MASTER_KEY, /^malformed\(length \d+\)$/);
+    assert.equal(r.why.ASSESSMENT_DATABASE_URL, 'malformed');
+    assert.equal(r.why.ASSESSMENT_ALLOWED_ORIGINS, 'unset');
+    assert.ok(!JSON.stringify(r).includes('topsecret') && !JSON.stringify(r).includes('SECRETPW'));
+    assert.equal(config.loadConfig({}).why.ASSESSMENT_MASTER_KEY, 'unset');
+  });
+
   test('TLS to the database: verified by default; "disable" only for local development', () => {
     assert.deepEqual(config.loadConfig(good).ssl, { rejectUnauthorized: true });
     assert.equal(config.loadConfig({ ...good, ASSESSMENT_DATABASE_SSL: 'disable' }).ok, false, 'a remote host must not allow plaintext');

@@ -32,16 +32,16 @@ function createApi({ env = process.env, store: injectedStore, now = () => Date.n
   let memo = null;
   function setup() {
     const config = loadConfig(env);
-    if (!config.ok) return { ok: false, missing: config.missing };
+    if (!config.ok) return { ok: false, missing: config.missing, why: config.why };
     if (!memo || memo.masterKey !== config.masterKey || memo.databaseUrl !== config.databaseUrl) {
       memo = { masterKey: config.masterKey, databaseUrl: config.databaseUrl, keys: crypto.deriveKeys(config.masterKey), store: injectedStore || createStore(config) };
     }
     return { ok: true, config, keys: memo.keys, store: memo.store };
   }
 
-  function unavailable(res, missing) {
-    // Names of missing settings only, never their values.
-    if (missing) log.error('assessment: configuration incomplete', missing.join(','));
+  function unavailable(res, missing, why = {}) {
+    // Names of missing settings and whether each is unset or malformed, never their values.
+    if (missing) log.error('assessment: configuration incomplete', missing.map((name) => (why[name] ? `${name}=${why[name]}` : name)).join(','));
     if (!res.headersSent) sendJson(res, 503, { error: 'unavailable' });
   }
 
