@@ -3,7 +3,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import AgentFloor from './AgentFloor';
+import AssessmentForm from './AssessmentForm';
 import { validateInquiry, INITIAL_VALUES } from './inquiryModel';
+import { isConfigured, submitAssessmentRequest, toPayload } from './leadClient';
 import { STEPS } from './scenario';
 
 const stageIds = (container) =>
@@ -13,16 +15,25 @@ const clickNext = (n = 1) => { for (let i = 0; i < n; i += 1) userEvent.click(sc
 const stepLabel = () => document.querySelector('.af-step-label').textContent;
 const toolbar = () => screen.getByRole('group', { name: 'Scenario controls' });
 
-afterEach(() => { delete window.matchMedia; });
+beforeAll(() => { if (!AbortSignal.timeout) AbortSignal.timeout = () => new AbortController().signal; });
+const originalFetch = global.fetch;
+beforeEach(() => { global.fetch = jest.fn().mockRejectedValue(new Error('unit test: backend unavailable')); });
+afterEach(() => { delete window.matchMedia; global.fetch = originalFetch; });
 
 describe('arrival', () => {
-  it('shows the headline and the three calls to action without a loading gate', () => {
+  it('opens with one plain statement and two obvious actions, without a loading gate', () => {
     render(<AgentFloor />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('You gave them a task. What did you give them permission to do?');
-    expect(screen.getByRole('button', { name: 'Take command' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Explore the research' })).toHaveAttribute('href', '#af-research');
-    expect(screen.getByRole('link', { name: 'Discuss an assessment' })).toHaveAttribute('href', '#af-inquiry');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Meet your AI team.');
+    expect(screen.getByRole('button', { name: 'Watch them work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Skip to the assessment' })).toHaveAttribute('href', '#af-inquiry');
+    expect(screen.getByText('A fictional simulation')).toBeInTheDocument();
     expect(screen.getAllByText(/illustrative/i).length).toBeGreaterThan(0);
+  });
+
+  it('offers a way to the assessment from the navigation', () => {
+    render(<AgentFloor />);
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(nav).getByRole('link', { name: 'Get an assessment' })).toHaveAttribute('href', '#af-inquiry');
   });
 
   it('has a persistent, labelled navigation and a skip link', () => {
@@ -38,7 +49,7 @@ describe('scenario controls', () => {
     expect(stepLabel()).toMatch(/Scene 00 of 07: Arrival/);
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
 
-    userEvent.click(screen.getByRole('button', { name: 'Take command' }));
+    userEvent.click(screen.getByRole('button', { name: 'Watch them work' }));
     expect(stepLabel()).toMatch(/Scene 01 of 07: Assignment/);
     expect(screen.getAllByText(/Summarize the Q3 supplier report/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/External export is not granted/).length).toBeGreaterThan(0);
@@ -232,50 +243,118 @@ describe('reduced motion', () => {
   });
 });
 
-describe('assessment inquiry (prototype)', () => {
+describe('assessment request', () => {
   const fill = (over = {}) => {
     userEvent.clear(screen.getByLabelText('Name'));
     userEvent.type(screen.getByLabelText('Name'), over.name ?? 'Ada Lovelace');
-    userEvent.clear(screen.getByLabelText('Email'));
-    userEvent.type(screen.getByLabelText('Email'), over.email ?? 'ada@example.com');
-    if (over.consent !== false) userEvent.click(screen.getByLabelText(/I agree to be contacted/));
+    userEvent.clear(screen.getByLabelText('Work email'));
+    userEvent.type(screen.getByLabelText('Work email'), over.email ?? 'ada@example.com');
+    if (over.consent !== false) userEvent.click(screen.getByLabelText(/You may contact me/));
   };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
 
-  it('is clearly a prototype and defaults to principal continuity', () => {
+  it('ends the page with the request: three fields, an optional disclosure and one button', () => {
     render(<AgentFloor />);
-    expect(screen.getByRole('heading', { name: 'Who was actually behind the action?' })).toBeInTheDocument();
-    expect(screen.getByText(/Prototype, nothing is sent/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Assessment interest')).toHaveValue('principal_continuity');
+    const section = document.getElementById('af-inquiry');
+    expect(within(section).getByRole('heading', { name: 'Your agents have boundaries too.' })).toBeInTheDocument();
+    expect(within(section).getByRole('heading', { name: 'Get an assessment' })).toBeInTheDocument();
+    ['Name', 'Work email', /Company or project/].forEach((l) => expect(within(section).getByLabelText(l)).toBeInTheDocument());
+    expect(within(section).getByText(/Tell us about your agent system/)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: /Request an assessment/ })).toBeInTheDocument();
   });
 
-  it('reports every missing required field with a link to it, and no success', () => {
+  it('says plainly when an endpoint is explicitly unavailable', () => {
+    render(<AssessmentForm connected={false} />);
+    expect(screen.getByText(/Not connected yet/)).toBeInTheDocument();
+  });
+
+  it('reports every missing required field with a link to it, and no success', async () => {
     render(<AgentFloor />);
-    userEvent.click(screen.getByRole('button', { name: /Check and preview/ }));
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    await flush();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(/Enter your name/);
-    expect(alert).toHaveTextContent(/Enter your email/);
-    expect(alert).toHaveTextContent(/agree to be contacted/);
+    expect(alert).toHaveTextContent(/Enter your work email/);
+    expect(alert).toHaveTextContent(/contact you/);
     expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.queryByText(/Not sent\./)).not.toBeInTheDocument();
-    expect(screen.queryByText(/thank you|submitted|we.ll be in touch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Request received/)).not.toBeInTheDocument();
   });
 
-  it('rejects a malformed email and requires consent', () => {
+  it('rejects a malformed email and requires consent', async () => {
     render(<AgentFloor />);
     fill({ email: 'not-an-email', consent: false });
-    userEvent.click(screen.getByRole('button', { name: /Check and preview/ }));
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    await flush();
     expect(screen.getByRole('alert')).toHaveTextContent(/valid email/);
-    expect(screen.getByRole('alert')).toHaveTextContent(/agree to be contacted/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/contact you/);
   });
 
-  it('on valid input shows a local preview that says nothing was sent', () => {
-    render(<AgentFloor />);
+  it('with no endpoint configured, says nothing was sent and keeps what was typed', async () => {
+    render(<AssessmentForm connected={false} submit={async () => ({ status: 'not-configured' })} />);
     fill();
-    userEvent.click(screen.getByRole('button', { name: /Check and preview/ }));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByText(/Not sent\./)).toBeInTheDocument();
-    expect(screen.getByText(/no way to deliver them/)).toBeInTheDocument();
-    expect(screen.queryByText(/thank you|submitted successfully/i)).not.toBeInTheDocument();
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    await flush();
+    expect(await screen.findByText(/Nothing was sent\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Request received/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Ada Lovelace');
+  });
+
+  it('shows success only when the endpoint accepted the request', async () => {
+    const submit = jest.fn().mockResolvedValue({ status: 'sent', receipt: '11111111-1111-4111-8111-111111111111' });
+    render(<AssessmentForm connected submit={submit} />);
+    fill();
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    expect(await screen.findByText('Request received.')).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ada Lovelace', email: 'ada@example.com', consent: true }));
+    expect(screen.queryByText(/Not connected yet/)).not.toBeInTheDocument();
+  });
+
+  it('on a failed send, says so and keeps the details for another try', async () => {
+    const submit = jest.fn().mockResolvedValue({ status: 'error', code: 500 });
+    render(<AssessmentForm connected submit={submit} />);
+    fill();
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    expect(await screen.findByText(/couldn’t confirm receipt/)).toBeInTheDocument();
+    expect(screen.queryByText(/Request received/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Work email')).toHaveValue('ada@example.com');
+  });
+});
+
+describe('lead client', () => {
+  const values = { ...INITIAL_VALUES, name: ' Ada ', email: 'ada@example.com ', consent: true };
+
+  it('only treats https, same-origin paths and local dev servers as configured', () => {
+    expect(isConfigured('')).toBe(false);
+    expect(isConfigured('http://example.com/lead')).toBe(false);
+    expect(isConfigured('javascript:alert(1)')).toBe(false);
+    expect(isConfigured('//evil.example/lead')).toBe(false);
+    expect(isConfigured('https://api.example.com/assessment')).toBe(true);
+    expect(isConfigured('/api/assessment')).toBe(true);
+    expect(isConfigured('http://localhost:8090/api/assessment')).toBe(true);
+  });
+
+  it('sends nothing when no endpoint is configured', async () => {
+    const fetchImpl = jest.fn();
+    await expect(submitAssessmentRequest(values, { endpoint: '', fetchImpl })).resolves.toEqual({ status: 'not-configured' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('POSTs trimmed JSON in the body, never in the URL, and requires a committed receipt', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true, status: 201, headers: { get: () => 'application/json' }, json: async () => ({ status: 'received', receipt: '11111111-1111-4111-8111-111111111111' }) });
+    await expect(submitAssessmentRequest(values, { endpoint: '/api/assessment', fetchImpl })).resolves.toEqual({ status: 'sent', receipt: '11111111-1111-4111-8111-111111111111' });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('/api/assessment');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual(toPayload(values));
+    expect(JSON.parse(init.body).name).toBe('Ada');
+    expect(url).not.toMatch(/ada/i);
+  });
+
+  it('reports an error on a non-2xx response or a network failure', async () => {
+    await expect(submitAssessmentRequest(values, { endpoint: '/x', fetchImpl: jest.fn().mockResolvedValue({ ok: false, status: 500 }) }))
+      .resolves.toMatchObject({ status: 'error', code: 500 });
+    await expect(submitAssessmentRequest(values, { endpoint: '/x', fetchImpl: jest.fn().mockRejectedValue(new Error('offline')) }))
+      .resolves.toEqual({ status: 'error' });
   });
 });
 
@@ -293,7 +372,6 @@ describe('validateInquiry', () => {
     [{ email: '' }, 'email'],
     [{ email: 'a@b' }, 'email'],
     [{ email: 'a b@c.com' }, 'email'],
-    [{ interest: 'bogus' }, 'interest'],
     [{ context: 'x'.repeat(1001) }, 'context'],
     [{ organization: 'x'.repeat(121) }, 'organization'],
     [{ consent: false }, 'consent'],
@@ -303,5 +381,55 @@ describe('validateInquiry', () => {
 
   it('keeps organization and context optional', () => {
     expect(validateInquiry({ ...ok, organization: '', context: '' })).toEqual({});
+  });
+});
+
+
+describe('receipt integrity and failure recovery', () => {
+  const values = { ...INITIAL_VALUES, name: 'Ada', email: 'ada@example.com', consent: true, token: 'signed' };
+  it.each([
+    { ok: true, status: 200, headers: { get: () => 'text/html' } },
+    { ok: true, status: 202, headers: { get: () => 'application/json' }, json: async () => ({ status: 'received', receipt: '11111111-1111-4111-8111-111111111111' }) },
+    { ok: true, status: 201, headers: { get: () => 'application/json' }, json: async () => ({ status: 'received' }) },
+    { ok: true, status: 201, headers: { get: () => 'application/json' }, json: async () => ({ status: 'queued', receipt: '11111111-1111-4111-8111-111111111111' }) },
+  ])('never claims delivery from an unverified 2xx response', async (response) => {
+    expect((await submitAssessmentRequest(values, { fetchImpl: jest.fn().mockResolvedValue(response) })).status).toBe('error');
+  });
+  it('contains thrown submission errors and preserves fields', async () => {
+    render(<AssessmentForm connected submit={async () => { throw new Error('offline'); }} />);
+    userEvent.type(screen.getByLabelText('Name'), 'Ada'); userEvent.type(screen.getByLabelText('Work email'), 'ada@example.com');
+    userEvent.click(screen.getByLabelText(/You may contact me/)); userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    expect(await screen.findByText(/couldn’t confirm receipt/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Work email')).toHaveValue('ada@example.com');
+  });
+  it('focuses the first invalid field', () => {
+    render(<AssessmentForm connected={false} />);
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+  });
+  it('explains scope and source-backed deliverables without promising findings', () => {
+    render(<AgentFloor />);
+    expect(screen.getByText(/discuss one workflow, agree on scope/)).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Assessment deliverables' })).toHaveTextContent('Authority mappingReproducible findingsRemediation guidance');
+    expect(screen.getByRole('link', { name: /Vulnerable vs. fixed/ })).toHaveAttribute('href', 'https://github.com/Aryanvirpsu/Crypton-DI/tree/main/labs/validation-benchmark/v0.1');
+  });
+});
+
+
+describe('slow connection delivery', () => {
+  it('shares an in-flight challenge with submission so receipt retries keep the original token', async () => {
+    let completeChallenge;
+    const pending = new Promise(resolve => { completeChallenge = resolve; });
+    global.fetch.mockReturnValueOnce(pending).mockResolvedValueOnce({ ok: true, status: 201, headers: { get: () => 'application/json' }, json: async () => ({ status: 'received', receipt: '11111111-1111-4111-8111-111111111111' }) });
+    render(<AssessmentForm connected />);
+    userEvent.type(screen.getByLabelText('Name'), 'Ada');
+    userEvent.type(screen.getByLabelText('Work email'), 'ada@example.com');
+    userEvent.click(screen.getByLabelText(/You may contact me/));
+    userEvent.click(screen.getByRole('button', { name: /Request an assessment/ }));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    completeChallenge({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ token: 'original-signed-token' }) });
+    expect(await screen.findByText('Request received.')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body).token).toBe('original-signed-token');
   });
 });

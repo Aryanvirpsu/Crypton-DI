@@ -20,11 +20,11 @@ export function statusText(action) {
 
 // ── manager desk ─────────────────────────────────────────────────────────────
 
-export function ManagerDesk({ step, vis, selection, onSelect, onNext }) {
+export function ManagerDesk({ step, vis, selection, onSelect, onNext, compact = false }) {
   const grant = vis.grants[0];
   const s = STEPS[step];
   return (
-    <section className="af-panel-card" aria-labelledby="af-desk-h">
+    <section className={compact ? 'af-desk af-desk--compact' : 'af-panel-card'} aria-labelledby="af-desk-h">
       <h3 id="af-desk-h" className="af-eyebrow">Manager desk</h3>
       {!vis.task ? (
         <p className="af-desk-empty">No task assigned yet. Assign Scout a task to begin.</p>
@@ -43,7 +43,7 @@ export function ManagerDesk({ step, vis, selection, onSelect, onNext }) {
         </div>
       )}
 
-      {step < STEPS.length - 1 && (
+      {onNext && step < STEPS.length - 1 && (
         <button type="button" className="af-btn af-btn--primary" onClick={onNext}>
           {s.cta}
         </button>
@@ -289,23 +289,29 @@ export function Inspector({ selection, vis, step, onSelect }) {
 
 // ── event log ────────────────────────────────────────────────────────────────
 
-export function EventLog({ step, vis }) {
+export function EventLog({ step, vis, compact = false, live = true }) {
   const s = STEPS[step];
+  const list = vis.events.length === 0 ? (
+    <p className="af-muted">No events yet.</p>
+  ) : (
+    <ol className="af-events">
+      {vis.events.map((ev) => (
+        <li key={ev.id}><span className="af-id">{ev.id}</span> {ev.text}</li>
+      ))}
+    </ol>
+  );
   return (
-    <section className="af-log" aria-labelledby="af-log-h">
-      <h3 id="af-log-h" className="af-eyebrow">Scenario events</h3>
-      <p className="af-narration" role="status" aria-live="polite">
+    <section className={`af-log${compact ? ' af-log--compact' : ''}`} aria-labelledby="af-log-h">
+      <h3 id="af-log-h" className={compact ? 'af-sr' : 'af-eyebrow'}>Scenario events</h3>
+      <p className="af-narration" role={live ? 'status' : undefined} aria-live={live ? 'polite' : undefined}>
         <strong>Scene {String(step).padStart(2, '0')}: {s.title}.</strong> {s.narration}
       </p>
-      {vis.events.length === 0 ? (
-        <p className="af-muted">No events yet.</p>
-      ) : (
-        <ol className="af-events">
-          {vis.events.map((ev) => (
-            <li key={ev.id}><span className="af-id">{ev.id}</span> {ev.text}</li>
-          ))}
-        </ol>
-      )}
+      {compact ? (
+        <details className="af-details af-log-details">
+          <summary>Event log ({vis.events.length})</summary>
+          {list}
+        </details>
+      ) : list}
     </section>
   );
 }

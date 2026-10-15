@@ -1,6 +1,8 @@
 import React from 'react';
 import { ROBOT_ART } from './Robots';
 import { PRINCIPALS, RESOURCES, getEntity } from './scenario';
+import { graphAt } from './authorityGraph';
+import { CHIP_TEXT, RESOURCE_GLYPH, inspectLabel } from './stageLabels';
 
 /**
  * One stage, two views. The SAME agent / resource / chip elements exist in both views;
@@ -101,21 +103,17 @@ function FloorBackdrop() {
 
 // ── atlas backdrop ────────────────────────────────────────────────────────────
 
-function edgeClass(kind, entity) {
-  if (kind === 'grant') return 'af-edge af-edge--grant';
-  if (kind === 'delegation') return 'af-edge af-edge--delegation';
-  return entity.status === 'attempted' ? 'af-edge af-edge--attempted' : 'af-edge af-edge--executed';
-}
+const EDGE_CLASS = {
+  grant: 'af-edge af-edge--grant',
+  delegation: 'af-edge af-edge--delegation',
+  executed: 'af-edge af-edge--executed',
+  attempted: 'af-edge af-edge--attempted',
+};
 
-function AtlasBackdrop({ vis, layout }) {
-  const edges = [
-    ...vis.grants.map((g) => ({ id: g.id, kind: 'grant', from: g.from, to: g.to, e: g })),
-    ...vis.delegations.map((d) => ({ id: d.id, kind: 'delegation', from: d.from, to: d.to, e: d })),
-    ...vis.actions
-      .filter((a) => a.id !== 'ACT-002') // same hop as DL-001; shown as its own chip
-      .map((a) => ({ id: a.id, kind: 'action', from: a.actor, to: a.target || a.resource, e: a })),
-  ];
-  const external = vis.actions.some((a) => a.id === 'ACT-003');
+function AtlasBackdrop({ step, layout }) {
+  const all = graphAt(step).edges;
+  const edges = all.filter((e) => e.kind !== 'unrecorded');
+  const external = all.some((e) => e.kind === 'unrecorded');
   return (
     <svg viewBox="0 0 1000 600" className="af-backdrop" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet">
       <defs>
@@ -131,7 +129,7 @@ function AtlasBackdrop({ vis, layout }) {
       {edges.map((ed) => {
         const [x1, y1] = vb(layout, ed.from);
         const [x2, y2] = vb(layout, ed.to);
-        return <line key={ed.id} x1={x1} y1={y1} x2={x2} y2={y2} className={edgeClass(ed.kind, ed.e)} markerEnd="url(#af-arrow)" />;
+        return <line key={ed.id} x1={x1} y1={y1} x2={x2} y2={y2} className={EDGE_CLASS[ed.kind]} markerEnd="url(#af-arrow)" />;
       })}
       {external && (
         <g>
@@ -145,21 +143,6 @@ function AtlasBackdrop({ vis, layout }) {
 }
 
 // ── interactive layer ─────────────────────────────────────────────────────────
-
-const RESOURCE_GLYPH = {
-  'RS-REPORT': 'RPT',
-  'RS-RECORDS': 'REC',
-  'RS-EXTERNAL': 'EXT',
-};
-
-// [id, short word]. The word is dropped in the Atlas, where space is tight and the legend carries it.
-const CHIP_TEXT = {
-  'GR-001': ['GR-001', 'grant'],
-  'DL-001': ['DL-001', 'delegation'],
-  'ACT-001': ['ACT-001', 'read'],
-  'ACT-002': ['ACT-002', 'delegate'],
-  'ACT-003': ['ACT-003', 'requested'],
-};
 
 function chipKind(id) {
   if (id.startsWith('GR')) return 'grant';
@@ -178,7 +161,7 @@ export default function Stage({ view, step, selection, focus, onSelect, vis }) {
         <FloorBackdrop />
       </div>
       <div className={`af-layer af-layer--atlas${view === 'atlas' ? '' : ' is-off'}`}>
-        <AtlasBackdrop vis={vis} layout={ATLAS} />
+        <AtlasBackdrop step={step} layout={ATLAS} />
       </div>
 
       {/* manager */}
@@ -187,7 +170,7 @@ export default function Stage({ view, step, selection, focus, onSelect, vis }) {
         className={`af-node af-node--manager${cls('PR-MGR')}`}
         style={pos(layout, 'PR-MGR')}
         aria-pressed={selection === 'PR-MGR'}
-        aria-label="Inspect Manager (you, the human manager)"
+        aria-label={inspectLabel('PR-MGR')}
         onClick={() => onSelect('PR-MGR')}
       >
         <span className="af-glyph" aria-hidden="true">YOU</span>
@@ -202,7 +185,7 @@ export default function Stage({ view, step, selection, focus, onSelect, vis }) {
           className={`af-node af-node--resource${cls(r.id)}${r.id === 'RS-EXTERNAL' ? ' is-external' : ''}`}
           style={pos(layout, r.id)}
           aria-pressed={selection === r.id}
-          aria-label={`Inspect resource ${r.id}: ${r.name}`}
+          aria-label={inspectLabel(r.id)}
           onClick={() => onSelect(r.id)}
         >
           <span className="af-glyph" aria-hidden="true">{RESOURCE_GLYPH[r.id]}</span>
@@ -220,7 +203,7 @@ export default function Stage({ view, step, selection, focus, onSelect, vis }) {
             className={`af-agent af-agent--${p.name.toLowerCase()}${cls(p.id)}`}
             style={pos(layout, p.id)}
             aria-pressed={selection === p.id}
-            aria-label={`Inspect ${p.name}, ${p.role.toLowerCase()}`}
+            aria-label={inspectLabel(p.id)}
             onClick={() => onSelect(p.id)}
           >
             <Art />
@@ -237,7 +220,7 @@ export default function Stage({ view, step, selection, focus, onSelect, vis }) {
           className={`af-chip af-chip--${chipKind(c.id)}${cls(c.id)}`}
           style={pos(layout, c.id)}
           aria-pressed={selection === c.id}
-          aria-label={`Inspect ${c.id}`}
+          aria-label={inspectLabel(c.id)}
           onClick={() => onSelect(c.id)}
         >
           <span>{CHIP_TEXT[c.id][0]}</span>
