@@ -10,6 +10,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
+    "postgres": "^3.4.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-scripts": "5.0.1",
@@ -20,7 +21,10 @@
     "start": "node scripts/start.cjs",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "dev:api": "node --env-file-if-exists=api/.env.local scripts/dev-api.mjs",
+    "test:api": "node --test \"api/__tests__/*.test.mjs\"",
+    "inbox": "node --env-file-if-exists=api/.env.local api/tools/inbox.mjs"
   },
   "eslintConfig": {
     "extends": [
