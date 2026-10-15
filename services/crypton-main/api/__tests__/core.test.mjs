@@ -256,7 +256,7 @@ describe('the handler tells the truth', () => {
     const api = handler.createApi({ env: { ASSESSMENT_DATABASE_URL: 'postgres://u:SECRETPW@h/db' }, log: { error: (...a) => logs.push(a.join(' ')) } });
     const r = await run(api.submit, mockReq({ body: body() }));
     assert.deepEqual([r.status, r.json], [503, { error: 'unavailable' }]);
-    assert.match(logs[0], /ASSESSMENT_MASTER_KEY/);
+    assert.match(logs[0], /ASSESSMENT_MASTER_KEY=unset/);
     assert.ok(!logs.join().includes('SECRETPW'));
   });
 

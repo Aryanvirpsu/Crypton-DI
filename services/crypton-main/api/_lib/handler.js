@@ -49,7 +49,7 @@ function createApi({ env = process.env, store: injectedStore, now = () => Date.n
     try {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' }, { Allow: 'GET' });
       const ctx = setup();
-      if (!ctx.ok) return unavailable(res, ctx.missing);
+      if (!ctx.ok) return unavailable(res, ctx.missing, ctx.why);
       if (!originAllowed(req, ctx.config.origins)) return sendJson(res, 403, { error: 'origin' });
       return sendJson(res, 200, { token: crypto.issueChallenge(ctx.keys, now()) });
     } catch (error) {
@@ -62,7 +62,7 @@ function createApi({ env = process.env, store: injectedStore, now = () => Date.n
     try {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' }, { Allow: 'POST' });
       const ctx = setup();
-      if (!ctx.ok) return unavailable(res, ctx.missing);
+      if (!ctx.ok) return unavailable(res, ctx.missing, ctx.why);
       const { config, keys, store } = ctx;
 
       if (!originAllowed(req, config.origins)) return sendJson(res, 403, { error: 'origin' });
