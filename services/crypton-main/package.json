@@ -24,7 +24,7 @@
     "eject": "react-scripts eject",
     "dev:api": "node --env-file-if-exists=api/.env.local scripts/dev-api.mjs",
     "test:api": "node --test \"api/__tests__/*.test.mjs\"",
-    "inbox": "node --env-file-if-exists=api/.env.local api/tools/inbox.mjs"
+    "inbox": "node --env-file-if-exists=api/.env.local scripts/inbox.mjs"
   },
   "eslintConfig": {
     "extends": [

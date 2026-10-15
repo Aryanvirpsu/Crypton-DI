@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import postgres from 'postgres';
 
 const require = createRequire(import.meta.url);
-const { deriveKeys, decryptPayload } = require('../_lib/crypto.js');
+const { deriveKeys, decryptPayload } = require('../api/_lib/crypto.js');
 
 const STATUSES = ['new', 'reviewing', 'contacted', 'qualified', 'closed', 'spam'];
 const url = process.env.ASSESSMENT_OPERATOR_DATABASE_URL;

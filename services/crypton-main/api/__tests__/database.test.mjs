@@ -14,7 +14,7 @@ import { startApiServer } from '../../scripts/dev-api.mjs';
 import { createTestDatabase, getToken, goodBody, freshIp, instanceEnv, lib, ORIGIN, post, sleep, startWorker, waitForSafeMinuteWindow } from './harness.mjs';
 
 const ADMIN = process.env.ASSESSMENT_TEST_DATABASE_URL;
-const TOOL = fileURLToPath(new URL('../tools/inbox.mjs', import.meta.url));
+const TOOL = fileURLToPath(new URL('../../scripts/inbox.mjs', import.meta.url));
 const UUID = /^[a-f\d]{8}-([a-f\d]{4}-){3}[a-f\d]{12}$/;
 const MINT_WAIT = 1700; // a token cannot be spent for 1.5 s
 const FUNCTION_CALL = `select * from assessment.submit_inquiry(gen_random_uuid(), repeat('a',64), repeat('b',64), repeat('c',64), 'deadbeef', decode(repeat('00',40),'hex'), 'x', 'agent-floor')`;

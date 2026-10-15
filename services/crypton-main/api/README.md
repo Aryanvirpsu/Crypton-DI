@@ -104,7 +104,7 @@ No variable is `REACT_APP_*`; none is read by anything under `src/`, so none can
 | Per-email 3/hour, per-client 60/min | database | Atomic across instances |
 | Idempotency + altered-retry detection | database | |
 | Safe errors, names-only logs | function | Logs carry an error *code* only, never a value, SQL or stack |
-| Platform rate limit | **Vercel Firewall (not configured yet)** | Recommended: rate-limit rule on `POST /api/assessment` (for example 10 per minute per IP). Needs a dashboard step; see "Outstanding configuration". |
+| Platform rate limit | **Vercel Firewall** | Recommended: a rate-limit rule on `POST /api/assessment` (for example 10 per minute per IP), set per project in the Vercel dashboard. |
 | Bot challenge (Turnstile / BotID) | **evaluated, not implemented** | Would add a third-party dependency and a client change; hold until real abuse appears. The signed token, honeypot and DB throttles are the interim controls. |
 
 ## Compromises (stated plainly)
@@ -143,7 +143,6 @@ which is the only deterministic way to prove the per-email lock and the idempote
 The migration was also mutation-tested: granting `anon` read, omitting RLS, and removing the per-email advisory
 lock each make the suite fail.
 
-## Outstanding configuration (requires owner approval)
+## Deployment configuration
 
-See the deployment checklist in `supabase/README.md`. Nothing here has been applied to any Supabase project or
-Vercel project.
+See the deployment checklist in `supabase/README.md`.

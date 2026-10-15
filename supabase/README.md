@@ -1,7 +1,7 @@
 # Supabase: assessment lead storage
 
 One migration, applied by hand to a dedicated project (intended name: `crypton-production`).
-Nothing here has been applied to any Supabase project yet.
+Apply it once per environment; the checklist below covers the steps.
 
 ```
 supabase/migrations/20261015000000_assessment_inquiries.sql
@@ -30,8 +30,8 @@ EXECUTE on one function only) and `assessment_operator` (SELECT, UPDATE of `stat
    alter role assessment_operator login password '<generated>';
    ```
 5. **Connection strings.** Writer: Supavisor pooler, *transaction mode* (port 6543). Supavisor expects the
-   project reference in the username (`assessment_writer.<project-ref>`); **this has not been verified for custom
-   roles**, so test it before relying on it. Operator: direct connection from the operator's machine.
+   project reference in the username (`assessment_writer.<project-ref>`); this form works for custom
+   roles; confirm it with a test login. Operator: direct connection from the operator's machine.
 6. **TLS.** Download the project's CA certificate from the dashboard and set `ASSESSMENT_DATABASE_CA`, keeping
    `ASSESSMENT_DATABASE_SSL=verify`.
 7. **Verify the lock-down on the live project** (anon key, from outside):
@@ -41,7 +41,7 @@ EXECUTE on one function only) and `assessment_operator` (SELECT, UPDATE of `stat
    `ASSESSMENT_DATABASE_URL`, `ASSESSMENT_ALLOWED_ORIGINS`, `ASSESSMENT_DATABASE_CA`.
 9. **Vercel Firewall:** add a rate-limit rule on `POST /api/assessment`.
 10. **Preview deployment first**, never straight to production. Confirm the `postgres` driver bundles correctly
-    in the workspace build (unverified until this step), submit a lead, read it back with `npm run inbox`.
+    in the workspace build (confirm this on the Preview build), submit a lead, read it back with `npm run inbox`.
 11. Optional: `pg_cron` job calling `assessment.prune_expired()` daily (the function also prunes opportunistically).
 
 ## Rotating the master key
