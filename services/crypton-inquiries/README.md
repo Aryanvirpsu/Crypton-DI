@@ -1,5 +1,9 @@
 # Crypton private assessment inbox
 
+> **Scope.** This SQLite service is for local development and single-host self-hosting only. Production runs on
+> Vercel Functions + Supabase Postgres: see [`services/crypton-main/api/README.md`](../crypton-main/api/README.md).
+> The two share one public contract.
+
 Dependency-free Node 24+ service for Agent Floor enquiries. This is a separate,
 small public-intake boundary; the identity service and gateway remain unchanged.
 No email provider, paid service, browser storage or public read endpoint is used.
