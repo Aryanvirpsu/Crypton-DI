@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { C } from './palette';
 import { FREEZE_STEP, SHOTS, shotFor } from './choreography';
+import { fitFrame, framingPoints } from './framing';
 import { STEPS } from '../scenario';
 import { WorldContext, useWorld } from './worldContext';
 import Floor3D from './Floor3D';
@@ -81,7 +82,7 @@ function Director({ step, clockRef }) {
 }
 
 /** Key light dims and a coral spot finds the request when the frame is held. */
-function Lights({ step }) {
+function Lights({ step, compact }) {
   const key = useRef();
   const hemi = useRef();
   const spot = useRef();
@@ -107,7 +108,7 @@ function Lights({ step }) {
         intensity={2.4}
         color={C.bone}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={compact ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0004}
         shadow-camera-left={-12}
         shadow-camera-right={14}
@@ -123,17 +124,27 @@ function Lights({ step }) {
 }
 
 /** Damped camera that frames each scene, follows robots, and keeps the subject clear of the HUD. */
-function CameraRig({ step, view, progressRef, inset }) {
+function CameraRig({ step, view, progressRef, inset, compact, safe }) {
   const { camera, size, pointer } = useThree();
   const world = useWorld();
   const look = useRef(null);
   const tmpPos = useMemo(() => new THREE.Vector3(), []);
   const tmpTarget = useMemo(() => new THREE.Vector3(), []);
 
+  // Small screens: fit the scene's cast inside the band the HUD leaves free, instead of scaling
+  // the desktop shot. Null on desktop and for the final pullback, which keep their own framing.
+  const framing = useMemo(() => {
+    if (!compact || !safe) return null;
+    const defaultView = STEPS[step].defaultView;
+    const points = framingPoints(step, view, defaultView);
+    if (!points) return null;
+    return fitFrame({ points, step, view, defaultView, width: size.width, height: size.height, safe });
+  }, [compact, safe, step, view, size.width, size.height]);
+
   // The HUD offsets the projection so subjects stay clear of panels. The offset eases to
   // its target instead of jumping, so a layout change never snaps the world sideways.
   const target = useRef(inset);
-  target.current = inset;
+  target.current = framing ? framing.shift : inset;
   const cur = useRef(null);
   useEffect(() => {
     cur.current = [target.current[0], target.current[1]];
@@ -161,10 +172,15 @@ function CameraRig({ step, view, progressRef, inset }) {
     }
     // scrolling through a scene eases the camera slightly closer; portrait screens
     // (phones) pull back so the same subjects still fit across the narrow width
-    const p = progressRef ? progressRef.current : 0;
-    const aspect = size.width / size.height;
-    const portrait = aspect < 1 ? Math.min(1.7, 1 + (1 - aspect) * 1.1) : 1;
-    tmpPos.sub(tmpTarget).multiplyScalar((1 - 0.07 * p) * portrait).add(tmpTarget);
+    if (framing) {
+      // fitted: the distance is exactly what keeps the cast inside the safe band (no scroll zoom)
+      tmpPos.sub(tmpTarget).multiplyScalar(framing.scale).add(tmpTarget);
+    } else {
+      const p = progressRef ? progressRef.current : 0;
+      const aspect = size.width / size.height;
+      const portrait = aspect < 1 ? Math.min(1.7, 1 + (1 - aspect) * 1.1) : 1;
+      tmpPos.sub(tmpTarget).multiplyScalar((1 - 0.07 * p) * portrait).add(tmpTarget);
+    }
     if (!world.reduced) {
       tmpPos.x += pointer.x * 0.35;
       tmpPos.y += pointer.y * 0.2;
@@ -200,10 +216,10 @@ function Scene(props) {
     <>
       <Director step={step} clockRef={props.clockRef} />
       <PerfProbe />
-      <CameraRig step={step} view={view} progressRef={props.progressRef} inset={props.inset} />
+      <CameraRig step={step} view={view} progressRef={props.progressRef} inset={props.inset} compact={props.compact} safe={props.safe} />
       <color attach="background" args={[C.graphite]} />
       <fog attach="fog" args={[C.graphite, 45, 175]} />
-      <Lights step={step} />
+      <Lights step={step} compact={props.compact} />
       <Floor3D step={step} showEcosystem={step === 7 && view === STEPS[7].defaultView} />
       {['AG-SCOUT', 'AG-RELAY', 'AG-COURIER'].map((id) => (
         <Robot key={id} id={id} step={step} selected={selection === id} onSelect={onSelect}>
@@ -239,7 +255,7 @@ export default function World3D(props) {
     <Canvas
       className="af-canvas"
       shadows="percentage"
-      dpr={props.cta ? 1 : [1, 1.75]}
+      dpr={props.cta ? 1 : props.compact ? [1, 1.5] : [1, 1.75]}
       frameloop={active ? 'always' : 'never'}
       camera={{ position: first.pos, fov: first.fov, near: 0.5, far: 220 }}
       gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 1.25 }}

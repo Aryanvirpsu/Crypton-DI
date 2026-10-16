@@ -54,6 +54,13 @@ Four layers, each with one job:
 - The outcome the evidence could support is **UNVERIFIABLE**, labelled "Illustrative scenario. Not a finding." ENFORCED and VIOLATED would need real evidence and, for VIOLATED, an affirmative trust-boundary check.
 - Research section: methodology exercised internally; benchmark cases compare documented vulnerable vs fixed third-party versions; no external customer validation.
 
+## Small screens (under 1024px)
+Desktop is untouched; everything below is gated on `vw < 1024`.
+- **Camera** (`world/framing.js`): instead of scaling the desktop shot, each scene lists the points that must be visible (the cast, their name tags, the places they relate to) and the camera is fitted: the closest distance along the shot's own direction at which they all project inside the band the HUD leaves free, plus the screen shift that centres them in it. Pure maths, tested without WebGL. The final pullback keeps its own composition.
+- **Safe band and labels** (`mobileLayout.js`): `useSafeRect` measures the header and the story text so the fit uses the real free area (a left column in landscape). `useLabelSolver` keeps the name tags apart with a CSS transform on the tag, and fades out a tag that cannot be placed without covering a more important one or the HUD (it returns on keyboard focus).
+- **Layout** (`agentFloorWorld.css`): one 44px tray row (`‹  01 02 03 04  ›  i`), safe-area aware (`viewport-fit=cover`, `env(safe-area-inset-*)`), a short-screen and a landscape arrangement, and type retuned for 320 to 430px.
+- **Cost**: device pixel ratio capped at 1.5 and a 1024px shadow map on phones.
+
 ## Tests
 Manifest integrity and copy honesty, authority-graph derivation (monotonic, typed, the request is attempted with an unrecorded destination leg, Courier never holds authority), world blocking agreeing with the scenario (envelopes match grants, records and destination outside every envelope, Courier never leaves the dock), reducer transitions (next/prev/reset/goto/skip determinism), component behaviour (controls, keyboard, same IDs across Floor/Atlas, inspector facts, evidence, reduced motion), inquiry validation and no-fake-success.
 
