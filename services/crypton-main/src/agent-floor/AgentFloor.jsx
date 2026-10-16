@@ -376,8 +376,8 @@ export default function AgentFloor() {
               {/* 01 · the opening */}
               <div className="af-hud-hero" inert={state.step !== 0 ? true : undefined}>
                 <HeroCopy onWatch={watch} onAssess={goAssessment} />
-                <p className="af-scroll-cue" aria-hidden="true">Scroll to watch</p>
               </div>
+              <p className="af-scroll-cue" aria-hidden="true"><span>Scroll to watch</span><i /></p>
 
               {/* 02–03 · one line per scene (re-keyed so each line animates in) */}
               <div className="af-hud-caption">
