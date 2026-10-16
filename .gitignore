@@ -72,3 +72,7 @@ __pycache__/
 # Tool-managed worktrees and test-generated output (kept locally, not tracked)
 .claude/worktrees/
 risk-engine/risk_playground.log
+
+# Private inquiry inbox, encryption keys and local verification artifacts
+services/crypton-inquiries/.private/
+services/crypton-inquiries/.verification/
