@@ -8,6 +8,7 @@ import { SCENARIO_ID, STEPS, visibleAt } from './scenario';
 import { LAST_STEP, initialState, reducer } from './state';
 import { MOMENTS, STORY, momentOf } from './story';
 import { initialMode, sceneFromURL, useOnScreen, useSceneScroll, useViewport } from './experience';
+import { useLabelSolver, useSafeRect } from './mobileLayout';
 
 // The 3D world is its own chunk: it loads only where WebGL is available.
 const World3D = lazy(() => import('./world/World3D'));
@@ -233,7 +234,11 @@ export default function AgentFloor() {
   // Keep the camera's subject clear of the HUD: right of the hero / closing card, left of
   // the details drawer, above the caption; on phones, above the bottom sheet.
   const wide = vw >= 1024;
+  const compact = !wide;
   const bookend = state.step === 0 || state.step === FINAL;
+  // Phones and small tablets: fit the cast inside what the HUD leaves free, and keep name tags apart.
+  const safe = useSafeRect({ enabled: immersive && compact, step: state.step, vw, vh });
+  useLabelSolver(tagLayerRef, { enabled: immersive && compact, safe, reduced });
   const inset = useMemo(() => {
     if (!wide) return [0, -Math.round(vh * (state.step === 0 ? 0.2 : state.step === FINAL ? 0.2 : 0.12))];
     if (state.step === FINAL) return [0, 0]; // the world sits centred behind the call to action
@@ -361,6 +366,8 @@ export default function AgentFloor() {
                     progressRef={progressRef}
                     clockRef={clockRef}
                     inset={inset}
+                    compact={compact}
+                    safe={safe}
                     detail={details}
                     cta={cta}
                     tagLayerRef={tagLayerRef}
@@ -448,8 +455,9 @@ export default function AgentFloor() {
                   <button type="button" className="af-btn af-btn--icon" aria-label="Previous scene" onClick={prev} disabled={state.step === 0}>‹</button>
                   <button type="button" className="af-btn af-btn--icon" aria-label="Next scene" onClick={next} disabled={state.step === FINAL}>›</button>
                   <button type="button" className="af-btn af-btn--quiet af-bar-replay" onClick={() => dispatch({ type: 'RESET' })}>Replay</button>
-                  <button type="button" className="af-btn af-btn--quiet" aria-expanded={details} aria-controls="af-details" onClick={() => setDetails((d) => !d)}>
-                    {details ? 'Hide details' : 'Inspect details'}
+                  <button type="button" className="af-btn af-btn--quiet af-bar-details" aria-expanded={details} aria-controls="af-details" onClick={() => setDetails((d) => !d)}>
+                    <span className="af-btn-label">{details ? 'Hide details' : 'Inspect details'}</span>
+                    <span className="af-btn-glyph" aria-hidden="true">{details ? '×' : 'i'}</span>
                   </button>
                 </div>
                 <span className="af-timecode" aria-hidden="true">
