@@ -58,16 +58,24 @@ html:has(.af--immersive), body:has(.af--immersive) { overflow-x: clip; }
   font-size: clamp(44px, 6vw, 88px); max-width: 11ch; margin: 12px 0 18px;
 }
 .af-hud-hero .af-lead { max-width: 38ch; font-size: clamp(16px, 1.5vw, 19px); }
+/* the scroll cue: centred on the whole stage, a label above a hairline track with one lime pulse running down it */
 .af-scroll-cue {
-  margin-top: 28px; font: 500 11px var(--af-mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--af-mist);
-  display: flex; align-items: center; gap: 10px;
+  position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); margin: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  font: 500 11px var(--af-mono); letter-spacing: 0.34em; text-transform: uppercase; color: var(--af-mist);
+  transition: opacity 0.6s var(--af-ease), visibility 0s linear 0s;
 }
-.af-scroll-cue::after {
-  content: ''; width: 1px; height: 34px; background: linear-gradient(var(--af-lime), transparent);
-  animation: af-cue 1.8s var(--af-ease) infinite;
+/* trailing letter-spacing would push the words off-centre; pad the left to match */
+.af-scroll-cue span { padding-left: 0.34em; }
+.af-scroll-cue i { position: relative; display: block; width: 1px; height: 46px; overflow: hidden; background: rgba(244, 241, 236, 0.16); }
+.af-scroll-cue i::after {
+  content: ''; position: absolute; left: 0; top: 0; width: 1px; height: 20px;
+  background: linear-gradient(to bottom, transparent, var(--af-lime));
+  animation: af-cue 2.2s cubic-bezier(0.6, 0, 0.2, 1) infinite;
 }
-@keyframes af-cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+@keyframes af-cue { 0% { transform: translateY(-100%); } 75%, 100% { transform: translateY(240%); } }
 .af-sticky:not([data-step='0']) .af-hud-hero { opacity: 0; transform: translateX(-24px); pointer-events: none; visibility: hidden; transition: none; }
+.af-sticky:not([data-step='0']) .af-scroll-cue { opacity: 0; visibility: hidden; transition: none; }
 
 /* 02–03 · caption: one line, like a subtitle, bottom left */
 .af-hud-caption {
@@ -315,13 +323,14 @@ html:has(.af--immersive), body:has(.af--immersive) { overflow-x: clip; }
 /* ── narrow screens: world on top, one sheet at the bottom ────────── */
 @media (max-width: 1023px) {
   .af-hud-hero {
-    width: 100%; top: auto; justify-content: flex-end; padding: 36vh 18px 128px;
+    width: 100%; top: auto; justify-content: flex-end; padding: 36vh 18px 206px;
     background: linear-gradient(0deg, rgba(var(--af-graphite-rgb), 0.96) 0%, rgba(var(--af-graphite-rgb), 0.82) 55%, rgba(var(--af-graphite-rgb), 0) 100%);
   }
   .af-hud-hero h1 { font-size: clamp(40px, 11vw, 60px); }
   .af-hud-hero .af-lead { font-size: 16px; }
   .af-hud-hero .af-row { margin-top: 14px; }
-  .af-scroll-cue { margin-top: 14px; }
+  .af-scroll-cue { bottom: 126px; gap: 10px; }
+  .af-scroll-cue i { height: 34px; }
   .af-hud-caption { left: 18px; right: 18px; width: auto; bottom: 128px; }
   .af-hud-caption::before { inset: -120px -18px -80px -18px; background: linear-gradient(0deg, rgba(var(--af-graphite-rgb), 0.95) 30%, rgba(var(--af-graphite-rgb), 0)); }
   .af-caption-line { font-size: clamp(28px, 8vw, 40px); }
