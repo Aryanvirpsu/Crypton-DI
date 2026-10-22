@@ -2,11 +2,15 @@
 
 Crypton is an experimental security prototype for exploring identity,
 authorization, delegation, approval, and accountability in action-taking
-AI agent workflows. It has two parts: a real Rust/Postgres identity
-service (`crypton-id`) that does WebAuthn passkey authentication for
-humans, and a Python prototype (`agent-lab`) built on top of that identity
-that gives *agents* their own identity, delegated authority, and
-pre-execution authorization checks.
+AI agent workflows. Its core is a real Rust/Postgres identity service
+(`crypton-id`) that does WebAuthn passkey authentication for humans,
+fronted by a gateway (`crypton-gateway`) that verifies its tokens and applies
+replay, rate-limit and risk-policy controls, and a Python prototype
+(`agent-lab`) built on that identity that gives *agents* their own identity,
+delegated authority, and pre-execution authorization checks. Around them sit
+assessment tooling and evidence (`assessment-kit`, `labs/`) and a public site
+(`crypton-main`) with an assessment intake. **New to the repository? Start with
+[`docs/handoff/CTO-HANDOFF.md`](docs/handoff/CTO-HANDOFF.md).**
 
 This README describes what's actually implemented, verified against the
 code — not a roadmap. See [`DECISIONS.md`](DECISIONS.md) for why things
@@ -66,8 +70,10 @@ Agent identity is behind the gateway's extension point in name only —
 `crypton-gateway`'s request path. Also not implemented: agent-security /
 adversarial testing (prompt or tool injection, delegation-attack
 simulation), MCP integration, and any agent-delegation check in the
-gateway. (Rate limiting, replay protection and risk-engine policy middleware
-exist on `dev` but are not proven end to end; see the gateway README.)
+gateway. (The gateway's token verification, replay protection, rate limiting and
+risk-engine policy are implemented and demonstrated against the real services in
+the container stack; production-platform network isolation is not verified from
+this repository. See the gateway README, "Verification status".)
 
 ## Architecture
 
@@ -102,7 +108,9 @@ has no agent-delegation checks. See
 services/crypton-id        Rust/Axum identity service — WebAuthn, JWT, devices, recovery, audit log, admin
 services/crypton-gateway   Rust/Axum gateway — verifies crypton-id EdDSA tokens, nonce/rate-limit/risk-policy, durable decision trail (see its README for what is and is not proven)
 services/crypton-console   Product frontend — register, login, devices, recovery, admin
-services/crypton-main      Public marketing site, no backend calls
+services/crypton-main      Public site (Agent Floor) + serverless assessment-intake API in api/ (Vercel Functions + Supabase Postgres); it does not call crypton-id
+services/crypton-inquiries Local / single-host assessment inbox (SQLite), same public contract as crypton-main/api; not the production path
+supabase/                  Migration for the assessment_inquiries schema (least-privilege roles)
 libs/crypton-sdk           TypeScript client SDK — the only thing that talks to crypton-id over HTTP
 risk-engine                Rust library — risk scoring, linked into the gateway
 policy-engine              Rust library — standalone policy evaluators (not linked into anything deployed)
@@ -111,11 +119,12 @@ labs/exp-*, labs/validation-benchmark   Reproducible experiments and benchmark c
 assessment-kit, assessment-engagement, pilot-pack, crypton-bigidea-2026   Assessment manual, reference engagement, pilot and verification evidence
 tests/runtime              Real-stack verification suite (tests/runtime/run.sh)
 infra/                     docker-compose: dev Postgres+Redis, and the full single-entry-point stack
+scripts/                   rust-audit.sh (RustSec gate) and its justified-exceptions list
 docs/                      Documentation — start at docs/README.md (one authoritative place per topic)
 ```
 
 Both frontends are kept deliberately: `crypton-console` is the product app, `crypton-main` is
-the marketing site (see [`docs/repository.md`](docs/repository.md)).
+the public site and assessment intake (see [`docs/repository.md`](docs/repository.md)).
 
 ## Running it locally
 
@@ -123,7 +132,7 @@ Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 [Node.js ≥ 18](https://nodejs.org/), [Rust + Cargo](https://rustup.rs/).
 
 ```powershell
-.\start-all.ps1              # first run auto-generates dev.env with a random JWT secret
+.\start-all.ps1              # first run creates dev.env from dev.env.example and an Ed25519 JWT keypair (needs openssl on PATH)
 .\status.ps1                 # health check every service
 .\stop-all.ps1                # stop (Postgres/Redis stay up — pass -StopInfra to stop those too)
 ```
@@ -132,6 +141,13 @@ This brings up Postgres + Redis (Docker), `crypton-id` (:8080),
 `crypton-gateway` (:8090), `crypton-main` (:3000), and `crypton-console`
 (:3001). Open http://localhost:3001 and register — the browser will prompt
 for Touch ID / Face ID / a security key.
+
+> **Caveat (from `docs/deployment-topology.md`, not re-run in the 2026-10-21 cleanup):**
+> `start-all.ps1` predates the hardened gateway and does not provision all of the gateway's
+> required environment (`JWT_PUBLIC_KEY_PEM_FILE`, `INTERNAL_TOKEN`, `DATABASE_URL`). For
+> anything that must behave like the real topology, use the containerized stack:
+> `tests/runtime/run.sh` (add `KEEP_STACK=1` to leave it running) or
+> `infra/docker-compose.stack.yml`.
 
 ### Manual / per-service
 
@@ -173,7 +189,10 @@ Delegation / scope attenuation:  labs/agent-lab/src/agentlab/delegation.py, chai
 Authorization pipeline:          labs/agent-lab/src/agentlab/authorization.py
 Approval (human-in-the-loop):    labs/agent-lab/src/agentlab/approval.py
 The agent loop itself:           labs/agent-lab/src/agentlab/agent.py
-Tests:                           services/crypton-id/src (inline), libs/crypton-sdk/src/__tests__, labs/agent-lab/tests
+Gateway (token, nonce, policy):  services/crypton-gateway/src/middleware/, services/crypton-gateway/README.md
+Real-stack verification:         tests/runtime/ (run.sh, e2e.mjs), infra/docker-compose.stack.yml
+Tests:                           services/crypton-id/src (inline), services/crypton-gateway/src, libs/crypton-sdk/src/__tests__, labs/agent-lab/tests
+Handoff / how everything fits:   docs/handoff/CTO-HANDOFF.md
 ```
 
 ## Testing
@@ -189,9 +208,11 @@ tests/runtime/run.sh                          # the real services in containers,
 ```
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the Rust, gateway-integration,
-real-stack runtime and frontend-build jobs on every push to `main`/`dev` and every PR. The
-workflow is validated locally only; it has not yet run on GitHub-hosted runners (see
-`docs/testing.md`).
+real-stack runtime, frontend-build and `rust-audit` jobs on every push to `main`/`dev` and every
+PR, plus a weekly `rust-audit`. It runs on GitHub-hosted runners. As of 2026-10-21 the `rust`,
+`runtime` and `frontend` jobs pass on `main`, but `rust-audit` fails there; it needs the
+rustls bump in PR #13 plus a small lockfile follow-up (see
+[`docs/dependency-audit.md`](docs/dependency-audit.md)).
 
 ## Current status
 

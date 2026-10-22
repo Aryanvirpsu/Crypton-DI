@@ -92,6 +92,46 @@ docker run --rm -v "$PWD/services/crypton-id:/src" -v idtest-target:/src/target 
 - `frontend`: `npm ci`, SDK build/typecheck/tests, production builds of `crypton-main` and
   `crypton-console` with `CI=true` (lint warnings are errors), and their tests.
 
-Status: the `rust`, `runtime` and `frontend` jobs passed on GitHub-hosted runners for `3a02135`
-(run 38462305933 on `dev`, 38487878105 on `main`). The `rust-audit` job was validated locally
-(script exit codes, YAML) and has **not yet run on a hosted runner**.
+Status (read from the GitHub API, 2026-10-21): the `rust`, `runtime` and `frontend` jobs passed
+on GitHub-hosted runners for `3a02135` (run 38462305933 on `dev`, 38487878105 on `main`) and
+again for the push of `4344036` (run 38959492440). The `rust-audit` job **has now run on hosted
+runners and is failing on `main`** (same push run, and the weekly run 39260629639): new RustSec
+advisories appeared after the last remediation. See "Status update, 2026-10-21" in
+[`dependency-audit.md`](dependency-audit.md); PR #13 plus a lockfile-only follow-up clears it.
+
+### What CI does not run
+
+These suites exist and pass locally (numbers in the next section) but no CI job executes them,
+so a regression in them would not turn CI red:
+
+- `risk-engine` (309 tests) and `policy-engine` (35 tests). The gateway links `risk-engine`,
+  so its code is compiled in CI, but its own tests are not run.
+- `labs/agent-lab` (453) and the other Python labs (`exp-003-*`, `exp-007`).
+- `services/crypton-main/api` tests (`npm run test:api`) and `services/crypton-inquiries` tests.
+- `cargo clippy`, and `cargo fmt --check` for `risk-engine` and `policy-engine` (both currently
+  report formatting differences: 506 and 50 hunks respectively).
+
+### Fresh run, 2026-10-21 (cleanup worktree on `origin/main` `4344036`)
+
+Windows 11, Docker Desktop, throwaway Postgres 16 and Redis 7 on loopback ports. Raw logs are
+kept outside the repository; the full table, commands and exceptions are in
+[`handoff/HANDOFF-VERIFICATION-REPORT.md`](handoff/HANDOFF-VERIFICATION-REPORT.md).
+
+| Layer | Result |
+|---|---|
+| Real-stack runtime suite (`tests/runtime/run.sh`, run through Git Bash) | 88/88 checks |
+| `crypton-id` (`cargo test`, with Postgres and Redis) | 41 passed |
+| Gateway (`cargo test`; `cargo test -- --ignored` with Postgres and Redis) | 32 passed; 37 passed |
+| `risk-engine` / `policy-engine` | 309 passed (+3 ignored) / 35 passed |
+| `crypton-sdk` | 11 passed (typecheck and build clean) |
+| `crypton-console` / `crypton-main` (`CI=true`) | 7 passed / 123 passed (9 suites); both production builds succeed |
+| `crypton-main/api` (with throwaway Postgres) | 64 passed, 0 skipped |
+| `crypton-inquiries` | 20 passed |
+| `labs/agent-lab`; EXP-007A; EXP-003 OpenAI / Microsoft / LangGraph | 453; 16; 17 / 12 / 12 passed |
+
+Windows notes from this run: `crypton-id` built with the vcpkg OpenSSL described above
+(`VCPKG_ROOT`), and `bash` on PATH may resolve to WSL's launcher (no distribution installed
+here), so run `tests/runtime/run.sh` and `scripts/rust-audit.sh` through Git Bash
+(`"C:\Program Files\Git\bin\bash.exe" tests/runtime/run.sh`) and leave MSYS path conversion on.
+Running the Python and experiment suites rewrites tracked `labs/exp-003*/evidence/*.json`
+files (new timestamps and ids); restore them with `git restore labs/*/evidence` afterwards.

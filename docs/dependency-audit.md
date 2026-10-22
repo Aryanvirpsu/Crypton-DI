@@ -18,6 +18,43 @@ Method: `cargo audit --json` per lockfile, then `cargo tree -i <pkg>@<ver> -e no
 binary ("compiled"), only in dev/test builds, or only listed in `Cargo.lock` (e.g. optional
 features that are off).
 
+### Status update, 2026-10-21: the gate is red on `main` and PR #13 alone will not clear it
+
+The tables below describe 2026-10-13 and are kept as the record of that remediation. New
+advisories have been published since, so the counts are no longer current:
+
+| Lockfile | Unlisted vulnerabilities on `origin/main` (`4344036`) | After PR #13 (rustls 0.23.46) | After PR #13 + the lockfile bump below |
+|---|---|---|---|
+| `services/crypton-id` | 6: `RUSTSEC-2026-0346/-0347/-0348/-0349` (`rustls` 0.23.45), `-0381` (`webpki-roots`), `-0382` (`rustls-webpki` 0.103.15) | 2 (`-0381`, `-0382`) | 0 |
+| `services/crypton-gateway` | 6, same IDs | 2 | 0 |
+| `risk-engine` | 6, same IDs | 2 | 0 |
+| `policy-engine` | 0 | 0 | 0 |
+
+- CI evidence: the hosted `rust-audit` job failed on the push of `4344036` (run 38959492440)
+  and on the weekly scheduled run (run 39260629639), while `rust`, `runtime` and `frontend`
+  passed on the same commit. PR #13 was green on all four jobs when it ran (2026-10-16),
+  **before** `RUSTSEC-2026-0381` (published 2026-10-19) and `-0382` (2026-10-20) existed.
+- Reproduced locally on 2026-10-21 with `bash scripts/rust-audit.sh` (Git Bash on Windows;
+  `bash` on PATH may be WSL's, which has no distribution here) and, for exact per-lockfile
+  lists, `cargo audit --file <lock> --json` with the ignore list from
+  `scripts/rust-audit-ignore.txt`.
+- The follow-up that clears the remaining two is lockfile-only and semver-compatible, applied
+  on top of PR #13 in each of the three lockfiles (`webpki-roots` is at 1.0.9 in `crypton-id`,
+  1.0.6 in the gateway, 1.0.7 in `risk-engine`; name the version, because a second
+  `webpki-roots` major exists and a bare `-p webpki-roots` is ambiguous):
+
+  ```sh
+  cargo update -p rustls-webpki@0.103.15 -p webpki-roots@<current version>
+  # -> rustls-webpki 0.103.16, webpki-roots 1.0.10
+  ```
+
+  Tried on a throwaway worktree of PR #13's branch: `cargo audit` then reports 0 unlisted
+  vulnerabilities in all three lockfiles, and the lockfile diff is 17 lines added and 17 removed. It was
+  **not** merged, committed or pushed from the cleanup branch (it is an independent dependency
+  change). The compile result is recorded in `HANDOFF-VERIFICATION-REPORT.md`.
+- `rust-audit` is not part of the pass/fail that protects `main`: nothing requires it before a
+  merge. Whether it should be a required check is a CTO decision.
+
 ### Before and after (baseline `3a02135`)
 
 | Lockfile | Vulnerabilities before -> after | Warnings before -> after | Compiled into a shipped binary before -> after |

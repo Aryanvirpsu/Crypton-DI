@@ -6,6 +6,7 @@ they are superseded by a newer entry, not edited.
 
 | Topic | Authoritative location | Notes |
 |---|---|---|
+| **Engineering handoff: what exists, how to build and test it, risks, priorities, ownership** | [`handoff/CTO-HANDOFF.md`](handoff/CTO-HANDOFF.md) | Fresh test results: [`handoff/HANDOFF-VERIFICATION-REPORT.md`](handoff/HANDOFF-VERIFICATION-REPORT.md); starting state: [`handoff/PRE_CLEANUP_BASELINE.md`](handoff/PRE_CLEANUP_BASELINE.md); Graphify caveats: [`handoff/GRAPHIFY-NOTES.md`](handoff/GRAPHIFY-NOTES.md) |
 | Agent / developer instructions, founder strategy, **security and strategic Decision Log** | [`/AGENTS.md`](../AGENTS.md) (`CLAUDE.md` is a one-line pointer to it) | Append-only Decision Log is §15 |
 | Technical decision log (Agent Lab / identity design decisions, invariants) | [`/DECISIONS.md`](../DECISIONS.md) | Append-only; different scope from AGENTS.md §15 |
 | System architecture, request flow, real-vs-experimental | [`architecture.md`](architecture.md) | |

@@ -1,7 +1,7 @@
 # Crypton Gateway
 
-Rust/Axum gateway in front of `crypton-id`. On `dev` it is a reverse proxy with a
-security middleware stack. It verifies the tokens `crypton-id` issues, applies replay,
+Rust/Axum gateway in front of `crypton-id`. On `main` (and `dev`) it is a reverse proxy
+with a security middleware stack. It verifies the tokens `crypton-id` issues, applies replay,
 rate-limit and risk-policy controls, and records every allow/deny decision.
 [Verification status](#verification-status) states exactly what is and is not proven.
 

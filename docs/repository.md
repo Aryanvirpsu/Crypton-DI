@@ -6,7 +6,12 @@
 services/crypton-id        Rust identity service (WebAuthn, EdDSA JWT, devices, recovery, audit). Authoritative issuer.
 services/crypton-gateway   Rust gateway: the stack's single external entry point (see deployment-topology.md)
 services/crypton-console   Product frontend (React/CRA): register, login, devices, recovery, admin. Uses @crypton/sdk.
-services/crypton-main      Public marketing site (React/CRA). No product functionality.
+services/crypton-main      Public site (React/CRA): Agent Floor experience + assessment-intake form, with a
+                           serverless intake API in api/ (Vercel Functions + Supabase Postgres). No product
+                           functionality; does not call crypton-id.
+services/crypton-inquiries Local / single-host SQLite twin of the intake API (same public contract). Not the production path.
+supabase/                  Migration for the assessment_inquiries schema
+scripts/                   rust-audit.sh and rust-audit-ignore.txt (the RustSec CI gate)
 libs/crypton-sdk           TypeScript client for crypton-id via the gateway
 risk-engine                Rust library: deterministic risk scoring. Linked into the gateway.
 policy-engine              Rust library: standalone policy evaluators. NOT linked into anything deployed (unique work, kept).
@@ -27,11 +32,11 @@ configuration, experiment imports and paths cited in the Decision Log, for no fu
 | | `crypton-console` | `crypton-main` |
 |---|---|---|
 | Purpose | The product app | Public marketing/landing site |
-| Backend | `@crypton/sdk` -> gateway -> `crypton-id` (register, login, devices, recovery, admin, audit) | none (a landing page; links to the console) |
-| Routes / UI | 9 screens (Login, Register, Dashboard, Devices, Recovery, Actions, Admin x3) | one `Landing.js` (~88 KB) |
-| Dependencies | CRA 5, React 19, `@crypton/sdk` | CRA 5, React 19 |
-| Deploy | Vercel (own `vercel.json`) | Vercel (own `vercel.json`) |
-| Activity | consolidated from the former demo+admin apps (2026-08) | landing-page work through 2026-04; **uncommitted local work in progress** (component setup) at the time of this cleanup |
+| Backend | `@crypton/sdk` -> gateway -> `crypton-id` (register, login, devices, recovery, admin, audit) | none of Crypton's identity stack; its own `api/` serves the assessment intake (Supabase Postgres) |
+| Routes / UI | 9 screens (Login, Register, Dashboard, Devices, Recovery, Actions, Admin x3) | the Agent Floor experience at `/` (`src/agent-floor/`), plus the earlier `Landing.js` (~88 KB) |
+| Dependencies | CRA 5, React 19, `@crypton/sdk` | CRA 5, React 19, 3D libraries for the Agent Floor |
+| Deploy | Vercel (own `vercel.json`) | Vercel (own `vercel.json`); delivery through the public production origin was still unverified in `docs/agent-floor-readiness-2026-10-14.md` |
+| Activity | consolidated from the former demo+admin apps (2026-08) | Agent Floor and intake work merged to `main` through PRs #11, #12 and #14 |
 
 Decision: keep both. They have different audiences, release cadences and (for `crypton-main`) an
 active uncommitted workstream. The overlap is three small, byte-identical boilerplate files
@@ -68,9 +73,23 @@ Three long-lived branches:
 
 `lab` starts at the same commit as `dev` (no divergent product copy). Short-lived topic
 branches are fine; they are deleted after they are merged and their unique commits are
-confirmed to be in `dev`. As of this change every local and remote branch is an ancestor of
+confirmed to be in `dev`. As of 2026-10-13 every local and remote branch was an ancestor of
 `dev` (no unique commits) except two Dependabot branches, which carry only lockfile bumps for
 frontends that no longer exist or have since changed (`crypton-demo`, `crypton-admin`, and an
 older `crypton-main` lockfile): re-run `npm audit` / let Dependabot re-open rather than
-merging them. No remote branch has been deleted; `origin/main` and `origin/dev` are behind
-local `dev` because nothing has been pushed.
+merging them. No remote branch had been deleted; at that time `origin/main` and `origin/dev`
+were behind local `dev` because nothing had been pushed.
+
+### Actual state, 2026-10-21 (read from refs; the rule table above is no longer followed)
+
+- `origin/main` (`4344036`) is the current line. `origin/dev` (`d882223`) is its ancestor and
+  has not moved since 2026-10-13. `lab` exists only locally (`50d57e9`).
+- Since then work reached `main` by pull request (#11, #12, #14), not by fast-forward from
+  `dev`. The "only fast-forwarded from `dev`" rule is therefore not in effect; nothing in the
+  repository enforces it either way.
+- Open pull requests: #13 (rustls 0.23.46 advisories, into `main`), #10 (Agent Floor RC1, into
+  `dev`; its content reached `main` via #11), #9 (gateway hardening into `feat/risk-engine`,
+  last touched 2026-06-24), #5 and #6 (Dependabot npm bumps into `main`).
+- Open decision for the CTO: keep the `main`/`dev`/`lab` model and actually follow it, or
+  collapse to `main` plus short-lived topic branches, and either way close or retarget #9 and
+  #10. See `docs/handoff/CTO-HANDOFF.md`.

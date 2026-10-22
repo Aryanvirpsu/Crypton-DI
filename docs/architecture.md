@@ -14,9 +14,9 @@ test layers are in [`testing.md`](testing.md); the repository map and branch wor
         ┌───────────────┼───────────────┐
         │                               │
   crypton-main                  crypton-console
-  (marketing, :3000)         (product app, :3001)
-  no backend calls                       │
-                                          │ CRA dev proxy (same-origin)
+  (public site + Agent Floor,   (product app, :3001)
+   :3000; own /api/assessment,           │
+   not wired to crypton-id)              │ CRA dev proxy (same-origin)
                                           ▼
                                 crypton-gateway (:8090)
                           verifies crypton-id tokens · nonce ·
@@ -91,6 +91,7 @@ platform from this repository. See `deployment-topology.md`.
 | Recovery (lost-device, trusted-device-approves, no email/SMS) | Real, working |
 | Step-up verification (`/actions/*`) | Real cryptographic proof-of-presence; carries no business logic itself |
 | OAuth authorization-code flow | Real state machine, but no PKCE, single hardcoded client — unmounted unless `ENABLE_OAUTH=true` |
-| Rate limiting / replay protection / policy engine at the gateway | On `dev`: verifies `crypton-id` EdDSA tokens; demonstrated against the real services in containers with a single external entry point and identity-produced security signals (`docs/deployment-topology.md`). Production-platform isolation is unverified. Absent on `main`. |
+| Rate limiting / replay protection / risk-engine policy at the gateway | On `main` (and `dev`): verifies `crypton-id` EdDSA tokens; demonstrated against the real services in containers with a single external entry point and identity-produced security signals (`docs/deployment-topology.md`). Production-platform isolation is unverified. The standalone `policy-engine` crate is **not** part of this path (it is not linked into anything deployed). |
+| Public assessment intake (`crypton-main/api`, Supabase Postgres) | Serverless endpoints with encrypted-at-rest payloads, signed challenges and fail-closed configuration; separate from the identity path. Production delivery was not verified end to end (see `docs/agent-floor-readiness-2026-10-14.md`). `services/crypton-inquiries` is its local/single-host SQLite twin. |
 | Agent identity / delegation (`labs/agent-lab`) | Real, working, but a separate Python lab, not wired behind the gateway — see `labs/README.md`. As of v0.6: multi-hop delegation chains (`Human -> Agent -> Agent -> ...`), Ed25519-signed, scope-attenuated (child authority can only narrow), verified by one authoritative walker (`chain.py`) — see `docs/CRYPTON_TECHNICAL_SOT_v1.1.md` §11 and `DECISIONS.md`. Root-only (single-hop) delegation remains fully supported as the degenerate case. Human-issued Approval sits on top, unchanged. |
 | Agent-security testing (adversarial/attack simulation) | Not implemented |

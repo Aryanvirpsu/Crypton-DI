@@ -9,6 +9,11 @@ on:
     - cron: "17 6 * * 1"
   workflow_dispatch:
 
+# Least privilege: every job only checks out code and runs tests/audits, so the
+# GITHUB_TOKEN needs no more than read access to the repository.
+permissions:
+  contents: read
+
 # Keep this fast and boring: format/check/test each crate and each frontend
 # package. No deployment steps here on purpose.
 jobs:
