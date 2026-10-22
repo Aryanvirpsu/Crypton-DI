@@ -35,7 +35,7 @@ configuration, experiment imports and paths cited in the Decision Log, for no fu
 | Backend | `@crypton/sdk` -> gateway -> `crypton-id` (register, login, devices, recovery, admin, audit) | none of Crypton's identity stack; its own `api/` serves the assessment intake (Supabase Postgres) |
 | Routes / UI | 9 screens (Login, Register, Dashboard, Devices, Recovery, Actions, Admin x3) | the Agent Floor experience at `/` (`src/agent-floor/`), plus the earlier `Landing.js` (~88 KB) |
 | Dependencies | CRA 5, React 19, `@crypton/sdk` | CRA 5, React 19, 3D libraries for the Agent Floor |
-| Deploy | Vercel (own `vercel.json`) | Vercel (own `vercel.json`); delivery through the public production origin was still unverified in `docs/agent-floor-readiness-2026-10-14.md` |
+| Deploy | Vercel (own `vercel.json`) | Vercel (own `vercel.json`); `docs/agent-floor-readiness-2026-10-14.md` predates the production cutover, which is recorded in the maintainers' private operations notes (outside this repository, not re-verified here) |
 | Activity | consolidated from the former demo+admin apps (2026-08) | Agent Floor and intake work merged to `main` through PRs #11, #12 and #14 |
 
 Decision: keep both. They have different audiences, release cadences and (for `crypton-main`) an

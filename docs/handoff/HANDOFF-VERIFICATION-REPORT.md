@@ -159,7 +159,8 @@ not read (`gh` is unauthenticated here). The production deployment cannot be see
 2. Run the suites CI skips (`risk-engine`, `policy-engine`, Python labs, API, inquiries).
 3. Decide the branch model; close PRs #9, #10, #5, #6; update local `main`.
 4. Make identity fail closed on Redis outage; default `REQUIRE_GATEWAY_SECRET` on in production configs.
-5. Verify one real deployment end to end (isolation, secrets, backups, public-origin intake).
+5. Take over the live environment: get the founder's private operations notes, then verify
+   isolation, secrets, backups and rotation.
 6. Close the risk-engine gaps (signal producers, action-bound step-up, lock-out tuning).
 7. Assessment readiness: deterministic evidence output, pinned Python dependencies, reproducible reference engagement.
 8. Format and lint gates for the Rust libraries; decide the fate of `policy-engine`.

@@ -49,9 +49,12 @@ no paid engagement and no production deployment that this repository can attest 
   not that Crypton discovers vulnerabilities. It was not re-run in this pass.
 - **`policy-engine`**: 35 passing tests, but not linked into anything deployed. Keep, wire or
   archive is an open decision.
-- **Agent Floor and the intake path**: functionally tested locally; delivery through the public
-  production origin was unverified in `docs/agent-floor-readiness-2026-10-14.md`, and the
-  production cutover state is tracked in a private note outside this repository (not read here).
+- **Agent Floor and the intake path**: functionally tested locally and in
+  `docs/agent-floor-readiness-2026-10-14.md`. The public site has since gone live on the
+  production domain; that cutover, the production environment's identifiers and its open
+  follow-ups are in the founder's private operations notes **outside this repository** (the
+  repository is public, so they are deliberately not copied here). Ask the founder to hand
+  them over directly; nothing in this repository lets you verify the live environment.
 - **OAuth** in `crypton-id`: real state machine but no PKCE and a single hardcoded client;
   unmounted unless `ENABLE_OAUTH=true`.
 - **`services/crypton-inquiries`**: a local/single-host SQLite twin of the intake API; not the
@@ -225,7 +228,7 @@ A signed Authorization-to-Test and a legal entity are a hard gate before any pai
 | R12 | `risk-engine/log.txt`, `failed_scenario.md`, `test_results.md` are tracked April-2026 artifacts (the first is linked from a guide); `failed_scenario.md` describes a test failure that no longer occurs (309 tests pass) | Stale artifacts, kept as history | not deleted |
 | R13 | Branch model (`main`/`dev`/`lab`) is documented but not followed; PRs #9 (stale since June) and #10 target other branches | Process | `docs/repository.md` |
 | R14 | `.env.production.example` carried dev credentials and no gateway-secret guidance | Config hygiene | fixed in this change (example file only) |
-| R15 | The hosted `runtime` job passed for the same commit, but the production cutover of the public site and intake delivery through the public origin remain unverified | Deployment | readiness doc; private note |
+| R15 | The public site is live, but its production configuration and open operational follow-ups are documented only in private notes and were not verified in this pass | Deployment / operations | private operations notes (founder) |
 | R17 | (low) `python -m agentlab.assessment.reference_dryrun` overwrites the tracked `assessment-engagement/reference-agentlab-dryrun/` files and does **not** reproduce them: the regenerated copy records the current commit as `target_commit` (committed: `ca2f52f`) and has `authority_map: null` (committed: a populated Authority Model section). Which step produced the committed variant was not investigated | Reproducibility gap, confirmed (low) | run on 2026-10-21; files restored afterwards |
 | R16 | The gateway's CORS allowlist is hard-coded (`app.cryptonid.tech`, `demo.cryptonid.tech`, two localhost origins; `services/crypton-gateway/src/main.rs:160`); the `ALLOWED_ORIGINS` variable once shown in `dev.env.example` was read by nothing (removed from the example in this change) | Config defect, confirmed | `main.rs`; any new frontend origin needs a code change |
 
@@ -254,8 +257,9 @@ production environment; Vercel and Railway are configured as targets only.
    (it is 46 commits behind `origin/main`).
 3. **Make identity fail closed on Redis** with a regression test, as the gateway does (R3);
    make `REQUIRE_GATEWAY_SECRET` the default for production configs.
-4. **Verify one real deployment**: private networking, the shared secret, backups and
-   retention for the intake database, a submission through the public origin (R5, R15).
+4. **Take over the live environment**: get the private operations notes from the founder,
+   then verify the gateway/identity deployment (private networking, the shared secret) and
+   the intake database (backups, retention, credential rotation) (R5, R15).
 5. **Close or retire the risk-engine gaps**: producers for the three signals, action-bound
    step-up, and a decision on the two-failures-deny behaviour (R6).
 6. **Assessment readiness**: keep `labs/agent-lab/src/agentlab/assessment/` stable, make
