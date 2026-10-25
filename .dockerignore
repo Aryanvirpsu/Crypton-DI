@@ -1,0 +1,17 @@
+.git
+**/target
+**/node_modules
+graphify-out
+labs
+docs
+assessment-kit
+assessment-engagement
+pilot-pack
+crypton-bigidea-2026
+services/crypton-console
+services/crypton-main
+libs
+.stack-secrets
+**/.env
+**/.env.*
+!**/.env.example

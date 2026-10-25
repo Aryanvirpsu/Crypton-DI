@@ -1,0 +1,30 @@
+{
+  "envelope_id": "c4a-expected-envelope",
+  "assessment_id": null,
+  "test_id": "candidate-4a",
+  "principal_id": "c4a-principal",
+  "actor_id": "c4a-actor-sub-agent",
+  "execution_context_id": "7ab08647-f513-402e-9b7b-78ebe47df8e1",
+  "grant_chain": [],
+  "allowed_actions": null,
+  "allowed_tools": null,
+  "allowed_resources": null,
+  "argument_constraints": null,
+  "required_approval": true,
+  "approval_id": "c4a-approval",
+  "approval_scope": {
+    "value": null,
+    "provenance": "UNKNOWN",
+    "availability": "UNREPRESENTABLE",
+    "note": "approveToolCall({runId}) with toolCallId omitted has no parameter capable of binding to one specific pending action — the API call shape itself cannot represent a single-action binding in this form, independent of what was or wasn't observed."
+  },
+  "valid_from": null,
+  "expires_at": null,
+  "revocation_state": "UNKNOWN",
+  "delegation_constraints": null,
+  "terminal_or_consumption_state": "granted",
+  "source_evidence_ids": [
+    "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+  ],
+  "derivation_notes": "No grant evidenced in this ledger for the named grant_id — grant-related dimensions left unset. Approval dimension derived from approval_id='c4a-approval'. execution_context_id here is this evidence capture's own run_id field (a fresh UUID minted per harness invocation) — it is not independently confirmed to equal Mastra's internal workflow runId string that approveToolCall({runId}) actually consumes, which this evidence capture did not separately record."
+}

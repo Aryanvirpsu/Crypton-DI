@@ -1,5 +1,5 @@
-use axum::{response::Html, routing::get, Router};
 use crate::state::AppState;
+use axum::{Router, response::Html, routing::get};
 
 // Embed the test UI at compile time so it's served from the same origin as the API.
 // This is critical for WebAuthn (same-origin) and for single-URL tunnel testing.

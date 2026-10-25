@@ -1,0 +1,86 @@
+{
+  "approval_decision": {
+    "round_1": "approved root-level delete_record + delegation only",
+    "round_2": "approved nested delete_record separately"
+  },
+  "approval_request": {
+    "round_1_call_ids": [
+      "root_delegate_2",
+      "root_delete_direct_1"
+    ]
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": null,
+    "notes": [
+      "Identical tool NAME at two nesting levels stayed correctly disambiguated by call_id and agent identity."
+    ],
+    "tool_match": true
+  },
+  "delegation_path": [
+    {
+      "agent": "root",
+      "call_id": "root_delete_direct_1",
+      "calls": "delete_record"
+    },
+    {
+      "agent": "root",
+      "call_id": "root_delegate_2",
+      "calls": "specialist"
+    },
+    {
+      "agent": "specialist",
+      "call_id": "specialist_delete_1",
+      "calls": "delete_record"
+    }
+  ],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "record_id": "rec-1"
+      },
+      "call_id": "root_delete_direct_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "h2_same_tool_name_both_levels",
+      "sequence": 1,
+      "timestamp": 1791838886.3678913,
+      "tool_name": "delete_record",
+      "tool_namespace": null
+    },
+    {
+      "agent_name": "specialist",
+      "approval_state": "approved",
+      "arguments": {
+        "record_id": "rec-1"
+      },
+      "call_id": "specialist_delete_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "h2_same_tool_name_both_levels",
+      "sequence": 2,
+      "timestamp": 1791838886.386703,
+      "tool_name": "delete_record",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "Same-named tool at two nesting levels: approving one call_id's instance did not confer approval on the other."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "note": "delete_record attached directly to root AND reachable via specialist delegation - identical tool name, distinct call_ids"
+  },
+  "scenario": "h2_same_tool_name_both_levels",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

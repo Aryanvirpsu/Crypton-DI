@@ -2,22 +2,21 @@ use std::sync::Arc;
 
 use axum::Router;
 use tower_governor::{
-    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+    GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
 };
-
 
 use crate::state::AppState;
 
-pub mod auth_webauthn;
 mod actions;
+mod admin;
 mod audit_logs;
+pub mod auth_webauthn;
 mod devices;
 mod health;
+mod me;
 mod oauth;
 mod recovery;
 mod secure;
-mod stubs;
-mod contact;
 
 pub fn router() -> Router<AppState> {
     let auth_governor = Arc::new(
@@ -41,16 +40,15 @@ pub fn router() -> Router<AppState> {
             .unwrap(),
     );
 
-    let auth_router = auth_webauthn::router()
-        .layer(GovernorLayer { config: auth_governor.clone() });
+    let auth_router = auth_webauthn::router().layer(GovernorLayer {
+        config: auth_governor.clone(),
+    });
 
-    let recovery_router = recovery::router()
-        .layer(GovernorLayer { config: recovery_governor });
+    let recovery_router = recovery::router().layer(GovernorLayer {
+        config: recovery_governor,
+    });
 
-    let oauth_router = oauth::router()
-        .layer(GovernorLayer { config: auth_governor.clone() });
-
-    Router::<AppState>::new()
+    let mut router = Router::<AppState>::new()
         .merge(health::router())
         .merge(auth_router)
         .merge(audit_logs::router())
@@ -58,7 +56,20 @@ pub fn router() -> Router<AppState> {
         .merge(recovery_router)
         .merge(actions::router())
         .merge(secure::router())
-        .merge(stubs::router())
-        .merge(oauth_router)
-        .merge(contact::router())
+        .merge(admin::router())
+        .merge(me::router());
+
+    // OAuth is an experimental, incomplete surface (no PKCE, single hardcoded
+    // client — see routes/oauth.rs) that nothing in this repo currently
+    // consumes. Rather than expose a half-finished auth flow as if it were
+    // production-ready, it stays unmounted unless explicitly opted into.
+    if std::env::var("ENABLE_OAUTH").as_deref() == Ok("true") {
+        tracing::warn!("ENABLE_OAUTH=true — mounting experimental OAuth routes");
+        let oauth_router = oauth::router().layer(GovernorLayer {
+            config: auth_governor.clone(),
+        });
+        router = router.merge(oauth_router);
+    }
+
+    router
 }

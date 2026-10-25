@@ -1,0 +1,4 @@
+traces/*.jsonl
+__pycache__/
+.env.local
+batch_results_temp*.jsonl

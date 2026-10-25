@@ -1,0 +1,12 @@
+# Crypton Agent Lab v0.1 — dependencies.
+# Deliberately minimal: no agent framework (LangChain/LangGraph/CrewAI),
+# just the pieces the requirements ask for.
+
+pydantic>=2.6        # tool argument schema validation
+PyJWT>=2.8            # verifies the same JWTs crypton-id issues
+cryptography>=42      # Ed25519/EdDSA key handling (PyJWT's EdDSA backend) — v0.5.1
+anthropic>=0.34       # the one supported model provider for v0.1
+python-dotenv>=1.0    # loads .env for local dev (JWT_PUBLIC_KEY_PEM, ANTHROPIC_API_KEY)
+
+pytest>=8.0
+pytest-asyncio>=0.23

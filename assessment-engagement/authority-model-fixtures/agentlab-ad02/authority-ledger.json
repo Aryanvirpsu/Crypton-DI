@@ -1,0 +1,169 @@
+{
+  "assessment_id": "ENG-REFERENCE-AGENTLAB-DRYRUN",
+  "events": [
+    {
+      "event_id": "ad02-evt-1-grant-created",
+      "event_type": "GRANT_CREATED",
+      "assessment_id": "ENG-REFERENCE-AGENTLAB-DRYRUN",
+      "test_id": "AD-02",
+      "timestamp": null,
+      "sequence": 1,
+      "execution_context": null,
+      "principal_id": "ad02-principal",
+      "actor_id": "ad02-actor-agent-a",
+      "grant_id": "ad02-grant-actual",
+      "approval_id": null,
+      "action_id": null,
+      "resource_id": null,
+      "effect_id": null,
+      "before_state": null,
+      "after_state": null,
+      "evidence_ids": [
+        "E-001"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    },
+    {
+      "event_id": "ad02-evt-2-action-attempted",
+      "event_type": "ACTION_ATTEMPTED",
+      "assessment_id": "ENG-REFERENCE-AGENTLAB-DRYRUN",
+      "test_id": "AD-02",
+      "timestamp": null,
+      "sequence": 2,
+      "execution_context": null,
+      "principal_id": null,
+      "actor_id": "ad02-actor-agent-a",
+      "grant_id": "ad02-grant-actual",
+      "approval_id": null,
+      "action_id": "ad02-action-get-order-cust2",
+      "resource_id": null,
+      "effect_id": null,
+      "before_state": null,
+      "after_state": "decision=ALLOW, reason_code=ALLOW",
+      "evidence_ids": [
+        "E-003"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  ],
+  "principals": {
+    "ad02-principal": {
+      "principal_type": "human",
+      "principal_id": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not named in AD-02's own cited evidence (E-001/E-002/E-003)."
+      },
+      "authenticated_identity": null,
+      "claimed_identity": null,
+      "tenant_org": null,
+      "evidence_ids": [
+        "E-001"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "RELEASE_APPROVED"
+    }
+  },
+  "actors": {
+    "ad02-actor-agent-a": {
+      "actor_type": "AGENT",
+      "actor_id": {
+        "value": "reference-agent-a",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": "registered name from E-001's evidence text, not Agent Lab's internal agent_id"
+      },
+      "framework_identity": null,
+      "acts_for_principal": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "E-001's evidence text does not name the granting principal."
+      },
+      "evidence_ids": [
+        "E-001"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  },
+  "grants": {
+    "ad02-grant-actual": {
+      "grant_id": {
+        "value": "dlg_00000000000040008000000000000004",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "granted_by": {
+        "value": null,
+        "provenance": "UNKNOWN",
+        "availability": "UNKNOWN",
+        "note": "Not named in E-001's evidence text."
+      },
+      "granted_to": {
+        "value": "reference-agent-a",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "allowed_actions": null,
+      "allowed_tools": [
+        "add_case_note",
+        "get_customer",
+        "get_order"
+      ],
+      "allowed_resources": [
+        "customer_ids:cust_1",
+        "customer_ids:cust_2"
+      ],
+      "argument_constraints": null,
+      "delegation_allowed": null,
+      "delegation_depth_limit": null,
+      "valid_from": null,
+      "expires_at": null,
+      "revoked_at": null,
+      "parent_grant_id": null,
+      "evidence_ids": [
+        "E-001"
+      ],
+      "provenance": "OBSERVED",
+      "classification": "RELEASE_APPROVED"
+    }
+  },
+  "approvals": {},
+  "actions": {
+    "ad02-action-get-order-cust2": {
+      "action_id": {
+        "value": "authz_00000000000040008000000000000011",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": "this is the authorization decision's own decision_id — no separate tool-call/action id was minted, because this evidence is a direct chain.verify_delegation_chain check, not an AgentRunner execution"
+      },
+      "actor_id": {
+        "value": "reference-agent-a",
+        "provenance": "OBSERVED",
+        "availability": "AVAILABLE",
+        "note": null
+      },
+      "tool": "get_order",
+      "operation": null,
+      "arguments": null,
+      "argument_hash": null,
+      "intended_resource": "customer_ids:cust_2",
+      "actual_resource": "customer_ids:cust_2",
+      "state": "authorized",
+      "execution_context_id": null,
+      "evidence_ids": [
+        "E-003"
+      ],
+      "provenance": "OBSERVED",
+      "classification": null
+    }
+  },
+  "resources": {},
+  "effects": {}
+}

@@ -1,4 +1,11 @@
-/// OAuth 2.0 Authorization Code flow — minimal implementation
+/// OAuth 2.0 Authorization Code flow — EXPERIMENTAL, minimal implementation.
+///
+/// Not mounted by default — see `routes/mod.rs` (`ENABLE_OAUTH`). Known gaps
+/// that keep this out of the "real, working" surface: no PKCE, a single
+/// hardcoded client, and an opaque (non-JWT) access token. It is kept in
+/// the tree because the agent-identity work will likely need an OAuth-style
+/// delegation flow, and this is a reasonable starting point — not because
+/// it should be presented as a finished feature today.
 ///
 /// Routes:
 ///   GET  /authorize             — validate client, store session, redirect to React login
@@ -11,11 +18,11 @@
 ///   oauth:code:{code}      TTL 120s  → {user_id, username, client_id, redirect_uri}
 ///   oauth:token:{token}    TTL 3600s → {user_id, username}
 use axum::{
+    Json, Router,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
-    Json, Router,
 };
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
@@ -29,14 +36,12 @@ use crate::{error::AppJson, state::AppState};
 fn cfg_client_id() -> String {
     env::var("OAUTH_CLIENT_ID").unwrap_or_else(|_| "demo-site".into())
 }
-fn cfg_client_secret() -> String {
-    match env::var("OAUTH_CLIENT_SECRET") {
-        Ok(s) if !s.is_empty() => s,
-        _ => {
-            tracing::warn!("OAUTH_CLIENT_SECRET not set — using insecure default. DO NOT deploy to production.");
-            "insecure-change-me".into()
-        }
-    }
+/// No insecure fallback: if this isn't configured, /token always refuses
+/// every client rather than accepting a guessable default secret.
+fn cfg_client_secret() -> Option<String> {
+    env::var("OAUTH_CLIENT_SECRET")
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 fn cfg_redirect_uris() -> Vec<String> {
     env::var("OAUTH_REDIRECT_URIS")
@@ -61,10 +66,7 @@ pub struct AuthorizeParams {
     scope: Option<String>,
 }
 
-pub async fn authorize(
-    Query(p): Query<AuthorizeParams>,
-    State(st): State<AppState>,
-) -> Response {
+pub async fn authorize(Query(p): Query<AuthorizeParams>, State(st): State<AppState>) -> Response {
     if p.response_type != "code" {
         return (StatusCode::BAD_REQUEST, "unsupported_response_type").into_response();
     }
@@ -73,7 +75,10 @@ pub async fn authorize(
         return (StatusCode::BAD_REQUEST, "unknown_client").into_response();
     }
     if !cfg_redirect_uris().contains(&p.redirect_uri) {
-        tracing::warn!("oauth/authorize: disallowed redirect_uri={}", p.redirect_uri);
+        tracing::warn!(
+            "oauth/authorize: disallowed redirect_uri={}",
+            p.redirect_uri
+        );
         return (StatusCode::BAD_REQUEST, "redirect_uri_not_allowed").into_response();
     }
 
@@ -124,14 +129,10 @@ pub async fn oauth_complete(
     AppJson(body): AppJson<CompleteBody>,
 ) -> Response {
     // Verify JWT signature + expiry
-    let claims = match jsonwebtoken::decode::<crate::jwt::Claims>(
-        &body.token,
-        &jsonwebtoken::DecodingKey::from_secret(st.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    ) {
-        Ok(d) => d.claims,
+    let claims = match crate::jwt::verify_token(&st, &body.token) {
+        Ok(c) => c,
         Err(e) => {
-            tracing::warn!("oauth/complete: invalid JWT: {}", e);
+            tracing::warn!("oauth/complete: invalid JWT: {:?}", e);
             return (StatusCode::UNAUTHORIZED, "invalid_token").into_response();
         }
     };
@@ -145,13 +146,6 @@ pub async fn oauth_complete(
         Err(_) => return (StatusCode::UNAUTHORIZED, "invalid_token_cred").into_response(),
     };
 
-    if let Some(ref db) = st.db {
-        if let Err(e) = crate::jwt::verify_device_active(db, cred_uuid, user_id).await {
-            tracing::warn!("oauth/complete: device validation failed: {:?}", e);
-            return (StatusCode::UNAUTHORIZED, "device_not_active").into_response();
-        }
-    }
-
     let mut conn = match st.redis_conn().await {
         Ok(c) => c,
         Err(e) => {
@@ -159,6 +153,25 @@ pub async fn oauth_complete(
             return (StatusCode::INTERNAL_SERVER_ERROR, "storage_error").into_response();
         }
     };
+
+    // A logged-out (denylisted) token must not be exchangeable for an OAuth
+    // code — this used to be a bypass because AuthUser's denylist check
+    // wasn't reachable from this handler (token arrives in the body, not
+    // the Authorization header).
+    if let Ok(true) = crate::redis::sessions::is_denied(&mut conn, &claims.sub, claims.iat).await {
+        tracing::warn!(
+            "oauth/complete: rejected denylisted token for sub={}",
+            claims.sub
+        );
+        return (StatusCode::UNAUTHORIZED, "session_invalidated").into_response();
+    }
+
+    if let Some(ref db) = st.db {
+        if let Err(e) = crate::jwt::verify_device_active(db, cred_uuid, user_id).await {
+            tracing::warn!("oauth/complete: device validation failed: {:?}", e);
+            return (StatusCode::UNAUTHORIZED, "device_not_active").into_response();
+        }
+    }
 
     let session_key = format!("oauth:session:{}", body.nonce);
     let raw: Option<String> = conn.get(&session_key).await.ok().flatten();
@@ -214,10 +227,7 @@ pub struct TokenResponse {
     expires_in: u64,
 }
 
-pub async fn token(
-    State(st): State<AppState>,
-    AppJson(body): AppJson<TokenBody>,
-) -> Response {
+pub async fn token(State(st): State<AppState>, AppJson(body): AppJson<TokenBody>) -> Response {
     if body.grant_type != "authorization_code" {
         return (
             StatusCode::BAD_REQUEST,
@@ -225,8 +235,24 @@ pub async fn token(
         )
             .into_response();
     }
-    if body.client_id != cfg_client_id() || body.client_secret != cfg_client_secret() {
-        tracing::warn!("oauth/token: invalid client credentials client_id={}", body.client_id);
+    let expected_secret = match cfg_client_secret() {
+        Some(s) => s,
+        None => {
+            tracing::error!(
+                "oauth/token: OAUTH_CLIENT_SECRET not configured — refusing all clients"
+            );
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error":"oauth_not_configured"})),
+            )
+                .into_response();
+        }
+    };
+    if body.client_id != cfg_client_id() || body.client_secret != expected_secret {
+        tracing::warn!(
+            "oauth/token: invalid client credentials client_id={}",
+            body.client_id
+        );
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error":"invalid_client"})),
@@ -282,8 +308,7 @@ pub async fn token(
 
     // Issue opaque access token stored in Redis
     let access_token = Uuid::new_v4().to_string();
-    let token_payload =
-        serde_json::json!({ "user_id": user_id, "username": username }).to_string();
+    let token_payload = serde_json::json!({ "user_id": user_id, "username": username }).to_string();
     let token_key = format!("oauth:token:{}", access_token);
     let _: Result<(), _> = conn.set_ex(&token_key, &token_payload, 3600u64).await;
 
@@ -321,9 +346,7 @@ pub async fn userinfo(State(st): State<AppState>, headers: HeaderMap) -> Respons
     let raw: Option<String> = conn.get(&key).await.ok().flatten();
     let raw = match raw {
         Some(s) => s,
-        None => {
-            return (StatusCode::UNAUTHORIZED, "invalid_or_expired_token").into_response()
-        }
+        None => return (StatusCode::UNAUTHORIZED, "invalid_or_expired_token").into_response(),
     };
 
     let data: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();

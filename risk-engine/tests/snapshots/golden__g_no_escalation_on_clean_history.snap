@@ -1,0 +1,23 @@
+---
+source: tests/golden.rs
+expression: "run_with_recent(\"no_escalation_on_clean_history\", ctx, vec![]).await"
+---
+scenario: no_escalation_on_clean_history
+decision: Challenge
+score: 49
+base_score: 49
+adjusted_score: 49
+required_action: StepUpWebAuthn
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: false
+lock_account: false
+notify_user: true
+notify_admin: false
+breakdown: D=5 S=0 N=0 B=40 C=0 base=45 m_action=1.20 m_org=1.00 a=0 final=49
+top_factors:
+  - name: failed_attempts_elevated  component: Behavioral  contribution: 20
+  - name: login_velocity_elevated  component: Behavioral  contribution: 20
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["failed_attempts_elevated", "headless_ua", "login_velocity_elevated"]

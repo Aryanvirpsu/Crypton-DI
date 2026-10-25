@@ -1,0 +1,7 @@
+Rejecting request for session 5de4152eaaa04fc2b4e13f0ef8572ec8: credential does not match the one that created the session
+Crypton Validation Benchmark v0.1 -- Case 01: Principal / Session Binding
+Installed mcp version: 1.27.2
+Baseline status (creator re-requests own session): 400
+Negative control (baseline is not itself a 404): ok
+Cross-principal request status: 404
+VERDICT: PASS -- SECURE (manager rejected the mismatched principal as an unknown session, before ever reaching the transport)

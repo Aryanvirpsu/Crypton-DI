@@ -1,0 +1,67 @@
+{
+  "approval_decision": {
+    "always_approve": false,
+    "call_id": "call_c1",
+    "decision": "approve",
+    "via": "RunState.from_string reload"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "call_c1",
+    "qualified_name": "transfer_funds",
+    "tool_name": "transfer_funds",
+    "tool_namespace": null
+  },
+  "authorization_binding": {
+    "argument_match": true,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "vendor-A"
+      },
+      "call_id": "call_c1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "baseline_c",
+      "sequence": 1,
+      "timestamp": 1791838886.2989426,
+      "tool_name": "transfer_funds",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "Baseline: RunState.to_string() -> RunState.from_string() round trip preserves the pending approval and executes exactly once."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "call_c1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "baseline_c_serialize_resume",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

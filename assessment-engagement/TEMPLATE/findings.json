@@ -1,0 +1,43 @@
+[
+  {
+    "finding_id": "AD-01",
+    "area": "identity_ownership | delegation_authority_flow | scope_attenuation | pre_execution_boundary | authorization_bypass | approval_binding | revocation_expiry | evidence_accountability",
+    "title": "<short, specific title>",
+    "outcome": "ENFORCED | VIOLATED | UNREPRESENTABLE | UNVERIFIABLE | NOT_APPLICABLE",
+    "observation": "<what was actually observed, plainly>",
+    "expected_control": "<what should hold for this to be a genuine ENFORCED>",
+    "evidence_ids": ["E-001"],
+    "severity": null,
+    "risk_impact": null,
+    "recommendation": "<the control to put in place — name the control, not Crypton>",
+    "limitations": null,
+    "confidence": null,
+
+    "_comment_2026_09_30": "Fields below were added in the 2026-09-30 remediation pass (the expanded property/test-record shape). All optional — use null, not an invented value, when a field genuinely wasn't captured. ENFORCED/VIOLATED require a fully-satisfied evidence_gate_status (all seven gates true) in addition to evidence_ids; see docs/ASSESSMENT_METHODOLOGY.md.",
+    "test_id": null,
+    "property_id": null,
+    "property_family": null,
+    "tested_layer": null,
+    "required_semantic_facts": [],
+    "invariant": null,
+    "preconditions": null,
+    "initial_state": null,
+    "stimulus": null,
+    "expected": null,
+    "observed": null,
+    "effect": null,
+    "control_or_calibration": null,
+    "reproduction": null,
+    "retest_condition": null,
+    "evidence_gate_status": {
+      "g1_representability": null,
+      "g2_observability": null,
+      "g3_controlled_execution": null,
+      "g4_effect_confirmation": null,
+      "g5_calibration_control": null,
+      "g6_reproduction": null,
+      "g7_security_claim_triage": null,
+      "notes": null
+    }
+  }
+]

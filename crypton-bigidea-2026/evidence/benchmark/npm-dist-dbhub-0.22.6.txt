@@ -1,0 +1,2 @@
+dist.integrity = 'sha512-lYlbYY1lZpCQDdrp6ULA1J9aYNTMAWhyh9085Cu2L4uK+R1uKlSK2qUGro7Ps/AWllu4PGE8ZOKhMLKAhwcNjg=='
+dist.shasum = '0b523a9c0f24644af351beaf2de4e8923c0f5de6'

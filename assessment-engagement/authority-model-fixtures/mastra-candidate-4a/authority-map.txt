@@ -1,0 +1,13 @@
+AUTHORITY PATH
+
+Principal UNKNOWN [UNKNOWN]
+  |
+  [invariant]
+  v
+Approval UNKNOWN
+    expected scope: one intended pending action
+    basis: assessed invariant
+  |
+  [invariant]
+  v
+Selected pending action

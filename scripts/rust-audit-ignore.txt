@@ -1,0 +1,9 @@
+# Advisories deliberately NOT failing the Rust audit gate. One per line:
+#   <RUSTSEC-ID>  <justification and the trigger that must reopen it>
+# Every entry needs both. Nothing is suppressed without a written reason, and an entry
+# is removed as soon as its trigger fires. The audit still PRINTS these as findings
+# context in docs/dependency-audit.md; only the exit status ignores them.
+
+RUSTSEC-2023-0071  rsa 0.9.10 (Marvin timing sidechannel): no upstream fix exists. Present only in Cargo.lock because sqlx's macro crate lists the MySQL driver; cargo tree shows rsa is not in the resolved dependency graph of crypton-id, the gateway or risk-engine, so it is not compiled into any binary. Reopen if a crate enables sqlx's mysql feature, if rsa is ever compiled (cargo tree -i rsa succeeds), or when upstream publishes a fix.
+
+RUSTSEC-2025-0132  maxminddb 0.24.0 (unsound Reader::open_mmap): affects only open_mmap. risk-engine uses Reader::open_readfile (src/signals/geoip.rs) and the optional `geoip` feature that pulls the crate is off by default and off in every build here. Reopen before enabling the `geoip` feature or if any code calls open_mmap; upgrading to maxminddb >= 0.27 is the intended fix and is an API-breaking change to schedule separately.

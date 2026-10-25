@@ -1,0 +1,53 @@
+{
+  "approval_decision": {
+    "decision": "reject",
+    "request_id": "af-call-86788b5cc38c479b91805aac4b8e28ab"
+  },
+  "approval_request": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b2_1",
+    "id": "af-call-86788b5cc38c479b91805aac4b8e28ab",
+    "tool_name": "transfer_funds"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": null,
+    "checkpoint_match": null,
+    "delegation_match": true,
+    "notes": [
+      "argument_match/checkpoint_match null: nothing executed, no execution-argument set or checkpoint restore involved to compare."
+    ],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003B",
+  "notes": [
+    "Baseline: rejection produces zero side effects."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "vendor-A"
+    },
+    "call_id": "b2_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "b2_reject",
+  "state_boundary": {
+    "checkpoint": null,
+    "session": null,
+    "workflow": "b2_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

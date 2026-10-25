@@ -1,0 +1,42 @@
+{
+  "approval_decision": {
+    "resume": {
+      "approved": false
+    }
+  },
+  "approval_request": {
+    "interrupt_id": "72bac8df852a94399a106f483bfca8ce"
+  },
+  "authorization_binding": {
+    "argument_match": null,
+    "delegation_match": true,
+    "interrupt_id_match": true,
+    "notes": [],
+    "thread_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003C",
+  "notes": [
+    "Rejection produces zero side effects."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "baseline_b_reject",
+  "state_boundary": {
+    "checkpointer": "InMemorySaver",
+    "thread_id": "bb"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

@@ -1,5 +1,9 @@
+# The gateway Dockerfile builds from the repository root (it needs ../../risk-engine).
+# On Railway set this service's root directory to the repo root; dockerfilePath
+# below is relative to it. Only this service should have a public domain; see
+# docs/deployment-topology.md for the private-networking requirements of the rest.
 [build]
-dockerfilePath = "Dockerfile"
+dockerfilePath = "services/crypton-gateway/Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"

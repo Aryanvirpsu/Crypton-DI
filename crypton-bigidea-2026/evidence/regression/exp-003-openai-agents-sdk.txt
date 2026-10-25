@@ -1,0 +1,28 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 17 items
+
+tests/test_approval_guardrail_lifecycle.py::test_h5_control_unchanged_policy_executes_normally PASSED [  5%]
+tests/test_approval_guardrail_lifecycle.py::test_h5_policy_change_between_approval_and_resume_blocks_execution PASSED [ 11%]
+tests/test_approval_guardrail_lifecycle.py::test_h5_policy_change_across_serialize_reload_also_blocks_execution PASSED [ 17%]
+tests/test_argument_binding.py::test_h1a_post_approval_mutation_does_not_execute_drifted_args PASSED [ 23%]
+tests/test_argument_binding.py::test_h1b_reload_then_mutate_before_approval_is_rejected_by_sdk PASSED [ 29%]
+tests/test_baseline.py::test_baseline_a_approve PASSED                   [ 35%]
+tests/test_baseline.py::test_baseline_b_reject PASSED                    [ 41%]
+tests/test_baseline.py::test_baseline_c_serialize_resume PASSED          [ 47%]
+tests/test_nested_authority.py::test_h2_delegation_approval_does_not_confer_sensitive_tool_approval PASSED [ 52%]
+tests/test_nested_authority.py::test_h2_same_tool_name_at_different_nesting_levels_stay_independent PASSED [ 58%]
+tests/test_resume_binding.py::test_h4_reconstructed_agent_preserves_call_and_arguments PASSED [ 64%]
+tests/test_resume_binding.py::test_h4_resuming_with_one_unresolved_approval_does_not_execute_it PASSED [ 70%]
+tests/test_resume_binding.py::test_h4_repeated_resume_of_completed_state_does_not_reexecute PASSED [ 76%]
+tests/test_shared_context_approval.py::test_shared_context_does_not_carry_always_approve_across_runs PASSED [ 82%]
+tests/test_sticky_approval.py::test_h3_always_approve_covers_same_same_and_higher_impact_calls PASSED [ 88%]
+tests/test_sticky_approval.py::test_h3_always_approve_does_not_persist_across_separate_agent_contexts PASSED [ 94%]
+tests/test_sticky_approval.py::test_h3_always_approve_does_not_cover_a_differently_named_tool PASSED [100%]
+
+============================= 17 passed in 2.36s ==============================

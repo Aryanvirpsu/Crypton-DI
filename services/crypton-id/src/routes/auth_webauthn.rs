@@ -1,4 +1,4 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{Json, Router, extract::State, http::header::AUTHORIZATION, routing::post};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
@@ -6,10 +6,10 @@ use webauthn_rs::prelude::*;
 
 use crate::{
     audit,
-    error::{AppError, AppJson, ApiResponse},
-    jwt::issue_jwt,
-    redis::challenges::{challenge_key, login_key},
-    state::{AppState, AuthChallenge, RegChallenge, CHALLENGE_TTL_SECS},
+    error::{ApiResponse, AppError, AppJson},
+    jwt::{issue_jwt, verify_device_active},
+    redis::challenges::{challenge_key, login_key, recovery_enrollment_key},
+    state::{AppState, AuthChallenge, CHALLENGE_TTL_SECS, RegChallenge},
 };
 
 pub fn router() -> Router<AppState> {
@@ -23,8 +23,15 @@ pub fn router() -> Router<AppState> {
 
 // ── Challenge helpers ─────────────────────────────────────────────────────────
 
-async fn store_reg_challenge(state: &AppState, key: String, challenge: RegChallenge) -> Result<(), AppError> {
-    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+async fn store_reg_challenge(
+    state: &AppState,
+    key: String,
+    challenge: RegChallenge,
+) -> Result<(), AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
     let json = serde_json::to_string(&challenge).map_err(|e| AppError::internal(e.to_string()))?;
     let _: () = redis::cmd("SETEX")
         .arg(key)
@@ -37,7 +44,10 @@ async fn store_reg_challenge(state: &AppState, key: String, challenge: RegChalle
 }
 
 async fn take_reg_challenge(state: &AppState, key: &str) -> Result<Option<RegChallenge>, AppError> {
-    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
     // Use GET + DEL instead of GETDEL for compatibility with Redis < 6.2
     let json: Option<String> = redis::cmd("GET")
         .arg(key)
@@ -57,8 +67,15 @@ async fn take_reg_challenge(state: &AppState, key: &str) -> Result<Option<RegCha
     }
 }
 
-pub async fn store_auth_challenge(state: &AppState, key: String, challenge: AuthChallenge) -> Result<(), AppError> {
-    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+pub async fn store_auth_challenge(
+    state: &AppState,
+    key: String,
+    challenge: AuthChallenge,
+) -> Result<(), AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
     let json = serde_json::to_string(&challenge).map_err(|e| AppError::internal(e.to_string()))?;
     let _: () = redis::cmd("SETEX")
         .arg(key)
@@ -70,8 +87,14 @@ pub async fn store_auth_challenge(state: &AppState, key: String, challenge: Auth
     Ok(())
 }
 
-pub async fn take_auth_challenge(state: &AppState, key: &str) -> Result<Option<AuthChallenge>, AppError> {
-    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+pub async fn take_auth_challenge(
+    state: &AppState,
+    key: &str,
+) -> Result<Option<AuthChallenge>, AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
     // Use GET + DEL instead of GETDEL for compatibility with Redis < 6.2
     let json: Option<String> = redis::cmd("GET")
         .arg(key)
@@ -97,6 +120,7 @@ pub async fn take_auth_challenge(state: &AppState, key: &str) -> Result<Option<A
 struct RegisterStartReq {
     username: String,
     display_name: Option<String>,
+    enrollment_token: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -106,13 +130,152 @@ struct RegisterStartResp {
     ccr: CreationChallengeResponse,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RecoveryEnrollmentGrant {
+    pub user_id: Uuid,
+    pub username: String,
+    pub request_id: Uuid,
+}
+
+async fn get_recovery_enrollment_grant(
+    state: &AppState,
+    token: &str,
+) -> Result<Option<RecoveryEnrollmentGrant>, AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(recovery_enrollment_key(token))
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    Ok(raw.and_then(|s| serde_json::from_str(&s).ok()))
+}
+
+async fn consume_recovery_enrollment_grant(
+    state: &AppState,
+    token: &str,
+    expected_user_id: Uuid,
+    expected_username: &str,
+) -> Result<(), AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+    let key = recovery_enrollment_key(token);
+    let raw: Option<String> = redis::cmd("GET")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    let grant: RecoveryEnrollmentGrant = raw
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .ok_or_else(|| AppError::unauthorized("invalid_recovery_enrollment_token"))?;
+
+    if grant.user_id != expected_user_id || grant.username != expected_username {
+        return Err(AppError::unauthorized("invalid_recovery_enrollment_token"));
+    }
+
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
+
+    Ok(())
+}
+
+async fn authenticated_user_id_from_headers(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+) -> Result<Option<Uuid>, AppError> {
+    let token = headers
+        .get(AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "));
+
+    let Some(token) = token else {
+        return Ok(None);
+    };
+
+    let claims = crate::jwt::verify_token(state, token).ok();
+
+    let Some(claims) = claims else {
+        return Ok(None);
+    };
+
+    if let Ok(mut conn) = state.redis_conn().await {
+        if let Ok(true) =
+            crate::redis::sessions::is_denied(&mut conn, &claims.sub, claims.iat).await
+        {
+            return Ok(None);
+        }
+    }
+
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => return Ok(None),
+    };
+    let cred_id = match Uuid::parse_str(&claims.cred_id) {
+        Ok(id) => id,
+        Err(_) => return Ok(None),
+    };
+
+    if let Some(ref pool) = state.db {
+        if verify_device_active(pool, cred_id, user_id).await.is_err() {
+            return Ok(None);
+        }
+    }
+
+    Ok(Some(user_id))
+}
+
 async fn register_start(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     AppJson(req): AppJson<RegisterStartReq>,
 ) -> Result<Json<ApiResponse<RegisterStartResp>>, AppError> {
     tracing::info!(username = %req.username, "register_start");
 
-    let user_id = Uuid::new_v4();
+    let db = state
+        .db
+        .as_ref()
+        .ok_or_else(|| AppError::internal("database_not_configured"))?;
+
+    let existing_user_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE username = $1")
+            .bind(&req.username)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+
+    let mut existing_user = false;
+    let mut enrollment_token = None;
+    let user_id = if let Some(existing) = existing_user_id {
+        existing_user = true;
+        if authenticated_user_id_from_headers(&state, &headers).await? == Some(existing) {
+            existing
+        } else if let Some(token) = req.enrollment_token.as_deref() {
+            let grant = get_recovery_enrollment_grant(&state, token)
+                .await?
+                .ok_or_else(|| AppError::unauthorized("invalid_recovery_enrollment_token"))?;
+            if grant.user_id != existing || grant.username != req.username {
+                return Err(AppError::unauthorized("invalid_recovery_enrollment_token"));
+            }
+            enrollment_token = Some(token.to_string());
+            existing
+        } else {
+            return Err(AppError::unauthorized(
+                "existing_account_requires_authorized_enrollment",
+            ));
+        }
+    } else {
+        Uuid::new_v4()
+    };
+
     let display_name = req.display_name.as_deref().unwrap_or(&req.username);
 
     let (ccr, reg_state) = state
@@ -130,10 +293,16 @@ async fn register_start(
             user_id,
             username: req.username,
             reg_state,
+            existing_user,
+            enrollment_token,
         },
-    ).await?;
+    )
+    .await?;
 
-    Ok(Json(ApiResponse::success(RegisterStartResp { challenge_id, ccr })))
+    Ok(Json(ApiResponse::success(RegisterStartResp {
+        challenge_id,
+        ccr,
+    })))
 }
 
 // ── /register/finish ─────────────────────────────────────────────────────────
@@ -167,7 +336,8 @@ async fn register_finish(
     tracing::info!(challenge_id = %req.challenge_id, "register_finish");
 
     let key = challenge_key(req.challenge_id);
-    let challenge = take_reg_challenge(&state, &key).await?
+    let challenge = take_reg_challenge(&state, &key)
+        .await?
         .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
 
     let rpk: RegisterPublicKeyCredential = serde_json::from_value(req.attestation)
@@ -183,26 +353,25 @@ async fn register_finish(
         .as_ref()
         .ok_or_else(|| AppError::internal("database_not_configured"))?;
 
-    let passkey_json = serde_json::to_string(&passkey)
-        .map_err(|e| AppError::internal(e.to_string()))?;
+    let passkey_json =
+        serde_json::to_string(&passkey).map_err(|e| AppError::internal(e.to_string()))?;
     let cred_id_bytes: Vec<u8> = passkey.cred_id().to_vec();
 
-    // Upsert user
-    sqlx::query(
-        "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING",
-    )
-    .bind(challenge.user_id)
-    .bind(&challenge.username)
-    .execute(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    if let Some(token) = challenge.enrollment_token.as_deref() {
+        consume_recovery_enrollment_grant(&state, token, challenge.user_id, &challenge.username)
+            .await?;
+    }
 
-    // Resolve canonical user_id
-    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE username = $1")
-        .bind(&challenge.username)
-        .fetch_one(db)
-        .await
-        .map_err(|e| AppError::internal(e.to_string()))?;
+    if !challenge.existing_user {
+        sqlx::query("INSERT INTO users (id, username) VALUES ($1, $2)")
+            .bind(challenge.user_id)
+            .bind(&challenge.username)
+            .execute(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
+    }
+
+    let user_id = challenge.user_id;
 
     // Persist credential
     sqlx::query(
@@ -218,17 +387,25 @@ async fn register_finish(
     .map_err(|e| AppError::internal(e.to_string()))?;
 
     // Fetch the new credential's DB UUID for JWT binding
-    let cred_uuid: Uuid = sqlx::query_scalar(
-        "SELECT id FROM credentials WHERE user_id = $1 AND credential_id = $2",
-    )
-    .bind(user_id)
-    .bind(&cred_id_bytes)
-    .fetch_one(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    let cred_uuid: Uuid =
+        sqlx::query_scalar("SELECT id FROM credentials WHERE user_id = $1 AND credential_id = $2")
+            .bind(user_id)
+            .bind(&cred_id_bytes)
+            .fetch_one(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
     // Issue JWT for auto-login
-    let token = issue_jwt(user_id, &challenge.username, cred_uuid, &state.jwt_secret)?;
+    let token = issue_jwt(
+        user_id,
+        &challenge.username,
+        cred_uuid,
+        &state.jwt_encoding_key,
+    )?;
+
+    if challenge.existing_user {
+        crate::signals::record_device_added(&state, cred_uuid).await;
+    }
 
     // Audit
     audit::log_event(
@@ -293,11 +470,16 @@ async fn login_start(
         .try_get("id")
         .map_err(|e| AppError::internal(e.to_string()))?;
 
+    // Account lock is enforced here, by the authentication authority: the
+    // public login routes carry no token for the gateway's policy to evaluate.
+    crate::signals::ensure_not_locked(&state, user_id).await?;
+    crate::signals::record_login_attempt(&state, user_id).await;
+
     // Block login only for non-expired approved recovery (prevents permanently stuck accounts)
     let pending_recovery = sqlx::query(
         "SELECT status FROM recovery_requests \
          WHERE user_id = $1 AND status = 'approved' AND expires_at > now() \
-         ORDER BY created_at DESC LIMIT 1"
+         ORDER BY created_at DESC LIMIT 1",
     )
     .bind(user_id)
     .fetch_optional(db)
@@ -312,13 +494,12 @@ async fn login_start(
         }
     }
 
-    let rows = sqlx::query(
-        "SELECT passkey FROM credentials WHERE user_id = $1 AND status = 'active'",
-    )
-    .bind(user_id)
-    .fetch_all(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    let rows =
+        sqlx::query("SELECT passkey FROM credentials WHERE user_id = $1 AND status = 'active'")
+            .bind(user_id)
+            .fetch_all(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
     if rows.is_empty() {
         tracing::warn!(user_id = %user_id, "login_start failed: no_active_credentials");
@@ -353,9 +534,13 @@ async fn login_start(
             username: req.username,
             auth_state,
         },
-    ).await?;
+    )
+    .await?;
 
-    Ok(Json(ApiResponse::success(LoginStartResp { challenge_id, rcr })))
+    Ok(Json(ApiResponse::success(LoginStartResp {
+        challenge_id,
+        rcr,
+    })))
 }
 
 // ── /login/finish ─────────────────────────────────────────────────────────────
@@ -379,16 +564,38 @@ async fn login_finish(
     tracing::info!(challenge_id = %req.challenge_id, "login_finish");
 
     let key = login_key(req.challenge_id);
-    let challenge = take_auth_challenge(&state, &key).await?
+    let challenge = take_auth_challenge(&state, &key)
+        .await?
         .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
+
+    // A challenge issued before the account locked must not be usable after.
+    crate::signals::ensure_not_locked(&state, challenge.user_id).await?;
 
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
         .map_err(|_| AppError::bad_request("invalid_assertion"))?;
 
-    let auth_result = state
+    let auth_result = match state
         .webauthn
         .finish_passkey_authentication(&auth_cred, &challenge.auth_state)
-        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
+    {
+        Ok(r) => r,
+        Err(_) => {
+            crate::signals::record_failed_assertion(&state, challenge.user_id).await;
+            if let Some(db) = state.db.as_ref() {
+                audit::log_event(
+                    db,
+                    Some(challenge.user_id),
+                    &challenge.username,
+                    None,
+                    "login_failed",
+                    serde_json::json!({ "reason": "webauthn_verification_failed" }),
+                    "failure",
+                )
+                .await;
+            }
+            return Err(AppError::bad_request("webauthn_verification_failed"));
+        }
+    };
 
     let db = state
         .db
@@ -398,20 +605,23 @@ async fn login_finish(
     let cred_id_bytes: Vec<u8> = auth_result.cred_id().to_vec();
     let new_counter = auth_result.counter() as i64;
 
-    let cred_row = sqlx::query(
-        "SELECT id, status FROM credentials WHERE user_id = $1 AND credential_id = $2",
-    )
-    .bind(challenge.user_id)
-    .bind(&cred_id_bytes)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    let cred_row =
+        sqlx::query("SELECT id, status FROM credentials WHERE user_id = $1 AND credential_id = $2")
+            .bind(challenge.user_id)
+            .bind(&cred_id_bytes)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
     let (cred_uuid, status) = match cred_row {
         None => return Err(AppError::bad_request("device_revoked")),
         Some(r) => {
-            let id: Uuid = r.try_get("id").map_err(|e| AppError::internal(e.to_string()))?;
-            let s: String = r.try_get("status").map_err(|e| AppError::internal(e.to_string()))?;
+            let id: Uuid = r
+                .try_get("id")
+                .map_err(|e| AppError::internal(e.to_string()))?;
+            let s: String = r
+                .try_get("status")
+                .map_err(|e| AppError::internal(e.to_string()))?;
             (id, s)
         }
     };
@@ -450,8 +660,8 @@ async fn login_finish(
 
             passkey.update_credential(&auth_result);
 
-            let updated_json = serde_json::to_string(&passkey)
-                .map_err(|e| AppError::internal(e.to_string()))?;
+            let updated_json =
+                serde_json::to_string(&passkey).map_err(|e| AppError::internal(e.to_string()))?;
 
             sqlx::query(
                 "UPDATE credentials SET passkey = $1 \
@@ -466,7 +676,14 @@ async fn login_finish(
         }
     }
 
-    let token = issue_jwt(challenge.user_id, &challenge.username, cred_uuid, &state.jwt_secret)?;
+    let token = issue_jwt(
+        challenge.user_id,
+        &challenge.username,
+        cred_uuid,
+        &state.jwt_encoding_key,
+    )?;
+
+    crate::signals::record_login_success(&state, challenge.user_id).await;
 
     // Audit
     audit::log_event(
@@ -486,7 +703,10 @@ async fn login_finish(
         cred_id = %cred_uuid,
         "login complete"
     );
-    Ok(Json(ApiResponse::success(LoginFinishResp { status: "ok", token })))
+    Ok(Json(ApiResponse::success(LoginFinishResp {
+        status: "ok",
+        token,
+    })))
 }
 
 // ── /auth/logout ─────────────────────────────────────────────────────────────
@@ -506,16 +726,13 @@ async fn logout(
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::unauthorized("missing_token"))?;
 
-    let claims = jsonwebtoken::decode::<crate::jwt::Claims>(
-        auth_header,
-        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
-    )
-    .map_err(|e| AppError::unauthorized(format!("invalid_token: {e}")))?
-    .claims;
+    let claims = crate::jwt::verify_token(&state, auth_header)?;
 
     // Denylist the token in Redis
-    let mut conn = state.redis_conn().await.map_err(|e| AppError::internal(e.to_string()))?;
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?;
     crate::redis::sessions::deny_token(&mut conn, &claims.sub, claims.iat, claims.exp)
         .await
         .map_err(|e| AppError::internal(e.to_string()))?;
@@ -542,4 +759,3 @@ async fn logout(
 struct LogoutResp {
     status: &'static str,
 }
-

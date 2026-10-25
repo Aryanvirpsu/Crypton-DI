@@ -1,0 +1,52 @@
+{
+  "approval_decision": {
+    "first_agent": "approve, always_approve=True",
+    "second_agent": "no decision made yet - still pending"
+  },
+  "approval_request": {
+    "first_agent_call_id": "nested_sticky_1",
+    "second_agent_call_id": "nested_sticky_2"
+  },
+  "authorization_binding": {
+    "argument_match": null,
+    "call_id_match": true,
+    "delegation_match": true,
+    "namespace_match": true,
+    "notes": [],
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "agent_name": "root",
+      "approval_state": "approved",
+      "arguments": {
+        "body": "hello",
+        "recipient": "internal-test"
+      },
+      "call_id": "nested_sticky_1",
+      "delegation_call_id": null,
+      "notes": [],
+      "root_agent_name": null,
+      "scenario_id": "h3_nested",
+      "sequence": 1,
+      "timestamp": 1791838886.4969332,
+      "tool_name": "send_message",
+      "tool_namespace": null
+    }
+  ],
+  "experiment": "EXP-003A",
+  "notes": [
+    "AUTHORITY EXPANSION: NONE observed across genuinely separate run contexts (no shared context= or RunState continuation). The second, independent agent run still required its own fresh approval for the identical tool.",
+    "Classification: EXPECTED BY DESIGN. This only shows the grant is scoped to a continuing context, not that it is impossible to make it broader - a calling application that deliberately passes the SAME `context=` object across unrelated runs could plausibly extend this scope further; that configuration was not tested here (out of scope for this pass; candidate for Phase 2)."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "note": "always_approve granted under agent 'root'; a separate agent 'root_2' with its own fresh context later proposes the same tool"
+  },
+  "scenario": "h3_always_approve_scope_across_separate_contexts",
+  "target": {
+    "package": "openai-agents",
+    "version": "0.22.2"
+  }
+}

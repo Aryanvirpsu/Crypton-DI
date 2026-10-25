@@ -1,0 +1,7 @@
+Crypton Validation Benchmark v0.1 -- Case 02: Authorization Boundary (readonly claim)
+Installed @bytebase/dbhub version: 0.22.6
+Negative control (ordinary UPDATE on row 2 actually wrote "control-mutated"): ok
+Readonly-write attempt threw an error: true
+Row 1 value before: original-a / after: original-a
+VERDICT: PASS -- SECURE (the write under { readonly: true } was rejected by the database itself, and the row is unchanged)
+  note: readonly write attempt raised: attempt to write a readonly database

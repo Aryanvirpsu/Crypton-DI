@@ -1,0 +1,28 @@
+{
+  "approval_decision": null,
+  "approval_request": null,
+  "authorization_binding": {
+    "argument_match": null,
+    "delegation_match": null,
+    "interrupt_id_match": null,
+    "notes": [],
+    "thread_match": null,
+    "tool_match": null
+  },
+  "delegation_path": [],
+  "execution": [],
+  "experiment": "EXP-003C",
+  "notes": [
+    "InterruptOnConfig (the config shape passed to HumanInTheLoopMiddleware) has exactly four fields - allowed_decisions, description, args_schema, when - none of which express 'approve this tool/argument-pattern for all future calls'. `when` is a per-call predicate the application can write statefully (e.g. closing over a set of already-approved args) to APPROXIMATE standing approval, but that is an application-built pattern, not a framework primitive comparable to openai-agents' always_approve or agent-framework's ToolApprovalRule. Raw langgraph.types.interrupt() has no approval concept at all - it is a generic pause/resume primitive. H3 is therefore NOT_APPLICABLE at the langgraph/langchain layer as tested, distinct from a PASS (property held) or a FAIL (property violated) - there is no standing-approval surface here to characterize the scope of."
+  ],
+  "outcome": "NOT_APPLICABLE",
+  "proposal": null,
+  "scenario": "h3_no_standing_approval_primitive",
+  "state_boundary": {
+    "note": "no runtime execution - this is a static source-introspection check"
+  },
+  "target": {
+    "package": "langgraph",
+    "version": "1.2.11"
+  }
+}

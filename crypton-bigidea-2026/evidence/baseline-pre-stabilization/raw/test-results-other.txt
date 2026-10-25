@@ -1,0 +1,253 @@
+### exp-007 (agent-lab venv)
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\agent-lab\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-007-principal-continuity
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 16 items
+
+tests/test_scenario_007a.py::test_vulnerable_policy_fails_and_executes_every_substitution_leg PASSED [  6%]
+tests/test_scenario_007a.py::test_secure_policy_passes_and_blocks_every_substitution_leg PASSED [ 12%]
+tests/test_scenario_007a.py::test_authenticated_substitute_precondition_everything_valid_except_continuity PASSED [ 18%]
+tests/test_scenario_007a.py::test_authenticated_substitute_reason_is_continuity_specific PASSED [ 25%]
+tests/test_scenario_007a.py::test_four_reason_codes_are_distinct PASSED  [ 31%]
+tests/test_scenario_007a.py::test_vulnerable_trace_does_not_claim_b_is_u_and_shows_unchecked_authority PASSED [ 37%]
+tests/test_scenario_007a.py::test_unauthenticated_substitution_vulnerable_trace_misattributes_to_u PASSED [ 43%]
+tests/test_scenario_007a.py::test_gate_passes_for_reference_policies PASSED [ 50%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[vulnerable_policy] PASSED [ 56%]
+tests/test_scenario_007a.py::test_negative_control_gate_rejects_broken_secure_policies[authenticated_only_policy] PASSED [ 62%]
+tests/test_scenario_007a.py::test_authenticated_only_mutant_fails_specifically_on_authenticated_substitute PASSED [ 68%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_for_broken_secure_policy PASSED [ 75%]
+tests/test_scenario_007a.py::test_runner_exits_nonzero_if_secure_policy_never_evaluated_authority_chain PASSED [ 81%]
+tests/test_scenario_007a.py::test_evidence_has_all_fields PASSED         [ 87%]
+tests/test_scenario_007a.py::test_deterministic_across_repeated_in_process_runs PASSED [ 93%]
+tests/test_scenario_007a.py::test_deterministic_across_processes_and_hash_seeds PASSED [100%]
+
+============================= 16 passed in 0.44s ==============================
+### exp-003c (own venv)
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph\.venv\Scripts\python.exe
+rootdir: C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003c-langgraph
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, langsmith-0.12.5, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_exp003c.py::test_baseline_a_approve PASSED                    [  8%]
+tests/test_exp003c.py::test_baseline_b_reject PASSED                     [ 16%]
+tests/test_exp003c.py::test_baseline_c_persist_reload_resume_sqlite PASSED [ 25%]
+tests/test_exp003c.py::test_h1a_state_sourced_execution_is_immune_to_resume_payload_drift PASSED [ 33%]
+tests/test_exp003c.py::test_h1b_resume_sourced_execution_is_not_protected_by_the_framework PASSED [ 41%]
+tests/test_exp003c.py::test_h1c_update_state_public_api_can_mutate_pending_state_before_resume PASSED [ 50%]
+tests/test_exp003c.py::test_h2_delegation_approval_does_not_satisfy_child_approval PASSED [ 58%]
+tests/test_exp003c.py::test_h3_not_applicable_no_standing_approval_primitive_exists PASSED [ 66%]
+tests/test_exp003c.py::test_h4_resuming_an_already_completed_thread_does_not_reexecute PASSED [ 75%]
+tests/test_exp003c.py::test_h5_application_built_policy_recheck_blocks_stale_authorization PASSED [ 83%]
+tests/test_exp003c.py::test_h6a_resume_against_a_thread_with_its_own_distinct_pending_interrupt PASSED [ 91%]
+tests/test_exp003c.py::test_h6b_resume_against_a_thread_id_with_no_checkpoint_at_all PASSED [100%]
+
+============================= 12 passed in 1.31s ==============================
+### exp-003-openai-agents-sdk (agent-lab venv, no own venv)
+
+=================================== ERRORS ====================================
+_________ ERROR collecting tests/test_approval_guardrail_lifecycle.py _________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_approval_guardrail_lifecycle.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_approval_guardrail_lifecycle.py:24: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_argument_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_argument_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_argument_binding.py:28: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+___________________ ERROR collecting tests/test_baseline.py ___________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_baseline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_baseline.py:20: in <module>
+    from scenarios.baseline_approval import PROPOSED_ARGS, run_baseline_a, run_baseline_b, run_baseline_c
+scenarios\baseline_approval.py:17: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_nested_authority.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_nested_authority.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_nested_authority.py:24: in <module>
+    from scenarios.nested_agent import DELETE_ARGS, run_h2_same_tool_name_both_levels, run_h2_two_boundaries
+scenarios\nested_agent.py:25: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+________________ ERROR collecting tests/test_resume_binding.py ________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_resume_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_resume_binding.py:18: in <module>
+    from scenarios.resume_state import (
+scenarios\resume_state.py:26: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+___________ ERROR collecting tests/test_shared_context_approval.py ____________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_shared_context_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_shared_context_approval.py:21: in <module>
+    from scenarios.shared_context_approval import RUN_A_ARGS, RUN_B_ARGS, run_shared_context_probe
+scenarios\shared_context_approval.py:28: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+_______________ ERROR collecting tests/test_sticky_approval.py ________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-openai-agents-sdk\tests\test_sticky_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_sticky_approval.py:25: in <module>
+    from scenarios.sticky_approval import (
+scenarios\sticky_approval.py:22: in <module>
+    import agents
+E   ModuleNotFoundError: No module named 'agents'
+=========================== short test summary info ===========================
+ERROR tests/test_approval_guardrail_lifecycle.py
+ERROR tests/test_argument_binding.py
+ERROR tests/test_baseline.py
+ERROR tests/test_nested_authority.py
+ERROR tests/test_resume_binding.py
+ERROR tests/test_shared_context_approval.py
+ERROR tests/test_sticky_approval.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!
+7 errors in 0.18s
+### exp-003-microsoft-agent-framework (agent-lab venv, no own venv)
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/test_argument_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_argument_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_argument_binding.py:16: in <module>
+    from scenarios.approval_binding import APPROVED_ARGS, DRIFTED_ARGS, run_h1_mutate_after_approval_decision
+scenarios\approval_binding.py:20: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+___________________ ERROR collecting tests/test_baseline.py ___________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_baseline.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_baseline.py:16: in <module>
+    from scenarios.baseline_tool_approval import TRANSFER_ARGS, run_b1_approve, run_b2_reject, run_b3_checkpoint_reconstruct
+scenarios\baseline_tool_approval.py:18: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+______________ ERROR collecting tests/test_checkpoint_binding.py ______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_checkpoint_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_checkpoint_binding.py:23: in <module>
+    from scenarios.checkpoint_approval import ARGS, run_h3_restore_same_checkpoint_twice, run_replay_stale_response_after_completion
+scenarios\checkpoint_approval.py:23: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+___________________ ERROR collecting tests/test_handoff.py ____________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_handoff.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_handoff.py:30: in <module>
+    from scenarios.handoff_delegation import run_h2_as_tool_delegation_boundary
+scenarios\handoff_delegation.py:27: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+_______________ ERROR collecting tests/test_identity_binding.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_identity_binding.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_identity_binding.py:16: in <module>
+    from scenarios.identity_binding import run_h6_cross_agent_response_injection
+scenarios\identity_binding.py:18: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+________________ ERROR collecting tests/test_multi_pending.py _________________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_multi_pending.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_multi_pending.py:16: in <module>
+    from scenarios.multi_pending import X_ARGS, Y_ARGS, run_h4_approve_x_reject_y
+scenarios\multi_pending.py:19: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+______________ ERROR collecting tests/test_standing_approval.py _______________
+ImportError while importing test module 'C:\Users\aryan vir\Aryan vir\projectsnstuff\Crypton-DI\labs\exp-003-microsoft-agent-framework\tests\test_standing_approval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_standing_approval.py:16: in <module>
+    from scenarios.standing_approval import (
+scenarios\standing_approval.py:22: in <module>
+    import agent_framework as af
+E   ModuleNotFoundError: No module named 'agent_framework'
+=========================== short test summary info ===========================
+ERROR tests/test_argument_binding.py
+ERROR tests/test_baseline.py
+ERROR tests/test_checkpoint_binding.py
+ERROR tests/test_handoff.py
+ERROR tests/test_identity_binding.py
+ERROR tests/test_multi_pending.py
+ERROR tests/test_standing_approval.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!
+7 errors in 0.16s
+### validation-benchmark
+
+### RERUN exp-003-openai-agents-sdk with its own .venv (intended env)
+.................                                                        [100%]
+17 passed in 4.18s
+
+### RERUN exp-003-microsoft-agent-framework with its own .venv (intended env)
+............                                                             [100%]
+12 passed in 2.59s
+
+### validation-benchmark case-01 (pytest, agent-lab venv)

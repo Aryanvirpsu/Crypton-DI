@@ -1,0 +1,21 @@
+---
+source: tests/golden.rs
+expression: "run(\"redis_degraded_sensitive_forces_challenge\", ctx).await"
+---
+scenario: redis_degraded_sensitive_forces_challenge
+decision: Challenge
+score: 7
+base_score: 7
+adjusted_score: 7
+required_action: StepUpWebAuthn
+hold_reason: None
+triggered_gates: []
+escalated: false
+signals_degraded: true
+lock_account: false
+notify_user: false
+notify_admin: true
+breakdown: D=5 S=0 N=0 B=0 C=0 base=5 m_action=1.80 m_org=1.00 a=0 final=7
+top_factors:
+  - name: headless_ua  component: Device  contribution: 5
+triggered_rules: ["redis_signals_degraded_on_sensitive_action"]

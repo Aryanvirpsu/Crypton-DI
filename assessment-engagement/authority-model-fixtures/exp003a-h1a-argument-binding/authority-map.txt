@@ -1,0 +1,8 @@
+AUTHORITY PATH
+
+Approval h1a_1
+    tool_name=transfer_funds; arguments={'account': 'checking', 'amount': 100, 'destination': 'vendor-A'} as originally proposed/presented
+  |
+  ────
+  v
+Action h1a_1

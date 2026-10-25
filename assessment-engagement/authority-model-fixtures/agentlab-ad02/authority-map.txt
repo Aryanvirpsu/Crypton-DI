@@ -1,0 +1,8 @@
+AUTHORITY PATH
+
+Principal UNKNOWN [UNKNOWN]
+  |
+  [derived]
+  v
+Grant (no formal grant_id -- see derivation_notes)
+    allowed_tools=[add_case_note, get_customer], allowed_resources=[customer_ids:cust_1]

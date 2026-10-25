@@ -1,9 +1,13 @@
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{Json, Router, extract::State, routing::get};
 use serde::Serialize;
-use sqlx::{postgres::PgRow, Row};
+use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
 
-use crate::{error::{AppError, ApiResponse}, jwt::AuthUser, state::AppState};
+use crate::{
+    error::{ApiResponse, AppError},
+    jwt::AdminUser,
+    state::AppState,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/audit-logs", get(list_audit_logs))
@@ -30,7 +34,7 @@ struct AuditLogsResp {
 // ── GET /audit-logs ───────────────────────────────────────────────────────────
 
 async fn list_audit_logs(
-    auth: AuthUser,
+    _admin: AdminUser,
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<AuditLogsResp>>, AppError> {
     let db = state
@@ -45,11 +49,9 @@ async fn list_audit_logs(
                 detail  AS metadata, \
                 created_at::text AS created_at \
          FROM audit_logs \
-         WHERE user_id = $1 \
          ORDER BY created_at DESC \
          LIMIT 50",
     )
-    .bind(auth.user_id)
     .fetch_all(db)
     .await
     .map_err(|e| AppError::internal(e.to_string()))?;
@@ -60,12 +62,15 @@ async fn list_audit_logs(
 
 fn row_to_entry(row: &PgRow) -> Option<AuditLogEntry> {
     Some(AuditLogEntry {
-        id:            row.try_get("id").ok()?,
-        actor:         row.try_get("actor").ok(),
-        event_type:    row.try_get("event_type").ok()?,
-        status:        row.try_get("status").ok()?,
+        id: row.try_get("id").ok()?,
+        actor: row.try_get("actor").ok(),
+        event_type: row.try_get("event_type").ok()?,
+        status: row.try_get("status").ok()?,
         credential_id: row.try_get("credential_id").ok().flatten(),
-        metadata:      row.try_get("metadata").ok().unwrap_or(serde_json::json!({})),
-        created_at:    row.try_get("created_at").ok().flatten(),
+        metadata: row
+            .try_get("metadata")
+            .ok()
+            .unwrap_or(serde_json::json!({})),
+        created_at: row.try_get("created_at").ok().flatten(),
     })
 }

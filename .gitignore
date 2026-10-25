@@ -54,3 +54,25 @@ services/*/build*.log
 
 # ── Demo internal ─────────────────────────────────────
 .demo/
+
+# ── Local analysis tool output (not a build artifact of anything in-repo) ──
+graphify-out/
+
+# ── Python (labs/*, repo-wide) ────────────────────────
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+.ruff_cache/
+
+# Throwaway runtime-verification secrets (tests/runtime/stack-env.sh)
+.stack-secrets/
+
+# Tool-managed worktrees and test-generated output (kept locally, not tracked)
+.claude/worktrees/
+risk-engine/risk_playground.log
+
+# Private inquiry inbox, encryption keys and local verification artifacts
+services/crypton-inquiries/.private/
+services/crypton-inquiries/.verification/

@@ -1,0 +1,8 @@
+{
+  "installed_mcp_version": "1.27.1",
+  "control_status": 400,
+  "cross_principal_status": 400,
+  "negative_control_ok": true,
+  "verdict": "FAIL -- VULNERABLE (a different, independently-authenticated principal reached the transport exactly as the session's own creator did; the manager never checked who was asking)",
+  "notes": []
+}

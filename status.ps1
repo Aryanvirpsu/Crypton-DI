@@ -61,12 +61,10 @@ Write-Host ""
 
 # ── Frontends ─────────────────────────────────────────────────────────────────
 Write-Host "  FRONTENDS" -ForegroundColor DarkGray
-$main  = Check-Http "http://127.0.0.1:3000"
-$demo  = Check-Http "http://127.0.0.1:3001"
-$admin = Check-Http "http://127.0.0.1:3002"
-Status-Line "crypton-main   :3000   (marketing site)  " $main.ok  $(if($main.ok) {"reachable / $($main.code)" }else{"unreachable"})
-Status-Line "crypton-demo   :3001   (SaaS demo app)   " $demo.ok  $(if($demo.ok) {"reachable / $($demo.code)" }else{"unreachable"})
-Status-Line "crypton-admin  :3002   (operator panel)  " $admin.ok $(if($admin.ok){"reachable / $($admin.code)"}else{"unreachable"})
+$main    = Check-Http "http://127.0.0.1:3000"
+$console = Check-Http "http://127.0.0.1:3001"
+Status-Line "crypton-main    :3000   (marketing site)         " $main.ok    $(if($main.ok)    {"reachable / $($main.code)"}   else{"unreachable"})
+Status-Line "crypton-console :3001   (login/devices/admin)    " $console.ok $(if($console.ok) {"reachable / $($console.code)"}else{"unreachable"})
 
 Write-Host ""
 
@@ -90,7 +88,7 @@ Write-Host ""
 # ── PID file ──────────────────────────────────────────────────────────────────
 $pidFile = Join-Path $Root ".run\pids.json"
 if(Test-Path $pidFile) {
-    Write-Host "  SAVED PIDs (.demo\pids.json)" -ForegroundColor DarkGray
+    Write-Host "  SAVED PIDs (.run\pids.json)" -ForegroundColor DarkGray
     $saved = Get-Content $pidFile -Raw | ConvertFrom-Json
     foreach($prop in $saved.PSObject.Properties) {
         $pid = [int]$prop.Value

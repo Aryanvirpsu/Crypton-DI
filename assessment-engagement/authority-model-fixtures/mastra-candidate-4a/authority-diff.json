@@ -1,0 +1,25 @@
+{
+  "diff_id": "c4a-diff",
+  "assessment_id": null,
+  "test_id": "candidate-4a",
+  "expected_envelope_id": "c4a-expected-envelope",
+  "observed_action_ids": [
+    "c4a-action-1",
+    "c4a-action-2"
+  ],
+  "observed_resources": [
+    "approved_vendor",
+    "attacker_sink"
+  ],
+  "observed_effect_ids": [],
+  "divergence_type": "APPROVAL_SCOPE_MISMATCH",
+  "divergence_point": "Approval -> Action",
+  "unexpected_authority": [
+    "c4a-action-2"
+  ],
+  "missing_expected_authority": [],
+  "evidence_ids": [
+    "semantic-rulebook/experiments/004-candidate-4a-evidence/candidate-4a.json#run=7ab08647-f513-402e-9b7b-78ebe47df8e1"
+  ],
+  "confidence_note": "Approval's own scope is UNREPRESENTABLE (approveToolCall({runId}) with toolCallId omitted has no parameter capable of binding to one specific pending action — the API call shape itself cannot represent a single-action binding in this form, independent of what was or wasn't observed.); 2 actions were nonetheless observed resolved under it, not at most one."
+}

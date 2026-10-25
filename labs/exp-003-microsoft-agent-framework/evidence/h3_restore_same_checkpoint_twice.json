@@ -1,0 +1,61 @@
+{
+  "approval_decision": {
+    "branch_1": "approve (own to_function_approval_response call)",
+    "branch_2": "approve (own, separate to_function_approval_response call)"
+  },
+  "approval_request": {
+    "note": "one pending request, restored into two independent Agent/Workflow object graphs from the same checkpoint_id"
+  },
+  "authorization_binding": {
+    "agent_match": true,
+    "argument_match": true,
+    "checkpoint_match": true,
+    "delegation_match": true,
+    "notes": [],
+    "request_match": true,
+    "tool_match": true
+  },
+  "delegation_path": [],
+  "execution": [
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    },
+    {
+      "arguments": {
+        "account": "checking",
+        "amount": 100,
+        "destination": "A"
+      },
+      "tool_name": "transfer_funds"
+    }
+  ],
+  "experiment": "EXP-003B",
+  "notes": [
+    "NOT a vulnerability, per the task's explicit instruction not to label normal checkpoint branching as one: each of the two independently-reconstructed branches received its OWN separate to_function_approval_response() call in this test - i.e. two genuine approval submissions were made, one per branch, and each branch executed exactly once as a result. This confirms checkpoint restoration creates a genuinely independent execution timeline per restore, each still gated by requiring its own approval delivery - it does not, by itself, duplicate execution without a matching number of approval decisions."
+  ],
+  "outcome": "PASS",
+  "proposal": {
+    "arguments": {
+      "account": "checking",
+      "amount": 100,
+      "destination": "A"
+    },
+    "call_id": "branch_1",
+    "tool_name": "transfer_funds"
+  },
+  "scenario": "h3_restore_same_checkpoint_twice",
+  "state_boundary": {
+    "checkpoint": "one checkpoint_id, restored twice independently",
+    "session": null,
+    "workflow": "h3_workflow"
+  },
+  "target": {
+    "package": "agent-framework",
+    "version": "1.18.0"
+  }
+}

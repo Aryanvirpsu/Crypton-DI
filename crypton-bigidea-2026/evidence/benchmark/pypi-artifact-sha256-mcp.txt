@@ -1,0 +1,2 @@
+1af3c4203b329430fde7a87b4fcb6392a041f5cb851fd68fc674016ab4e7c06f *mcp-1.27.1-py3-none-any.whl
+d6ff5160c6ca65d93013626efb3fc249de683c30b2d8570755ceddd490344de5 *mcp-1.27.2-py3-none-any.whl

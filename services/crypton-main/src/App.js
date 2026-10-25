@@ -1,6 +1,5 @@
-import { useState } from "react";
 import Landing from './Landing';
-import AttackSim from './AttackSim';
+import AgentFloor from './agent-floor/AgentFloor';
 import { DEMO_URL } from './config';
 
 const FontLink = () => (
@@ -25,8 +24,6 @@ const FontLink = () => (
 );
 
 function App() {
-  const [simOpen, setSimOpen] = useState(false);
-
   const handleGo = (action) => {
     const demoPorts = ['demo', 'register', 'login', 'dashboard'];
     const adminPorts = ['admin', 'risk', 'security', 'auditlogs', 'sessions', 'rbac', 'policy'];
@@ -38,16 +35,26 @@ function App() {
     }
   };
 
+  // The Agent Floor is the site: it is served at / and, for existing links, at /agent-floor
+  // (see src/agent-floor/README.md). The previous landing page stays reachable, unlinked, at /legacy.
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+  if (!/^\/legacy\/?$/.test(path)) {
+    return (
+      <>
+        <FontLink />
+        <AgentFloor />
+      </>
+    );
+  }
+
   return (
     <>
       <FontLink />
       <div className="grain" />
-      <Landing 
-        go={handleGo} 
-        toast={(m) => console.log(m)} 
-        openSim={() => setSimOpen(true)} 
+      <Landing
+        go={handleGo}
+        toast={(m) => console.log(m)}
       />
-      {simOpen && <AttackSim close={() => setSimOpen(false)} />}
     </>
   );
 }

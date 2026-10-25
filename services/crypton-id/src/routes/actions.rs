@@ -1,4 +1,19 @@
-use axum::{extract::State, routing::post, Json, Router};
+//! Step-up (re-authentication) verification.
+//!
+//! This is a real, minimal primitive: prove the caller still holds one of
+//! their registered passkeys *right now*, for some caller-supplied intent
+//! label, with the result audit-logged. It intentionally does not carry
+//! any business logic (it used to gate three hardcoded "demo" results —
+//! `add_admin`, `rotate_api_key`, `delete_resource` — that were removed
+//! rather than kept as filler; see git history if they're wanted back as
+//! a reference).
+//!
+//! This shape — human present, fresh cryptographic proof, audit trail —
+//! is the building block the upcoming agent-delegation work will need
+//! ("a human approves this specific agent action") and is preserved for
+//! that reason.
+
+use axum::{Json, Router, extract::State, routing::post};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
@@ -13,7 +28,16 @@ use crate::{
     state::{AppState, AuthChallenge},
 };
 
-const ALLOWED_ACTIONS: &[&str] = &["add_admin", "rotate_api_key", "export_data", "delete_resource"];
+/// Caller-supplied intent labels are not business logic — just a short,
+/// audit-log-friendly tag for what the step-up was for. Constrained so an
+/// arbitrary string can't pollute audit_logs.detail.
+fn is_valid_intent(intent: &str) -> bool {
+    !intent.is_empty()
+        && intent.len() <= 64
+        && intent
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -40,7 +64,7 @@ async fn action_challenge(
     State(state): State<AppState>,
     AppJson(req): AppJson<ActionChallengeReq>,
 ) -> Result<Json<ApiResponse<ActionChallengeResp>>, AppError> {
-    if !ALLOWED_ACTIONS.contains(&req.action.as_str()) {
+    if !is_valid_intent(&req.action) {
         return Err(AppError::bad_request("invalid_action"));
     }
 
@@ -49,13 +73,12 @@ async fn action_challenge(
         .as_ref()
         .ok_or_else(|| AppError::internal("database_not_configured"))?;
 
-    let rows = sqlx::query(
-        "SELECT passkey FROM credentials WHERE user_id = $1 AND status = 'active'",
-    )
-    .bind(auth.user_id)
-    .fetch_all(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    let rows =
+        sqlx::query("SELECT passkey FROM credentials WHERE user_id = $1 AND status = 'active'")
+            .bind(auth.user_id)
+            .fetch_all(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
     if rows.is_empty() {
         return Err(AppError::bad_request("no_credentials"));
@@ -89,9 +112,13 @@ async fn action_challenge(
             username: auth.username,
             auth_state,
         },
-    ).await?;
+    )
+    .await?;
 
-    Ok(Json(ApiResponse::success(ActionChallengeResp { challenge_id, rcr })))
+    Ok(Json(ApiResponse::success(ActionChallengeResp {
+        challenge_id,
+        rcr,
+    })))
 }
 
 // ── POST /actions/execute ────────────────────────────────────────────────────
@@ -101,31 +128,28 @@ struct ActionExecuteReq {
     challenge_id: Uuid,
     action: String,
     assertion: serde_json::Value,
-    resource_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct ActionExecuteResp {
     status: &'static str,
-    result: serde_json::Value,
+    verified: bool,
+    intent: String,
 }
 
 async fn action_execute(
     auth: AuthUser,
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     AppJson(req): AppJson<ActionExecuteReq>,
 ) -> Result<Json<ApiResponse<ActionExecuteResp>>, AppError> {
-    if !ALLOWED_ACTIONS.contains(&req.action.as_str()) {
+    if !is_valid_intent(&req.action) {
         return Err(AppError::bad_request("invalid_action"));
     }
 
-    // delete_resource requires resource_id before consuming the challenge
-    if req.action == "delete_resource" && req.resource_id.as_deref().unwrap_or("").is_empty() {
-        return Err(AppError::bad_request("resource_id_required"));
-    }
-
     let key = action_key(req.challenge_id);
-    let challenge = take_auth_challenge(&state, &key).await?
+    let challenge = take_auth_challenge(&state, &key)
+        .await?
         .ok_or_else(|| AppError::bad_request("invalid_or_expired_challenge"))?;
 
     // Ownership guard: challenge must belong to the authenticated user
@@ -136,10 +160,16 @@ async fn action_execute(
     let auth_cred: PublicKeyCredential = serde_json::from_value(req.assertion)
         .map_err(|_| AppError::bad_request("invalid_assertion"))?;
 
-    let auth_result = state
+    let auth_result = match state
         .webauthn
         .finish_passkey_authentication(&auth_cred, &challenge.auth_state)
-        .map_err(|_| AppError::bad_request("webauthn_verification_failed"))?;
+    {
+        Ok(r) => r,
+        Err(_) => {
+            crate::signals::record_failed_assertion(&state, auth.user_id).await;
+            return Err(AppError::bad_request("webauthn_verification_failed"));
+        }
+    };
 
     let db = state
         .db
@@ -148,99 +178,45 @@ async fn action_execute(
 
     // Resolve credential UUID for audit
     let cred_id_bytes: Vec<u8> = auth_result.cred_id().to_vec();
-    let cred_uuid: Option<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM credentials WHERE user_id = $1 AND credential_id = $2",
-    )
-    .bind(auth.user_id)
-    .bind(&cred_id_bytes)
-    .fetch_optional(db)
-    .await
-    .map_err(|e| AppError::internal(e.to_string()))?;
+    let cred_uuid: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM credentials WHERE user_id = $1 AND credential_id = $2")
+            .bind(auth.user_id)
+            .bind(&cred_id_bytes)
+            .fetch_optional(db)
+            .await
+            .map_err(|e| AppError::internal(e.to_string()))?;
 
-    // ── Action dispatch ──────────────────────────────────────────
-    // WebAuthn verification above is REAL. Action results below are
-    // demo stubs unless otherwise noted. Each stub is clearly labeled.
-
-    let (result, is_demo) = match req.action.as_str() {
-        "add_admin" => (serde_json::json!({
-            "message": "[DEMO] Admin add simulated — not persisted",
-            "user": "new-admin@crypton.io",
-            "role": "Admin",
-            "demo": true
-        }), true),
-        "rotate_api_key" => {
-            let hex: String = (0..16)
-                .map(|_| format!("{:02x}", rand_byte()))
-                .collect();
-            (serde_json::json!({
-                "message": "[DEMO] API key generated — not persisted",
-                "api_key": format!("ck_demo_{hex}"),
-                "demo": true
-            }), true)
-        }
-        "export_data" => (serde_json::json!({
-            "message": "Export ready",
-            "download_url": "/export/audit-logs",
-            "demo": false
-        }), false),
-        "delete_resource" => {
-            let rid = req.resource_id.as_deref().unwrap_or("");
-            (serde_json::json!({
-                "message": "[DEMO] Resource delete simulated — not persisted",
-                "resource_id": rid,
-                "demo": true
-            }), true)
-        }
-        _ => (serde_json::json!({ "message": "unknown_action" }), true),
-    };
-
-    let outcome = if is_demo { "demo" } else { "success" };
-
-    // Audit — action name carries demo: prefix when is_demo so log queries
-    // can distinguish real operations from showcase flows without joining outcome.
-    let prefix = if is_demo { "demo:" } else { "" };
-    let (audit_action, audit_detail) = if req.action == "delete_resource" {
-        (
-            format!("{}action_executed", prefix),
-            serde_json::json!({
-                "action": "delete_resource",
-                "resource_id": req.resource_id.as_deref().unwrap_or("")
-            }),
-        )
-    } else {
-        (format!("{}action:{}", prefix, req.action), result.clone())
-    };
-
+    // WebAuthn verification above is real and complete at this point — the
+    // caller has proven fresh possession of a registered passkey for the
+    // given intent. Record it; callers decide what "verified" authorizes.
     audit::log_event(
         db,
         Some(auth.user_id),
         &auth.username,
         cred_uuid,
-        &audit_action,
-        audit_detail,
-        outcome,
+        "step_up_verified",
+        serde_json::json!({ "intent": req.action }),
+        "success",
     )
     .await;
 
-    tracing::info!(
-        user_id = %auth.user_id,
-        action = %req.action,
-        demo = is_demo,
-        "protected action executed"
-    );
+    // Record completion SERVER-SIDE, bound to this session token (user + iat), only
+    // now that the assertion has been cryptographically verified above. The
+    // gateway reads this key; nothing a client sends can create it. If it cannot
+    // be stored the caller is told so rather than being told "verified".
+    let bearer = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("missing_token"))?;
+    let claims = crate::jwt::verify_token(&state, bearer)?;
+    crate::signals::record_step_up_completed(&state, auth.user_id, claims.iat).await?;
+
+    tracing::info!(user_id = %auth.user_id, intent = %req.action, "step-up verified");
 
     Ok(Json(ApiResponse::success(ActionExecuteResp {
         status: "ok",
-        result,
+        verified: true,
+        intent: req.action,
     })))
-}
-
-/// Simple deterministic-enough byte for demo hex keys.
-fn rand_byte() -> u8 {
-    use std::time::SystemTime;
-    let t = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    (t % 256) as u8
 }
