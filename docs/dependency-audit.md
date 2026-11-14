@@ -76,6 +76,10 @@ parses PEM files for the optional local TLS listener; the replacement is upstrea
 
 ## npm (build and test tooling)
 
+The November 2026 stabilization results and remaining advisories are recorded
+in [CTO P0 stabilization](cto-p0-stabilization.md). The counts below describe
+the prior baseline.
+
 `npm audit` at the repo root reports 96 findings (4 critical, 76 high, 11 moderate, 5 low) on
 `3a02135`. All flow through four direct dependencies: `react-scripts` 5 (Create React App,
 end-of-life), `jest`, `jest-environment-jsdom` and `@types/jest`. They are build, test and

@@ -335,6 +335,15 @@ async function main() {
   await sleep(1500);
   const r503 = await http('GET', '/me', { token: a.token });
   eq('Redis down: authenticated request -> 503', r503.status, 503);
+  const identityUnavailable = spawnSync('docker', [
+    'run', '--rm', '--network', internalNet, 'redis:7-alpine',
+    'wget', '-q', '-O-', '-S', '-T', '10',
+    '--header', `Authorization: Bearer ${a.token}`,
+    '--header', `x-gateway-secret: ${process.env.GATEWAY_SHARED_SECRET}`,
+    'http://identity:8080/me',
+  ], { encoding: 'utf8', timeout: 20000 });
+  check('Redis down: identity itself refuses an otherwise valid session (503)',
+    /HTTP\/1\.[01] 503\b/.test(identityUnavailable.stderr || ''));
   const rl = await loginStart(a.username);
   check('Redis down: login/start fails fast with a server error (no hang)', rl.status >= 500 && !rl.timeout, `status ${rl.status} timeout=${!!rl.timeout}`);
   const pub = await http('POST', '/auth/register/start', { body: { username: uname('x') } });

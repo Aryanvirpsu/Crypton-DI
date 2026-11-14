@@ -117,16 +117,30 @@ impl AppError {
             message: msg.into(),
         }
     }
+
+    pub fn service_unavailable(msg: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            message: msg.into(),
+        }
+    }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (code, msg) = if self.status.is_server_error() {
             tracing::error!(detail = %self.message, status = %self.status, "internal error");
-            (
-                "internal_server_error".to_string(),
-                "An unexpected internal error occurred.".to_string(),
-            )
+            if self.status == StatusCode::SERVICE_UNAVAILABLE {
+                (
+                    "service_unavailable".to_string(),
+                    "The service is temporarily unavailable.".to_string(),
+                )
+            } else {
+                (
+                    "internal_server_error".to_string(),
+                    "An unexpected internal error occurred.".to_string(),
+                )
+            }
         } else {
             let readable = self.message.replace("_", " ");
             let mut chars = readable.chars();

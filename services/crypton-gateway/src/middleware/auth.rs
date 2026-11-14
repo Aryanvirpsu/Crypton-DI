@@ -14,8 +14,7 @@
 //! After the signature, the gateway applies the same revocation semantics
 //! identity does on every request: the Redis logout denylist
 //! (`jwt:deny:{sub}:{iat}`) and "credential `cred_id` still `active` for
-//! `sub`" in Postgres. Unlike identity, an unavailable Redis/Postgres here
-//! fails CLOSED (503), never open.
+//! `sub`" in Postgres. An unavailable Redis or Postgres fails closed (503).
 
 use axum::{
     extract::{Request, State},

@@ -207,12 +207,8 @@ async fn authenticated_user_id_from_headers(
         return Ok(None);
     };
 
-    if let Ok(mut conn) = state.redis_conn().await {
-        if let Ok(true) =
-            crate::redis::sessions::is_denied(&mut conn, &claims.sub, claims.iat).await
-        {
-            return Ok(None);
-        }
+    if crate::jwt::session_is_denied(state, &claims).await? {
+        return Ok(None);
     }
 
     let user_id = match Uuid::parse_str(&claims.sub) {
