@@ -16,8 +16,9 @@ confirmed additional findings on the same branch.
   still receive HTTP 401. The regression suite covers the identity extractor and
   the full stack adds a check of identity's response during a Redis outage.
 - Updated Rust lockfiles to `rustls` 0.23.46, `rustls-webpki` 0.103.16 and
-  `webpki-roots` 1.0.10. Identity uses `openssl` 0.10.78. Release images now use
-  `cargo build --locked`.
+  `webpki-roots` 1.0.10. The follow-up CI audit also identified newer advisories
+  addressed by `openssl` 0.10.80 in identity and `quinn-udp` 0.5.16 in the
+  gateway lockfile. Release images now use `cargo build --locked`.
 - The Rust audit gate checks the enabled graph, including development edges and
   all declared risk-engine features, before excluding the lockfile-only SQLite
   finding RUSTSEC-2026-0459. Graph-inspection errors leave the finding actionable.
