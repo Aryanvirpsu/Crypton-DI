@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 # dependency layer is cached even when src/ changes.
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
+    cargo build --locked --release && \
     rm -f target/release/crypton-identity target/release/deps/crypton_identity*
 
 # Copy real source and compile
@@ -22,7 +22,7 @@ COPY src ./src
 COPY migrations ./migrations
 COPY test-webauthn.html ./test-webauthn.html
 
-RUN cargo build --release
+RUN cargo build --locked --release
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM debian:bookworm-slim

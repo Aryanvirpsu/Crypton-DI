@@ -11,7 +11,7 @@ COPY services/crypton-gateway/Cargo.toml services/crypton-gateway/Cargo.lock ./
 COPY services/crypton-gateway/tests-support ./tests-support
 COPY services/crypton-gateway/src ./src
 
-RUN cargo build --release
+RUN cargo build --locked --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/* \

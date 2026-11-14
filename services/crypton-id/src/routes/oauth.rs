@@ -150,7 +150,8 @@ pub async fn oauth_complete(
         Ok(c) => c,
         Err(e) => {
             tracing::error!("oauth/complete: redis error: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, "storage_error").into_response();
+            return crate::error::AppError::service_unavailable("OAuth session store unavailable")
+                .into_response();
         }
     };
 
@@ -158,12 +159,10 @@ pub async fn oauth_complete(
     // code — this used to be a bypass because AuthUser's denylist check
     // wasn't reachable from this handler (token arrives in the body, not
     // the Authorization header).
-    if let Ok(true) = crate::redis::sessions::is_denied(&mut conn, &claims.sub, claims.iat).await {
-        tracing::warn!(
-            "oauth/complete: rejected denylisted token for sub={}",
-            claims.sub
-        );
-        return (StatusCode::UNAUTHORIZED, "session_invalidated").into_response();
+    match crate::jwt::read_session_denylist(&mut conn, &claims).await {
+        Ok(false) => {}
+        Ok(true) => return (StatusCode::UNAUTHORIZED, "session_invalidated").into_response(),
+        Err(e) => return e.into_response(),
     }
 
     if let Some(ref db) = st.db {

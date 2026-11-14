@@ -80,6 +80,13 @@ to the specific action the client names (`action` is an audit label), so any com
 step-up satisfies any Challenge on that token for 5 minutes; and which actions trigger a
 Challenge is decided by the risk engine's scores, not by an explicit per-action policy.
 
+## Session revocation during a Redis outage
+
+The gateway and identity reject session-authenticated requests with HTTP 503
+when they cannot read the Redis logout denylist. Identity also enforces this
+for bearer-authenticated device enrollment and the optional OAuth completion
+route. A token already recorded on the denylist remains invalid.
+
 ## Non-atomic behaviour (documented and tested, not hidden)
 
 - Gateway `/internal/audit/ingest`: audit row insert, Redis effect, then commit. A
@@ -94,7 +101,7 @@ Challenge is decided by the risk engine's scores, not by an explicit per-action 
 ## How to reproduce
 
 ```sh
-tests/runtime/run.sh              # builds the real images, starts the stack, runs 88 checks, tears down
+tests/runtime/run.sh              # builds the real images, starts the stack, runs the checks, tears down
 KEEP_STACK=1 tests/runtime/run.sh # leave it running to inspect
 ```
 

@@ -121,6 +121,27 @@ pub struct AdminUser {
     pub role: String,
 }
 
+pub(crate) async fn session_is_denied(state: &AppState, claims: &Claims) -> Result<bool, AppError> {
+    let mut conn = state
+        .redis_conn()
+        .await
+        .map_err(|e| AppError::service_unavailable(format!("session denylist connection: {e}")))?;
+    read_session_denylist(&mut conn, claims).await
+}
+
+pub(crate) async fn read_session_denylist(
+    conn: &mut redis::aio::MultiplexedConnection,
+    claims: &Claims,
+) -> Result<bool, AppError> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        crate::redis::sessions::is_denied(conn, &claims.sub, claims.iat),
+    )
+    .await
+    .map_err(|_| AppError::service_unavailable("session denylist query timed out"))?
+    .map_err(|e| AppError::service_unavailable(format!("session denylist query: {e}")))
+}
+
 #[async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
@@ -145,12 +166,8 @@ impl FromRequestParts<AppState> for AuthUser {
             .map_err(|_| AppError::unauthorized("malformed_cred_id"))?;
 
         // Check JWT denylist (logout invalidation) before any DB work.
-        if let Ok(mut conn) = state.redis_conn().await {
-            if let Ok(true) =
-                crate::redis::sessions::is_denied(&mut conn, &claims.sub, claims.iat).await
-            {
-                return Err(AppError::unauthorized("session_invalidated"));
-            }
+        if session_is_denied(state, &claims).await? {
+            return Err(AppError::unauthorized("session_invalidated"));
         }
 
         // If a DB pool is available, verify the credential is still active.
@@ -239,6 +256,40 @@ mod tests {
 
     fn eddsa_validation() -> Validation {
         Validation::new(Algorithm::EdDSA)
+    }
+
+    #[tokio::test]
+    async fn valid_token_requires_a_session_store() {
+        use axum::{http::StatusCode, response::IntoResponse};
+
+        let state = AppState {
+            db: None,
+            redis: None,
+            webauthn: webauthn_rs::prelude::WebauthnBuilder::new(
+                "localhost",
+                &url::Url::parse("http://localhost:8080").unwrap(),
+            )
+            .unwrap()
+            .build()
+            .unwrap(),
+            jwt_encoding_key: signing_key(),
+            jwt_decoding_key: decoding_key(),
+            cors_origin: "http://localhost:8080".into(),
+        };
+        let token = issue_jwt(Uuid::new_v4(), "alice", Uuid::new_v4(), &signing_key()).unwrap();
+        let (mut parts, _) = axum::http::Request::builder()
+            .header(AUTHORIZATION, format!("Bearer {token}"))
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        let Err(rejection) = AuthUser::from_request_parts(&mut parts, &state).await else {
+            panic!("authentication succeeded without a denylist check");
+        };
+        assert_eq!(
+            rejection.into_response().status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 
     #[test]
